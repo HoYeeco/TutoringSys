@@ -10,7 +10,7 @@
 
     <el-card shadow="never" class="filter-card">
       <div class="filter-container">
-        <el-select v-model="filterForm.courseId" placeholder="按课程筛选" class="filter-item">
+        <el-select v-model="filterForm.courseId" placeholder="按课程筛选" class="filter-item" clearable>
           <el-option
             v-for="course in courses"
             :key="course.courseId"
@@ -18,24 +18,18 @@
             :value="course.courseId"
           />
         </el-select>
-        <el-select v-model="filterForm.aiStatus" placeholder="按智能批改状态筛选" class="filter-item">
-          <el-option label="全部" value="" />
-          <el-option label="已完成" value="completed" />
-          <el-option label="异常" value="error" />
-        </el-select>
         <el-input
           v-model="filterForm.search"
           placeholder="按作业名、课程、学生姓名搜索"
           class="filter-item"
           clearable
+          @keyup.enter="handleSearch"
         >
           <template #prefix>
             <el-icon><Search /></el-icon>
           </template>
-          <template #suffix>
-            <el-button type="primary" @click="handleSearch">搜索</el-button>
-          </template>
         </el-input>
+        <el-button type="primary" @click="handleSearch">搜索</el-button>
       </div>
     </el-card>
 
@@ -43,24 +37,26 @@
       <template #header>
         <div class="card-header">
           <span>待复核列表</span>
-          <el-button type="primary" @click="handleBatchReview">批量复核</el-button>
+          <el-button type="primary" @click="handleBatchAdopt" :disabled="selectedSubmissions.length === 0">
+            批量采用AI评分
+          </el-button>
         </div>
       </template>
       <el-table
         :data="submissions"
         style="width: 100%"
-        @sort-change="handleSortChange"
+        @selection-change="handleSelectionChange"
+        v-loading="loading"
       >
-        <el-table-column prop="assignmentName" label="作业名称" min-width="180" />
+        <el-table-column type="selection" width="55" />
+        <el-table-column prop="assignmentTitle" label="作业名称" min-width="180" />
         <el-table-column prop="courseName" label="所属课程" min-width="150" />
         <el-table-column prop="studentName" label="学生姓名" width="120" />
-        <el-table-column prop="submitTime" label="提交时间" width="180" sortable />
-        <el-table-column prop="aiStatus" label="智能批改状态" width="120" sortable>
+        <el-table-column prop="submitTime" label="提交时间" width="180" />
+        <el-table-column prop="aiGradingStatus" label="智能批改状态" width="120">
           <template #default="scope">
-            <el-tag
-              :type="scope.row.aiStatus === 'completed' ? 'success' : 'danger'"
-            >
-              {{ scope.row.aiStatus === 'completed' ? '已完成' : '异常' }}
+            <el-tag :type="scope.row.aiGradingStatus === '已完成' ? 'success' : 'danger'">
+              {{ scope.row.aiGradingStatus }}
             </el-tag>
           </template>
         </el-table-column>
@@ -92,133 +88,105 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import { Search } from '@element-plus/icons-vue';
-import { useRequest } from '@/composables/useRequest';
 import request from '@/utils/request';
 
 const router = useRouter();
 
 const filterForm = ref({
   courseId: '',
-  aiStatus: '',
   search: ''
 });
 
 const currentPage = ref(1);
 const pageSize = ref(10);
 const total = ref(0);
+const loading = ref(false);
+const selectedSubmissions = ref<any[]>([]);
 
-const courses = ref([
-  { courseId: 1, courseName: '计算机导论' },
-  { courseId: 2, courseName: '数据结构' },
-  { courseId: 3, courseName: '算法设计与分析' }
-]);
+const courses = ref<any[]>([]);
+const submissions = ref<any[]>([]);
 
-const submissions = ref([
-  {
-    submissionId: 1,
-    assignmentName: '数据结构作业1',
-    courseName: '数据结构',
-    studentName: '张三',
-    submitTime: '2024-01-15 14:30:00',
-    aiStatus: 'completed'
-  },
-  {
-    submissionId: 2,
-    assignmentName: '算法作业2',
-    courseName: '算法设计与分析',
-    studentName: '李四',
-    submitTime: '2024-01-15 15:45:00',
-    aiStatus: 'completed'
-  },
-  {
-    submissionId: 3,
-    assignmentName: '计算机导论作业3',
-    courseName: '计算机导论',
-    studentName: '王五',
-    submitTime: '2024-01-15 16:20:00',
-    aiStatus: 'error'
-  },
-  {
-    submissionId: 4,
-    assignmentName: '数据结构作业2',
-    courseName: '数据结构',
-    studentName: '赵六',
-    submitTime: '2024-01-15 17:10:00',
-    aiStatus: 'completed'
-  },
-  {
-    submissionId: 5,
-    assignmentName: '算法作业1',
-    courseName: '算法设计与分析',
-    studentName: '钱七',
-    submitTime: '2024-01-15 18:00:00',
-    aiStatus: 'completed'
-  }
-]);
-
-total.value = submissions.value.length;
-
-const getSubmissions = async () => {
+const getCourses = async () => {
   try {
-    // 实际项目中调用接口
-    // const response = await request.get('/teacher/grading/submissions', {
-    //   params: {
-    //     page: currentPage.value,
-    //     pageSize: pageSize.value,
-    //     courseId: filterForm.value.courseId,
-    //     aiStatus: filterForm.value.aiStatus,
-    //     search: filterForm.value.search
-    //   }
-    // });
-    // return response.data;
-    
-    // 模拟数据
-    return {
-      list: submissions.value,
-      total: submissions.value.length
-    };
+    const response = await request.get('/teacher/courses');
+    courses.value = (response.data || []).map((c: any) => ({
+      courseId: c.id,
+      courseName: c.name
+    }));
   } catch (error) {
-    ElMessage.error('获取待复核列表失败');
-    return null;
+    console.error('获取课程列表失败:', error);
   }
 };
 
-const { execute: fetchSubmissions } = useRequest(getSubmissions);
+const getSubmissions = async () => {
+  loading.value = true;
+  try {
+    const response = await request.get('/teacher/review/pending', {
+      params: {
+        page: currentPage.value,
+        size: pageSize.value,
+        courseId: filterForm.value.courseId || undefined,
+        keyword: filterForm.value.search || undefined
+      }
+    });
+    submissions.value = response.data?.records || [];
+    total.value = response.data?.total || 0;
+  } catch (error) {
+    ElMessage.error('获取待复核列表失败');
+    submissions.value = [];
+    total.value = 0;
+  } finally {
+    loading.value = false;
+  }
+};
 
 const handleSearch = () => {
   currentPage.value = 1;
-  fetchSubmissions();
-};
-
-const handleSortChange = (sort: any) => {
-  // 处理排序逻辑
-  console.log('排序', sort);
+  getSubmissions();
 };
 
 const handleSizeChange = (size: number) => {
   pageSize.value = size;
-  fetchSubmissions();
+  getSubmissions();
 };
 
 const handleCurrentChange = (current: number) => {
   currentPage.value = current;
-  fetchSubmissions();
+  getSubmissions();
 };
 
-const viewReviewDetail = (submissionId: number) => {
+const handleSelectionChange = (selection: any[]) => {
+  selectedSubmissions.value = selection;
+};
+
+const viewReviewDetail = (submissionId: string) => {
   router.push(`/teacher/grading/detail/${submissionId}`);
 };
 
-const handleBatchReview = () => {
-  router.push('/teacher/grading/batch');
+const handleBatchAdopt = async () => {
+  if (selectedSubmissions.value.length === 0) {
+    ElMessage.warning('请选择要批量复核的提交');
+    return;
+  }
+  
+  try {
+    const submissionIds = selectedSubmissions.value.map(s => s.submissionId);
+    await request.post('/teacher/review/batch-adopt', submissionIds);
+    ElMessage.success('批量采用AI评分成功');
+    getSubmissions();
+  } catch (error) {
+    ElMessage.error('批量采用AI评分失败');
+  }
 };
 
-// 初始加载数据
-fetchSubmissions();
+onMounted(() => {
+  getCourses();
+  getSubmissions();
+});
 </script>
 
 <style scoped>
@@ -248,7 +216,6 @@ fetchSubmissions();
 
 .filter-item {
   min-width: 200px;
-  flex: 1;
 }
 
 .pagination-container {
@@ -257,23 +224,7 @@ fetchSubmissions();
   justify-content: flex-end;
 }
 
-@media (max-width: 768px) {
-  .filter-container {
-    flex-direction: column;
-  }
-  
-  .filter-item {
-    width: 100%;
-  }
-  
-  .card-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 10px;
-  }
-  
-  .pagination-container {
-    justify-content: center;
-  }
+.mt-4 {
+  margin-top: 16px;
 }
 </style>
