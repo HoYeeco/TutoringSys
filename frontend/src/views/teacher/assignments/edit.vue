@@ -1,5 +1,11 @@
 <template>
   <div class="teacher-assignment-edit">
+    <!-- 右侧草稿箱图标 -->
+    <div class="draft-box-icon" @click="openDraftBox">
+      <el-icon class="icon"><Document /></el-icon>
+      <el-badge v-if="drafts.length > 0" :value="drafts.length" />
+    </div>
+
     <el-card shadow="never" class="page-header">
       <template #header>
         <div class="card-header">
@@ -7,10 +13,10 @@
         </div>
       </template>
       <el-form :model="assignment" label-width="100px">
-        <el-form-item label="作业标题">
+        <el-form-item label="作业标题" required>
           <el-input v-model="assignment.title" placeholder="请输入作业标题" />
         </el-form-item>
-        <el-form-item label="所属课程">
+        <el-form-item label="所属课程" required>
           <el-select v-model="assignment.courseId" placeholder="选择课程">
             <el-option
               v-for="course in courses"
@@ -20,7 +26,19 @@
             />
           </el-select>
         </el-form-item>
-        <el-form-item label="截止时间">
+        <el-form-item label="总分值">
+          <el-input v-model="totalScore" disabled style="width: 100px" />
+          <span class="score-hint">（自动累加题目分值）</span>
+        </el-form-item>
+        <el-form-item label="补充说明">
+          <el-input
+            v-model="assignment.description"
+            type="textarea"
+            rows="3"
+            placeholder="请输入补充说明"
+          />
+        </el-form-item>
+        <el-form-item label="截止时间" required>
           <el-date-picker
             v-model="assignment.deadline"
             type="datetime"
@@ -34,22 +52,28 @@
     <el-card shadow="never" class="mt-4">
       <template #header>
         <div class="card-header">
-          <span>题目管理</span>
+          <span>题目配置</span>
           <div>
             <el-button type="primary" @click="openQuestionBankDialog">从题库选择</el-button>
-            <el-button type="success" @click="addQuestion">添加题目</el-button>
+            <el-button type="success" @click="openQuestionTypeDialog">添加题目</el-button>
           </div>
         </div>
       </template>
       
-      <div v-for="(question, index) in questions" :key="question.id" class="question-card">
+      <div v-if="questions.length === 0" class="empty-questions">
+        <el-button type="success" @click="openQuestionTypeDialog">
+          <el-icon><Plus /></el-icon> 添加题目
+        </el-button>
+      </div>
+      
+      <div v-else v-for="(question, index) in questions" :key="question.id" class="question-card">
         <div class="question-header">
           <span class="question-number">{{ index + 1 }}.</span>
-          <el-select v-model="question.type" placeholder="选择题型" style="width: 120px">
+          <el-select v-model="question.type" placeholder="选择题型" style="width: 120px" @change="handleQuestionTypeChange(question)">
             <el-option label="单选题" value="single" />
             <el-option label="多选题" value="multiple" />
             <el-option label="判断题" value="judgment" />
-            <el-option label="简答题" value="essay" />
+            <el-option label="主观题" value="essay" />
           </el-select>
           <el-button
             type="danger"
@@ -61,17 +85,15 @@
         </div>
         
         <el-form :model="question" label-width="80px" class="mt-2">
-          <el-form-item label="题目内容">
-            <el-input
-              v-model="question.content"
-              type="textarea"
-              rows="3"
-              placeholder="请输入题目内容"
-            />
+          <el-form-item label="题目内容" required>
+            <div class="rich-text-editor">
+              <div ref="editorRefs[question.id]" class="quill-editor"></div>
+            </div>
           </el-form-item>
           
           <el-form-item label="选项" v-if="['single', 'multiple'].includes(question.type)">
             <div v-for="(option, optIndex) in question.options" :key="optIndex" class="option-item">
+              <span class="option-label">{{ String.fromCharCode(65 + optIndex) }}.</span>
               <el-input
                 v-model="option.value"
                 placeholder="请输入选项内容"
@@ -81,6 +103,7 @@
                 type="danger"
                 size="small"
                 @click="removeOption(question, optIndex)"
+                :disabled="question.options.length <= 3"
               >
                 删除
               </el-button>
@@ -89,19 +112,23 @@
               type="primary"
               size="small"
               @click="addOption(question)"
+              :disabled="question.options.length >= 9"
             >
               添加选项
             </el-button>
+            <div class="option-hint">
+              选项数量：{{ question.options.length }}/9（最少3个，最多9个）
+            </div>
           </el-form-item>
           
-          <el-form-item label="答案">
+          <el-form-item label="标准答案" required v-if="['single', 'multiple', 'judgment'].includes(question.type)">
             <el-input
               v-model="question.correctAnswer"
               placeholder="请输入答案"
             />
           </el-form-item>
           
-          <el-form-item label="分值">
+          <el-form-item label="分值" required>
             <el-input-number
               v-model="question.score"
               :min="1"
@@ -109,6 +136,36 @@
               style="width: 100px"
             />
           </el-form-item>
+          
+          <!-- 主观题特有设置 -->
+          <template v-if="question.type === 'essay'">
+            <el-form-item label="字数限制">
+              <div class="word-limit">
+                <el-input-number
+                  v-model="question.minWords"
+                  :min="0"
+                  style="width: 100px"
+                  placeholder="最小"
+                />
+                <span class="word-limit-separator">-</span>
+                <el-input-number
+                  v-model="question.maxWords"
+                  :min="0"
+                  style="width: 100px"
+                  placeholder="最大"
+                />
+                <span class="word-limit-hint">（0表示无限制）</span>
+              </div>
+            </el-form-item>
+            <el-form-item label="参考答案">
+              <div class="rich-text-editor">
+                <div ref="answerEditorRefs[question.id]" class="quill-editor"></div>
+              </div>
+              <div class="answer-hint">
+                AI大模型将基于参考答案抓取关键词及逻辑关系以打分并生成评语
+              </div>
+            </el-form-item>
+          </template>
         </el-form>
       </div>
       
@@ -118,9 +175,34 @@
     </el-card>
 
     <div class="action-buttons mt-4">
-      <el-button @click="saveDraft">保存草稿</el-button>
-      <el-button type="primary" @click="publishAssignment">发布作业</el-button>
+      <el-button @click="previewAssignment">预览模式</el-button>
+      <el-button @click="saveDraft">预设发布</el-button>
+      <el-button type="primary" @click="publishAssignment">现在发布</el-button>
     </div>
+
+    <!-- 题型选择弹窗 -->
+    <el-dialog
+      v-model="questionTypeDialogVisible"
+      title="选择题型"
+      width="400px"
+    >
+      <div class="question-type-list">
+        <div
+          v-for="type in questionTypes"
+          :key="type.value"
+          class="question-type-item"
+          @click="addQuestionByType(type.value)"
+        >
+          <el-icon class="type-icon">{{ type.icon }}</el-icon>
+          <span class="type-name">{{ type.label }}</span>
+        </div>
+      </div>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="questionTypeDialogVisible = false">取消</el-button>
+        </span>
+      </template>
+    </el-dialog>
 
     <!-- 题库选择弹窗 -->
     <el-dialog
@@ -146,15 +228,47 @@
         </span>
       </template>
     </el-dialog>
+
+    <!-- 草稿箱弹窗 -->
+    <el-dialog
+      v-model="draftBoxDialogVisible"
+      title="草稿箱"
+      width="600px"
+    >
+      <el-empty v-if="drafts.length === 0" description="暂无草稿" />
+      <div v-else class="draft-list">
+        <el-card
+          v-for="draft in drafts"
+          :key="draft.id"
+          class="draft-item"
+          @click="loadDraft(draft.id)"
+        >
+          <div class="draft-header">
+            <span class="draft-title">{{ draft.title }}</span>
+            <span class="draft-course">{{ draft.courseName }}</span>
+          </div>
+          <div class="draft-info">
+            <span class="draft-time">保存时间：{{ formatDate(draft.saveTime) }}</span>
+            <span class="draft-questions">{{ draft.questionCount }}道题目</span>
+          </div>
+        </el-card>
+      </div>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="draftBoxDialogVisible = false">关闭</el-button>
+        </span>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import { useRequest } from '@/composables/useRequest';
-import request from '@/utils/request';
+import { Document, Plus, Check, Delete, Edit } from '@element-plus/icons-vue';
+import Quill from 'quill';
+import 'quill/dist/quill.snow.css';
 
 const route = useRoute();
 const router = useRouter();
@@ -165,6 +279,7 @@ const assignment = ref({
   id: '',
   title: '',
   courseId: '',
+  description: '',
   deadline: ''
 });
 
@@ -174,17 +289,7 @@ const courses = ref([
   { id: 3, name: '算法设计与分析' }
 ]);
 
-const questions = ref([
-  {
-    id: 1,
-    type: 'single',
-    content: '',
-    options: [{ value: '' }, { value: '' }, { value: '' }, { value: '' }],
-    correctAnswer: '',
-    score: 10
-  }
-]);
-
+const questions = ref([]);
 const questionBank = ref([
   {
     id: 1,
@@ -211,7 +316,39 @@ const questionBank = ref([
   }
 ]);
 
+const drafts = ref([
+  {
+    id: 1,
+    title: '第一章 计算机基础作业',
+    courseName: '计算机导论',
+    saveTime: new Date(Date.now() - 3600000).toISOString(),
+    questionCount: 3
+  },
+  {
+    id: 2,
+    title: '第二章 数据结构作业',
+    courseName: '数据结构',
+    saveTime: new Date(Date.now() - 7200000).toISOString(),
+    questionCount: 2
+  }
+]);
+
+const questionTypes = [
+  { label: '单选题', value: 'single', icon: Check },
+  { label: '多选题', value: 'multiple', icon: Check },
+  { label: '判断题', value: 'judgment', icon: Check },
+  { label: '主观题', value: 'essay', icon: Edit }
+];
+
+const questionTypeDialogVisible = ref(false);
 const questionBankDialogVisible = ref(false);
+const draftBoxDialogVisible = ref(false);
+
+const editorRefs = ref({});
+const answerEditorRefs = ref({});
+const editors = ref({});
+const answerEditors = ref({});
+const autoSaveTimer = ref(null);
 
 const totalScore = computed(() => {
   return questions.value.reduce((sum, question) => sum + (question.score || 0), 0);
@@ -222,20 +359,44 @@ const getQuestionTypeText = (type: string) => {
     single: '单选题',
     multiple: '多选题',
     judgment: '判断题',
-    essay: '简答题'
+    essay: '主观题'
   };
   return typeMap[type] || type;
 };
 
-const addQuestion = () => {
-  questions.value.push({
+const openQuestionTypeDialog = () => {
+  questionTypeDialogVisible.value = true;
+};
+
+const addQuestionByType = (type: string) => {
+  const newQuestion = {
     id: Date.now(),
-    type: 'single',
+    type: type,
     content: '',
-    options: [{ value: '' }, { value: '' }, { value: '' }, { value: '' }],
+    options: type === 'single' || type === 'multiple' ? [{ value: '' }, { value: '' }, { value: '' }] : [],
     correctAnswer: '',
-    score: 10
+    score: 10,
+    minWords: 0,
+    maxWords: 0,
+    referenceAnswer: ''
+  };
+  questions.value.push(newQuestion);
+  questionTypeDialogVisible.value = false;
+  
+  // 初始化编辑器
+  nextTick(() => {
+    initQuillEditors();
   });
+};
+
+const handleQuestionTypeChange = (question: any) => {
+  if (question.type === 'single' || question.type === 'multiple') {
+    if (!question.options || question.options.length < 3) {
+      question.options = [{ value: '' }, { value: '' }, { value: '' }];
+    }
+  } else {
+    question.options = [];
+  }
 };
 
 const removeQuestion = (index: number) => {
@@ -249,37 +410,55 @@ const removeQuestion = (index: number) => {
 };
 
 const addOption = (question: any) => {
-  question.options.push({ value: '' });
+  if (question.options.length < 9) {
+    question.options.push({ value: '' });
+  }
 };
 
 const removeOption = (question: any, index: number) => {
-  if (question.options.length > 2) {
+  if (question.options.length > 3) {
     question.options.splice(index, 1);
-  } else {
-    ElMessage.warning('至少需要两个选项');
   }
 };
 
 const openQuestionBankDialog = () => {
-  // 实际项目中调用接口获取题库
   questionBankDialogVisible.value = true;
 };
 
 const confirmSelectQuestions = () => {
-  // 实际项目中处理选中的题目
   questionBankDialogVisible.value = false;
   ElMessage.success('题目添加成功');
 };
 
+const openDraftBox = () => {
+  draftBoxDialogVisible.value = true;
+};
+
+const loadDraft = (draftId: number) => {
+  ElMessageBox.confirm('你将查看该草稿，当前页面未保存内容可能丢失，是否继续？', '提示', {
+    confirmButtonText: '确定',
+    cancelButtonText: '取消',
+    type: 'warning'
+  }).then(() => {
+    // 模拟加载草稿
+    ElMessage.success('草稿加载成功');
+    draftBoxDialogVisible.value = false;
+  });
+};
+
 const saveDraft = async () => {
   try {
-    // 实际项目中调用接口
-    // const response = await request.post('/teacher/assignments/draft', {
-    //   ...assignment.value,
-    //   questions: questions.value
-    // });
+    // 收集编辑器内容
+    questions.value.forEach(question => {
+      if (editors.value[question.id]) {
+        question.content = editors.value[question.id].root.innerHTML;
+      }
+      if (question.type === 'essay' && answerEditors.value[question.id]) {
+        question.referenceAnswer = answerEditors.value[question.id].root.innerHTML;
+      }
+    });
     
-    // 模拟成功
+    // 实际项目中调用接口
     ElMessage.success('草稿保存成功');
   } catch (error) {
     ElMessage.error('保存草稿失败');
@@ -306,69 +485,101 @@ const publishAssignment = async () => {
       return;
     }
     
-    // 实际项目中调用接口
-    // const response = await request.post('/teacher/assignments/publish', {
-    //   ...assignment.value,
-    //   questions: questions.value
-    // });
+    // 收集编辑器内容
+    questions.value.forEach(question => {
+      if (editors.value[question.id]) {
+        question.content = editors.value[question.id].root.innerHTML;
+      }
+      if (question.type === 'essay' && answerEditors.value[question.id]) {
+        question.referenceAnswer = answerEditors.value[question.id].root.innerHTML;
+      }
+    });
     
-    // 模拟成功
-    ElMessage.success('作业发布成功');
-    router.push('/teacher/courses');
+    ElMessageBox.confirm('确定要发布作业吗？发布后将通知所有学生。', '提示', {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning'
+    }).then(() => {
+      // 实际项目中调用接口
+      ElMessage.success('作业发布成功');
+      router.push('/teacher/courses');
+    });
   } catch (error) {
     ElMessage.error('发布作业失败');
   }
 };
 
-const getAssignmentDetail = async () => {
-  try {
-    // 实际项目中调用接口
-    // const response = await request.get(`/teacher/assignments/${assignmentId.value}`);
-    // return response.data;
-    
-    // 模拟数据
-    return {
-      assignment: {
-        id: 1,
-        title: '第一章 计算机基础作业',
-        courseId: 1,
-        deadline: '2026-03-10 23:59:59'
-      },
-      questions: [
-        {
-          id: 1,
-          type: 'single',
-          content: '计算机的基本组成部分不包括以下哪项？',
-          options: [{ value: 'CPU' }, { value: '内存' }, { value: '硬盘' }, { value: '打印机' }],
-          correctAnswer: 'D',
-          score: 10
-        },
-        {
-          id: 2,
-          type: 'multiple',
-          content: '以下哪些是计算机的输入设备？',
-          options: [{ value: '键盘' }, { value: '鼠标' }, { value: '显示器' }, { value: '打印机' }],
-          correctAnswer: 'A,B',
-          score: 15
-        }
-      ]
-    };
-  } catch (error) {
-    ElMessage.error('获取作业详情失败');
-    return null;
-  }
+const previewAssignment = () => {
+  // 预览模式，实际项目中应该打开预览页面
+  ElMessage.info('预览模式功能开发中');
 };
 
-const { execute: fetchAssignmentDetail } = useRequest(getAssignmentDetail);
+const initQuillEditors = () => {
+  questions.value.forEach(question => {
+    // 题目内容编辑器
+    if (!editors.value[question.id] && editorRefs.value[question.id]) {
+      const editor = new Quill(editorRefs.value[question.id], {
+        theme: 'snow',
+        modules: {
+          toolbar: [
+            ['bold', 'italic', 'underline', 'strike'],
+            ['blockquote', 'code-block'],
+            [{ 'header': 1 }, { 'header': 2 }],
+            [{ 'list': 'ordered' }, { 'list': 'bullet' }],
+            [{ 'color': [] }, { 'background': [] }],
+            ['image'],
+            ['clean']
+          ],
+          syntax: true
+        },
+        placeholder: '请输入题目内容...'
+      });
+      editors.value[question.id] = editor;
+    }
+    
+    // 参考答案编辑器（仅主观题）
+    if (question.type === 'essay' && !answerEditors.value[question.id] && answerEditorRefs.value[question.id]) {
+      const editor = new Quill(answerEditorRefs.value[question.id], {
+        theme: 'snow',
+        modules: {
+          toolbar: [
+            ['bold', 'italic', 'underline', 'strike'],
+            ['blockquote', 'code-block'],
+            [{ 'header': 1 }, { 'header': 2 }],
+            [{ 'list': 'ordered' }, { 'list': 'bullet' }],
+            [{ 'color': [] }, { 'background': [] }],
+            ['image'],
+            ['clean']
+          ],
+          syntax: true
+        },
+        placeholder: '请输入参考答案...'
+      });
+      answerEditors.value[question.id] = editor;
+    }
+  });
+};
+
+const startAutoSave = () => {
+  autoSaveTimer.value = window.setInterval(() => {
+    saveDraft();
+  }, 60000); // 每分钟自动保存
+};
+
+const formatDate = (date: string) => {
+  return new Date(date).toLocaleString('zh-CN');
+};
 
 onMounted(() => {
-  if (isEdit.value) {
-    fetchAssignmentDetail().then(data => {
-      if (data) {
-        assignment.value = data.assignment;
-        questions.value = data.questions;
-      }
-    });
+  startAutoSave();
+  nextTick(() => {
+    initQuillEditors();
+  });
+});
+
+onUnmounted(() => {
+  if (autoSaveTimer.value) {
+    clearInterval(autoSaveTimer.value);
   }
 });
 </script>
@@ -376,6 +587,28 @@ onMounted(() => {
 <style scoped>
 .teacher-assignment-edit {
   padding: 20px;
+  position: relative;
+}
+
+.draft-box-icon {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  width: 50px;
+  height: 50px;
+  background-color: #409eff;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+  z-index: 1000;
+}
+
+.draft-box-icon .icon {
+  font-size: 24px;
+  color: white;
 }
 
 .page-header {
@@ -386,6 +619,11 @@ onMounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+
+.empty-questions {
+  text-align: center;
+  padding: 40px 0;
 }
 
 .question-card {
@@ -413,8 +651,59 @@ onMounted(() => {
   margin-bottom: 8px;
 }
 
+.option-label {
+  width: 20px;
+  margin-right: 8px;
+  font-weight: 500;
+}
+
 .option-item .el-button {
   margin-left: 12px;
+}
+
+.option-hint {
+  font-size: 12px;
+  color: #909399;
+  margin-top: 8px;
+}
+
+.score-hint {
+  margin-left: 12px;
+  font-size: 14px;
+  color: #909399;
+}
+
+.word-limit {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.word-limit-separator {
+  font-size: 16px;
+  color: #909399;
+}
+
+.word-limit-hint {
+  margin-left: 12px;
+  font-size: 14px;
+  color: #909399;
+}
+
+.answer-hint {
+  font-size: 12px;
+  color: #909399;
+  margin-top: 8px;
+}
+
+.rich-text-editor {
+  margin-bottom: 12px;
+}
+
+.quill-editor {
+  min-height: 100px;
+  border: 1px solid #dcdfe6;
+  border-radius: 4px;
 }
 
 .total-score {
@@ -428,5 +717,94 @@ onMounted(() => {
   display: flex;
   justify-content: flex-end;
   gap: 12px;
+}
+
+.question-type-list {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20px;
+}
+
+.question-type-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 20px;
+  border: 1px solid #ebeef5;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.question-type-item:hover {
+  border-color: #409eff;
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+}
+
+.type-icon {
+  font-size: 32px;
+  color: #409eff;
+  margin-bottom: 10px;
+}
+
+.type-name {
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.draft-list {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.draft-item {
+  margin-bottom: 12px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.draft-item:hover {
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+}
+
+.draft-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.draft-title {
+  font-weight: 500;
+  font-size: 16px;
+}
+
+.draft-course {
+  font-size: 14px;
+  color: #909399;
+}
+
+.draft-info {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: #909399;
+}
+
+@media (max-width: 768px) {
+  .card-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  
+  .action-buttons {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .question-type-list {
+    grid-template-columns: 1fr;
+  }
 }
 </style>
