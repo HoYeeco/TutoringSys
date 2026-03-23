@@ -1,65 +1,78 @@
 package com.tutoringsys.api.controller.student;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
-import com.tutoringsys.api.dto.GradingReportVo;
-import com.tutoringsys.api.dto.StudentAssignmentVo;
-import com.tutoringsys.api.dto.SubmissionDto;
-import com.tutoringsys.api.dto.SubmissionListItemVo;
+import com.tutoringsys.common.dto.AssignmentListVo;
+import com.tutoringsys.common.dto.GradingReportVo;
+import com.tutoringsys.common.dto.SubmissionDto;
 import com.tutoringsys.common.response.R;
+import com.tutoringsys.common.util.SecurityUtil;
 import com.tutoringsys.service.StudentAssignmentService;
-import io.github.resilience4j.ratelimiter.annotation.RateLimiter;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
+import java.util.Map;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/student/assignments")
-@PreAuthorize("hasRole('STUDENT')")
 @Tag(name = "学生作业管理", description = "学生作业相关接口")
 public class StudentAssignmentController {
 
     @Resource
     private StudentAssignmentService studentAssignmentService;
 
-    @GetMapping("/list")
-    @Operation(summary = "获取作业列表", description = "获取学生的作业列表，支持分页和状态筛选")
-    public R<IPage<StudentAssignmentVo>> getAssignmentList(
-            @Parameter(description = "页码，默认1") @RequestParam(defaultValue = "1") int page,
-            @Parameter(description = "每页大小，默认10") @RequestParam(defaultValue = "10") int size,
-            @Parameter(description = "作业状态，可选值：pending, graded") @RequestParam(required = false) String status) {
-        IPage<StudentAssignmentVo> assignmentPage = studentAssignmentService.getAssignmentList(page, size, status);
-        return R.ok(assignmentPage);
-    }
-
-    @GetMapping("/history")
-    @Operation(summary = "获取历史记录", description = "获取学生的作业提交历史记录")
-    public R<IPage<SubmissionListItemVo>> getHistoryRecord(
-            @Parameter(description = "页码，默认1") @RequestParam(defaultValue = "1") int page,
-            @Parameter(description = "每页大小，默认10") @RequestParam(defaultValue = "10") int size) {
-        IPage<SubmissionListItemVo> historyPage = studentAssignmentService.getSubmissionHistory(page, size);
-        return R.ok(historyPage);
-    }
-
     @PostMapping("/submit/{assignmentId}")
-    @RateLimiter(name = "submitAssignment")
-    @Operation(summary = "提交作业", description = "提交作业答案，支持客观题和主观题")
+    @Operation(summary = "提交作业", description = "提交作业答案，系统自动批改")
     public R<GradingReportVo> submitAssignment(
-            @Parameter(description = "作业ID") @PathVariable Long assignmentId, 
-            @Parameter(description = "作业提交数据") @RequestBody SubmissionDto dto) {
-        dto.setAssignmentId(assignmentId);
-        GradingReportVo result = studentAssignmentService.submitAssignment(dto);
+            @Parameter(description = "作业ID") @PathVariable Long assignmentId,
+            @Parameter(description = "提交数据") @RequestBody SubmissionDto dto) {
+        Long studentId = SecurityUtil.getCurrentUserId();
+        if (dto.getSubmissionId() == null || dto.getSubmissionId().isEmpty()) {
+            dto.setSubmissionId(UUID.randomUUID().toString());
+        }
+        GradingReportVo report = studentAssignmentService.submitAssignment(assignmentId, studentId, dto);
+        return R.ok(report);
+    }
+
+    @PostMapping("/draft/{assignmentId}")
+    @Operation(summary = "保存草稿", description = "保存作业草稿")
+    public R<Boolean> saveDraft(
+            @Parameter(description = "作业ID") @PathVariable Long assignmentId,
+            @Parameter(description = "草稿数据") @RequestBody SubmissionDto dto) {
+        Long studentId = SecurityUtil.getCurrentUserId();
+        boolean result = studentAssignmentService.saveDraft(assignmentId, studentId, dto);
         return R.ok(result);
     }
 
-    @GetMapping("/report/{submissionId}")
-    @Operation(summary = "获取批改报告", description = "获取作业批改报告，包含得分和反馈")
-    public R<GradingReportVo> getGradingReport(
-            @Parameter(description = "提交记录ID") @PathVariable String submissionId) {
-        GradingReportVo report = studentAssignmentService.getSubmissionReport(submissionId);
-        return R.ok(report);
+    @GetMapping("/draft/{assignmentId}")
+    @Operation(summary = "获取草稿", description = "获取学生作业草稿")
+    public R<SubmissionDto> getDraft(
+            @Parameter(description = "作业ID") @PathVariable Long assignmentId) {
+        Long studentId = SecurityUtil.getCurrentUserId();
+        SubmissionDto draft = studentAssignmentService.getDraft(assignmentId, studentId);
+        return R.ok(draft);
+    }
+
+    @GetMapping("/list")
+    @Operation(summary = "获取作业列表", description = "获取学生作业列表，支持分页和筛选")
+    public R<IPage<AssignmentListVo>> getAssignmentList(
+            @Parameter(description = "页码，默认1") @RequestParam(defaultValue = "1") int page,
+            @Parameter(description = "每页大小，默认10") @RequestParam(defaultValue = "10") int size,
+            @Parameter(description = "作业状态") @RequestParam(required = false) String status) {
+        Long studentId = SecurityUtil.getCurrentUserId();
+        IPage<AssignmentListVo> assignmentPage = studentAssignmentService.getAssignmentList(studentId, page, size, status);
+        return R.ok(assignmentPage);
+    }
+
+    @GetMapping("/{assignmentId}")
+    @Operation(summary = "获取作业详情", description = "获取作业详情及题目列表")
+    public R<Map<String, Object>> getAssignmentDetail(
+            @Parameter(description = "作业ID") @PathVariable Long assignmentId) {
+        Long studentId = SecurityUtil.getCurrentUserId();
+        Map<String, Object> detail = studentAssignmentService.getAssignmentDetail(assignmentId, studentId);
+        return R.ok(detail);
     }
 }

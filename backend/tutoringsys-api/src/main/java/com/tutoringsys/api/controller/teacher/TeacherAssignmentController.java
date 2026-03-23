@@ -1,12 +1,7 @@
 package com.tutoringsys.api.controller.teacher;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
-import com.tutoringsys.api.dto.AssignmentCreateDto;
-import com.tutoringsys.api.dto.AssignmentUpdateDto;
-import com.tutoringsys.api.dto.AssignmentVo;
-import com.tutoringsys.api.dto.GradingReportVo;
-import com.tutoringsys.api.dto.ReviewDto;
-import com.tutoringsys.api.dto.SubmissionListItemVo;
+import com.tutoringsys.common.dto.*;
 import com.tutoringsys.common.response.R;
 import com.tutoringsys.service.TeacherAssignmentService;
 import io.swagger.v3.oas.annotations.Operation;

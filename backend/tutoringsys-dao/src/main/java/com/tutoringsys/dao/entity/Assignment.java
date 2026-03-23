@@ -12,10 +12,9 @@ public class Assignment {
     private Long courseId;
     private String title;
     private String description;
-    private Date startTime;
-    private Date endTime;
-    private Integer status;
+    private Date deadline;
     private Integer totalScore;
+    private String status;
     private Date createTime;
     private Date updateTime;
 }

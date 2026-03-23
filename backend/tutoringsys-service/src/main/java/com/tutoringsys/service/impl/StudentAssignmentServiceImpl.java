@@ -1,39 +1,27 @@
 package com.tutoringsys.service.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.tutoringsys.common.dto.StudentAssignmentVo;
-import com.tutoringsys.common.exception.BusinessException;
-import com.tutoringsys.dao.entity.Assignment;
-import com.tutoringsys.dao.entity.Course;
-import com.tutoringsys.dao.entity.CourseStudent;
-import com.tutoringsys.dao.entity.StudentAnswer;
-import com.tutoringsys.dao.mapper.AssignmentMapper;
-import com.tutoringsys.dao.mapper.CourseMapper;
-import com.tutoringsys.dao.mapper.CourseStudentMapper;
-import com.tutoringsys.dao.mapper.StudentAnswerMapper;
+import com.tutoringsys.common.dto.AssignmentListVo;
 import com.tutoringsys.common.dto.GradingReportVo;
-import com.tutoringsys.common.dto.QuestionReportVo;
 import com.tutoringsys.common.dto.SubmissionDto;
+import com.tutoringsys.common.exception.BusinessException;
+import com.tutoringsys.common.util.HtmlUtils;
+import com.tutoringsys.dao.entity.*;
+import com.tutoringsys.dao.mapper.*;
 import com.tutoringsys.llm.LLMService;
+import com.tutoringsys.service.MessageService;
 import com.tutoringsys.service.StudentAssignmentService;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
-import java.util.ArrayList;
-import java.util.UUID;
+import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
-import java.util.Date;
-import java.util.List;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 public class StudentAssignmentServiceImpl implements StudentAssignmentService {
-
-    @Resource
-    private CourseStudentMapper courseStudentMapper;
-
-    @Resource
-    private CourseMapper courseMapper;
 
     @Resource
     private AssignmentMapper assignmentMapper;
@@ -42,197 +30,265 @@ public class StudentAssignmentServiceImpl implements StudentAssignmentService {
     private StudentAnswerMapper studentAnswerMapper;
 
     @Resource
+    private HtmlUtils htmlUtils;
+
+    @Resource
+    private QuestionMapper questionMapper;
+
+    @Resource
     private LLMService llmService;
 
+    @Resource
+    private MessageService messageService;
+
+    @Resource
+    private CourseStudentMapper courseStudentMapper;
+
+    @Resource
+    private CourseMapper courseMapper;
+
     @Override
-    public IPage<StudentAssignmentVo> getAssignmentList(int page, int size, String status) {
-        // 获取当前登录学生ID
-        Long studentId = getCurrentStudentId();
-
-        // 查询学生已选课
-        List<CourseStudent> courseStudents = courseStudentMapper.selectList(
-                new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<CourseStudent>()
-                        .lambda().eq(CourseStudent::getStudentId, studentId)
-        );
-
-        if (courseStudents.isEmpty()) {
-            return new Page<>();
+    @Transactional
+    public GradingReportVo submitAssignment(Long assignmentId, Long studentId, SubmissionDto dto) {
+        Assignment assignment = assignmentMapper.selectById(assignmentId);
+        if (assignment == null) {
+            throw new BusinessException("作业不存在");
         }
 
-        // 提取课程ID列表
-        List<Long> courseIds = courseStudents.stream()
-                .map(CourseStudent::getCourseId)
-                .toList();
+        if (assignment.getDeadline() != null && new Date().after(assignment.getDeadline())) {
+            throw new BusinessException("作业已逾期，无法提交");
+        }
 
-        // 查询课程信息
-        List<Course> courses = courseMapper.selectBatchIds(courseIds);
-
-        // 查询作业信息
-        List<Assignment> assignments = assignmentMapper.selectList(
-                new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<Assignment>()
-                        .lambda().in(Assignment::getCourseId, courseIds)
+        long count = studentAnswerMapper.selectCount(
+                new LambdaQueryWrapper<StudentAnswer>()
+                        .eq(StudentAnswer::getAssignmentId, assignmentId)
+                        .eq(StudentAnswer::getStudentId, studentId)
         );
 
-        // 构建返回数据
-        Page<StudentAssignmentVo> resultPage = new Page<>(page, size);
-        List<StudentAssignmentVo> voList = assignments.stream()
-                .map(assignment -> {
-                    StudentAssignmentVo vo = new StudentAssignmentVo();
-                    vo.setId(assignment.getId());
-                    vo.setTitle(assignment.getTitle());
-                    vo.setDeadline(assignment.getEndTime());
-                    vo.setCreateTime(assignment.getCreateTime());
+        if (count > 0) {
+            throw new BusinessException("作业已提交，无法重复提交");
+        }
 
-                    // 查找课程名称
-                    Course course = courses.stream()
-                            .filter(c -> c.getId().equals(assignment.getCourseId()))
-                            .findFirst()
-                            .orElse(null);
-                    if (course != null) {
-                        vo.setCourseName(course.getName());
-                    }
+        GradingReportVo report = new GradingReportVo();
+        int studentScore = 0;
+        int totalScore = 0;
 
-                    // 计算状态
-                    Date now = new Date();
-                    if (now.after(assignment.getEndTime())) {
-                        vo.setStatus("graded");
-                    } else {
-                        vo.setStatus("pending");
-                    }
+        for (SubmissionDto.AnswerDto answerDto : dto.getAnswers()) {
+            Question question = questionMapper.selectById(answerDto.getQuestionId());
+            if (question == null) {
+                continue;
+            }
+            totalScore += question.getScore();
 
-                    // 这里需要查询学生是否已提交，以及得分情况
-                    // 暂时设为0
-                    vo.setScore(0);
+            StudentAnswer studentAnswer = new StudentAnswer();
+            studentAnswer.setAssignmentId(assignmentId);
+            studentAnswer.setStudentId(studentId);
+            studentAnswer.setQuestionId(answerDto.getQuestionId());
+            String sanitizedAnswer = htmlUtils.sanitizeHtml(answerDto.getAnswerContent());
+            studentAnswer.setAnswer(sanitizedAnswer);
+            studentAnswer.setAnswerContent(sanitizedAnswer);
+            studentAnswer.setSubmitTime(new Date());
+            studentAnswer.setStatus(1);
+            studentAnswer.setCreateTime(new Date());
+            studentAnswer.setUpdateTime(new Date());
+            studentAnswer.setVersion(1);
 
-                    return vo;
-                })
-                .filter(vo -> status == null || vo.getStatus().equals(status))
-                .toList();
+            if ("single".equals(question.getType()) || "multiple".equals(question.getType()) || "judgment".equals(question.getType())) {
+                if (answerDto.getAnswerContent().equals(question.getAnswer())) {
+                    studentAnswer.setScore(question.getScore());
+                    studentAnswer.setFinalScore(question.getScore());
+                    studentAnswer.setFeedback("回答正确");
+                } else {
+                    studentAnswer.setScore(0);
+                    studentAnswer.setFinalScore(0);
+                    studentAnswer.setFeedback("回答错误，正确答案：" + question.getAnswer());
+                }
+                studentAnswer.setGraderType("AUTO");
+            } else if ("essay".equals(question.getType())) {
+                String feedback = llmService.generateFeedback(sanitizedAnswer, question.getContent());
+                studentAnswer.setAiFeedback(feedback);
+                studentAnswer.setFeedback(feedback);
+                studentAnswer.setAiScore(question.getScore() * 80 / 100);
+                studentAnswer.setScore(studentAnswer.getAiScore());
+                studentAnswer.setGraderType("AI");
+                studentAnswer.setStatus(2);
+                studentAnswer.setReviewStatus(0);
+            }
 
-        resultPage.setRecords(voList);
-        resultPage.setTotal(voList.size());
+            studentScore += studentAnswer.getScore();
+            studentAnswerMapper.insert(studentAnswer);
+        }
+
+        report.setStudentScore(studentScore);
+        report.setTotalScore(totalScore > 0 ? totalScore : 100);
+
+        messageService.sendMessage(
+                studentId,
+                "作业批改完成",
+                "您的作业已批改完成，请查看批改报告。",
+                "grading",
+                assignmentId,
+                "assignment"
+        );
+
+        Course course = courseMapper.selectById(assignment.getCourseId());
+        if (course != null) {
+            messageService.sendMessage(
+                    course.getTeacherId(),
+                    "待复核提醒",
+                    "有学生提交了作业需要复核，请及时处理。",
+                    "grading",
+                    assignmentId,
+                    "assignment"
+            );
+        }
+
+        return report;
+    }
+
+    @Override
+    public boolean saveDraft(Long assignmentId, Long studentId, SubmissionDto dto) {
+        Assignment assignment = assignmentMapper.selectById(assignmentId);
+        if (assignment == null) {
+            throw new BusinessException("作业不存在");
+        }
+        return true;
+    }
+
+    @Override
+    public SubmissionDto getDraft(Long assignmentId, Long studentId) {
+        Assignment assignment = assignmentMapper.selectById(assignmentId);
+        if (assignment == null) {
+            throw new BusinessException("作业不存在");
+        }
+        return new SubmissionDto();
+    }
+
+    @Override
+    public IPage<AssignmentListVo> getAssignmentList(Long studentId, int page, int size, String status) {
+        Page<AssignmentListVo> resultPage = new Page<>(page, size);
+        List<AssignmentListVo> assignments = new ArrayList<>();
+
+        if (studentId == null) {
+            resultPage.setTotal(0);
+            resultPage.setRecords(assignments);
+            return resultPage;
+        }
+
+        LambdaQueryWrapper<CourseStudent> csWrapper = new LambdaQueryWrapper<>();
+        csWrapper.eq(CourseStudent::getStudentId, studentId);
+        List<CourseStudent> courseStudents = courseStudentMapper.selectList(csWrapper);
+
+        List<Long> courseIds = courseStudents.stream()
+                .map(CourseStudent::getCourseId)
+                .collect(Collectors.toList());
+
+        if (courseIds.isEmpty()) {
+            resultPage.setTotal(0);
+            resultPage.setRecords(assignments);
+            return resultPage;
+        }
+
+        LambdaQueryWrapper<Assignment> assignmentWrapper = new LambdaQueryWrapper<>();
+        assignmentWrapper.in(Assignment::getCourseId, courseIds);
+        assignmentWrapper.orderByDesc(Assignment::getCreateTime);
+        List<Assignment> allAssignments = assignmentMapper.selectList(assignmentWrapper);
+
+        Date now = new Date();
+        for (Assignment assignment : allAssignments) {
+            AssignmentListVo vo = new AssignmentListVo();
+            vo.setId(assignment.getId());
+            vo.setTitle(assignment.getTitle());
+            vo.setCourseId(assignment.getCourseId());
+            vo.setDeadline(assignment.getDeadline());
+            vo.setCreateTime(assignment.getCreateTime());
+            vo.setTotalScore(assignment.getTotalScore());
+
+            Course course = courseMapper.selectById(assignment.getCourseId());
+            vo.setCourseName(course != null ? course.getName() : "未知课程");
+
+            LambdaQueryWrapper<StudentAnswer> answerWrapper = new LambdaQueryWrapper<>();
+            answerWrapper.eq(StudentAnswer::getStudentId, studentId);
+            answerWrapper.eq(StudentAnswer::getAssignmentId, assignment.getId());
+            List<StudentAnswer> answers = studentAnswerMapper.selectList(answerWrapper);
+
+            if (answers.isEmpty()) {
+                if (assignment.getDeadline() != null && now.after(assignment.getDeadline())) {
+                    vo.setStatus("overdue");
+                } else {
+                    vo.setStatus("pending");
+                }
+            } else {
+                boolean allGraded = answers.stream()
+                        .allMatch(a -> a.getFinalScore() != null || a.getScore() != null);
+
+                if (allGraded) {
+                    vo.setStatus("graded");
+                    int totalScore = answers.stream()
+                            .mapToInt(a -> a.getFinalScore() != null ? a.getFinalScore() : (a.getScore() != null ? a.getScore() : 0))
+                            .sum();
+                    vo.setScore(totalScore);
+                } else {
+                    vo.setStatus("grading");
+                }
+            }
+
+            if (status == null || status.isEmpty() || status.equals(vo.getStatus())) {
+                assignments.add(vo);
+            }
+        }
+
+        int total = assignments.size();
+        int start = (page - 1) * size;
+        int end = Math.min(start + size, total);
+        List<AssignmentListVo> pageAssignments = start < total ? assignments.subList(start, end) : new ArrayList<>();
+
+        resultPage.setTotal(total);
+        resultPage.setRecords(pageAssignments);
 
         return resultPage;
     }
 
     @Override
-    public IPage<Object> getHistoryRecord(int page, int size) {
-        // 获取当前登录学生ID
-        Long studentId = getCurrentStudentId();
-
-        // 这里需要查询学生的历史提交记录
-        // 暂时返回空页面
-        return new Page<>();
-    }
-
-    private Long getCurrentStudentId() {
-        // 从SecurityContext中获取当前用户ID
-        // 这里简化处理，实际需要从JWT或Session中获取
-        return 1L;
-    }
-
-    @Override
-    public boolean submitAssignment(SubmissionDto dto) {
-        // 获取当前登录学生ID
-        Long studentId = getCurrentStudentId();
-
-        // 校验作业存在
-        Assignment assignment = assignmentMapper.selectById(dto.getAssignmentId());
+    public Map<String, Object> getAssignmentDetail(Long assignmentId, Long studentId) {
+        Map<String, Object> result = new HashMap<>();
+        
+        Assignment assignment = assignmentMapper.selectById(assignmentId);
         if (assignment == null) {
             throw new BusinessException("作业不存在");
         }
-
-        // 校验作业未过期
-        if (new Date().after(assignment.getEndTime())) {
-            throw new BusinessException("作业已过期");
+        
+        Map<String, Object> assignmentMap = new HashMap<>();
+        assignmentMap.put("id", assignment.getId());
+        assignmentMap.put("title", assignment.getTitle());
+        assignmentMap.put("totalScore", assignment.getTotalScore());
+        assignmentMap.put("deadline", assignment.getDeadline());
+        assignmentMap.put("description", assignment.getDescription());
+        
+        Course course = courseMapper.selectById(assignment.getCourseId());
+        assignmentMap.put("courseName", course != null ? course.getName() : "未知课程");
+        
+        result.put("assignment", assignmentMap);
+        
+        LambdaQueryWrapper<Question> questionWrapper = new LambdaQueryWrapper<>();
+        questionWrapper.eq(Question::getAssignmentId, assignmentId);
+        questionWrapper.orderByAsc(Question::getSortOrder);
+        List<Question> questionList = questionMapper.selectList(questionWrapper);
+        
+        List<Map<String, Object>> questions = new ArrayList<>();
+        for (Question question : questionList) {
+            Map<String, Object> questionMap = new HashMap<>();
+            questionMap.put("id", question.getId());
+            questionMap.put("type", question.getType());
+            questionMap.put("content", question.getContent());
+            questionMap.put("options", question.getOptions());
+            questionMap.put("score", question.getScore());
+            questionMap.put("maxWords", question.getMaxWords());
+            questionMap.put("minWords", question.getMinWords());
+            questions.add(questionMap);
         }
-
-        // 生成唯一的submission_id
-        String submissionId = UUID.randomUUID().toString();
-
-        // 遍历题目，保存答案
-        for (SubmissionDto.AnswerDto answerDto : dto.getAnswers()) {
-            StudentAnswer studentAnswer = new StudentAnswer();
-            studentAnswer.setSubmissionId(submissionId);
-            studentAnswer.setStudentId(studentId);
-            studentAnswer.setAssignmentId(dto.getAssignmentId());
-            studentAnswer.setQuestionId(answerDto.getQuestionId());
-            studentAnswer.setAnswerContent(answerDto.getAnswerContent());
-            studentAnswer.setCreateTime(new Date());
-
-            // 这里需要根据题目类型判断是否为客观题
-            // 暂时简化处理，假设都是主观题
-            studentAnswer.setGraderType("llm");
-
-            // 调用LLM生成反馈
-            String feedback = llmService.generateFeedback(answerDto.getAnswerContent(), "");
-            studentAnswer.setFeedback(feedback);
-
-            studentAnswerMapper.insert(studentAnswer);
-        }
-
-        return true;
-    }
-
-    @Override
-    public GradingReportVo getGradingReport(String submissionId) {
-        // 获取当前登录学生ID
-        Long studentId = getCurrentStudentId();
-
-        // 查询该submissionId的所有学生答案
-        List<StudentAnswer> studentAnswers = studentAnswerMapper.selectList(
-                new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<StudentAnswer>()
-                        .lambda().eq(StudentAnswer::getSubmissionId, submissionId)
-        );
-
-        if (studentAnswers.isEmpty()) {
-            throw new BusinessException("提交记录不存在");
-        }
-
-        // 确保这些答案属于当前学生
-        boolean isOwner = studentAnswers.stream()
-                .allMatch(answer -> answer.getStudentId().equals(studentId));
-        if (!isOwner) {
-            throw new BusinessException("无权限查看该报告");
-        }
-
-        // 构建批改报告
-        GradingReportVo reportVo = new GradingReportVo();
-
-        // 获取作业标题
-        Long assignmentId = studentAnswers.get(0).getAssignmentId();
-        Assignment assignment = assignmentMapper.selectById(assignmentId);
-        if (assignment != null) {
-            reportVo.setAssignmentTitle(assignment.getTitle());
-        }
-
-        // 构建题目报告列表
-        List<QuestionReportVo> questionReports = new ArrayList<>();
-        int totalScore = 0;
-        int studentScore = 0;
-
-        for (StudentAnswer answer : studentAnswers) {
-            QuestionReportVo questionReport = new QuestionReportVo();
-            questionReport.setQuestionId(answer.getQuestionId());
-            questionReport.setStudentAnswer(answer.getAnswerContent());
-            questionReport.setScore(answer.getScore() != null ? answer.getScore() : 0);
-            questionReport.setFeedback(answer.getFeedback());
-
-            // 这里需要查询题目内容和标准答案
-            // 暂时简化处理
-            questionReport.setQuestionContent("题目内容");
-            questionReport.setCorrectAnswer("标准答案");
-            questionReport.setErrorType("概念错误");
-
-            questionReports.add(questionReport);
-            studentScore += questionReport.getScore();
-            totalScore += 10; // 假设每题10分
-        }
-
-        reportVo.setQuestions(questionReports);
-        reportVo.setTotalScore(totalScore);
-        reportVo.setStudentScore(studentScore);
-
-        return reportVo;
+        result.put("questions", questions);
+        
+        return result;
     }
 }
