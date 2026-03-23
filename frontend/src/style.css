@@ -8,27 +8,25 @@
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 
-  /* 昼夜模式变量 */
-  --color-primary: #646cff;
+  --color-primary: #409eff;
   --color-primary-hover: #535bf2;
-  --color-background: #ffffff;
-  --color-text: #213547;
-  --color-card: #f9f9f9;
-  --color-border: #e5e7eb;
+  --color-background: #f5f7fa;
+  --color-text: #303133;
+  --color-card: #ffffff;
+  --color-border: #dcdfe6;
   --color-button: #f9f9f9;
   --color-button-hover: #e5e7eb;
 }
 
-/* 深色模式 */
-.dark {
-  --color-primary: #646cff;
-  --color-primary-hover: #535bf2;
-  --color-background: #242424;
-  --color-text: rgba(255, 255, 255, 0.87);
+html.dark {
+  --color-primary: #5d9eff;
+  --color-primary-hover: #6ea8fe;
+  --color-background: #0a0a0a;
+  --color-text: #e0e0e0;
   --color-card: #1a1a1a;
-  --color-border: #374151;
+  --color-border: #333333;
   --color-button: #1a1a1a;
-  --color-button-hover: #374151;
+  --color-button-hover: #333333;
 }
 
 a {
@@ -89,7 +87,6 @@ button:focus-visible {
   text-align: center;
 }
 
-/* 响应式设计 */
 @media (max-width: 768px) {
   h1 {
     font-size: 2.5em;
@@ -110,7 +107,46 @@ button:focus-visible {
   }
 }
 
-/* 平滑过渡 */
 * {
   transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+}
+
+.el-aside {
+  background-color: var(--color-menu-bg, #ffffff);
+  transition: width 0.3s ease;
+}
+
+.el-menu {
+  border-right: none !important;
+  background-color: transparent !important;
+}
+
+.el-menu-item {
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.el-menu-item:hover {
+  background-color: var(--color-menu-active-bg, #ecf5ff) !important;
+}
+
+.el-menu-item.is-active {
+  color: var(--color-primary) !important;
+  background-color: var(--color-menu-active-bg, #ecf5ff) !important;
+}
+
+.el-header {
+  background-color: var(--color-header-bg, #ffffff);
+}
+
+.el-main {
+  background-color: var(--color-background);
+}
+
+.el-card {
+  background-color: var(--color-card);
+  border-color: var(--color-border);
+}
+
+.el-table {
+  background-color: var(--color-card) !important;
 }
