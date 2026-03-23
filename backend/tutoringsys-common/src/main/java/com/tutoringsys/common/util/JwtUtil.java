@@ -12,7 +12,7 @@ import java.util.Date;
 @Component
 public class JwtUtil {
 
-    @Value("${jwt.secret:your-256-bit-secret}")
+    @Value("${jwt.secret:your-256-bit-secret-key-for-jwt-token-generation-and-validation}")
     private String secret;
 
     @Value("${jwt.expiration:86400000}") // 默认24小时
