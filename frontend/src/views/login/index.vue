@@ -60,7 +60,6 @@ import { ref, onMounted, onBeforeUnmount } from 'vue';
 import { useRouter } from 'vue-router';
 import { useUserStore } from '@/stores/user';
 import { ElMessage } from 'element-plus';
-import { View, Hide } from '@element-plus/icons-vue';
 import request from '@/utils/request';
 
 // 声明全局变量
@@ -337,16 +336,16 @@ const handleLogin = async () => {
     });
     
     if (response.code === 200) {
-      userStore.initialize();
       userStore.setToken(response.data.token);
       userStore.setUserInfo(response.data.userInfo);
+      ElMessage.success('登录成功');
       router.push('/dashboard');
     } else {
       ElMessage.error('登录失败，请检查用户名和密码');
     }
   } catch (error) {
     console.error('登录错误:', error);
-    ElMessage.error('登录失败，请稍后重试');
+    ElMessage.error('登录失败，请检查用户名和密码');
   } finally {
     loading.value = false;
   }
