@@ -1,0 +1,60 @@
+# ==================== IDE 相关 ====================
+# IntelliJ IDEA (backend/.idea 目录)
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+# Eclipse
+.classpath
+.project
+.settings/
+bin/
+# VS Code
+.vscode/
+*.code-workspace
+# ==================== 编译/构建产物 ====================
+# Maven 编译产物（backend 各模块target）
+**/target/
+# Gradle（若有）
+.gradle/
+build/
+# 前端编译/打包产物
+frontend/dist/
+frontend/.dist/
+# 后端调试日志
+**/debug.log
+# ==================== 依赖/缓存文件 ====================
+# 前端npm依赖
+frontend/node_modules/
+# npm缓存
+frontend/package-lock.json
+frontend/yarn.lock
+# 前端缓存
+frontend/.pnpm-store/
+frontend/.nuxt/
+# 后端Maven本地仓库
+.m2/
+# ==================== 系统/临时文件 ====================
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.tmp
+*.bak
+# Mac
+.DS_Store
+.AppleDouble
+.LSOverride
+# Linux
+*~
+# 日志文件
+*.log
+*.logs/
+# ==================== 环境配置 ====================
+# 前端环境变量（若包含敏感信息，如API密钥）
+frontend/.env.development
+frontend/.env.production
+# 后端配置（若包含密码/密钥，建议仅过滤敏感配置，或用配置中心）
+# backend/tutoringsys-api/src/main/resources/application-dev.yml
