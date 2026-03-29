@@ -5,42 +5,50 @@
         <canvas id="demo-canvas"></canvas>
         <div class="logo_box">
           <div class="logo-image">
-            <img src="@/assets/images/Scoututor.png" alt="Scoututor" class="logo-img">
+            <img
+              src="@/assets/images/Scoututor.png"
+              alt="Scoututor"
+              class="logo-img"
+            />
           </div>
           <form @submit.prevent="handleRegister">
             <!-- 账号输入 -->
             <div class="input_outer">
-              <input 
+              <input
                 v-model="username"
-                class="text-input" 
-                type="text" 
+                class="text-input"
+                type="text"
                 placeholder="请输入账号"
                 autocomplete="username"
-              >
+              />
             </div>
-            
+
             <!-- 真实姓名输入 -->
             <div class="input_outer">
-              <input 
+              <input
                 v-model="realName"
-                class="text-input" 
-                type="text" 
+                class="text-input"
+                type="text"
                 placeholder="请输入姓名"
                 autocomplete="name"
-              >
+              />
             </div>
-            
+
             <!-- 角色选择 -->
             <div class="input_outer">
               <div class="custom-select-container">
                 <div class="custom-select" @click="toggleDropdown">
-                  <span class="select-value">{{ roleDisplay || '请选择角色' }}</span>
-                  <span class="select-arrow">{{ isDropdownOpen ? '▼' : '▲' }}</span>
+                  <span class="select-value">{{
+                    roleDisplay || '请选择角色'
+                  }}</span>
+                  <span class="select-arrow">{{
+                    isDropdownOpen ? '▼' : '▲'
+                  }}</span>
                 </div>
                 <div v-if="isDropdownOpen" class="dropdown-menu">
-                  <div 
-                    v-for="item in roleOptions" 
-                    :key="item.value" 
+                  <div
+                    v-for="item in roleOptions"
+                    :key="item.value"
                     class="dropdown-item"
                     @click="selectRole(item)"
                   >
@@ -49,63 +57,69 @@
                 </div>
               </div>
             </div>
-            
+
             <!-- 邮箱输入 -->
             <div class="input_outer">
-              <input 
+              <input
                 v-model="email"
-                class="text-input" 
-                type="email" 
+                class="text-input"
+                type="email"
                 placeholder="请输入邮箱"
                 autocomplete="email"
-              >
+              />
             </div>
-            
+
             <!-- 电话输入 -->
             <div class="input_outer">
-              <input 
+              <input
                 v-model="phone"
-                class="text-input" 
-                type="tel" 
+                class="text-input"
+                type="tel"
                 placeholder="请输入电话"
                 autocomplete="tel"
-              >
+              />
             </div>
-            
+
             <!-- 密码输入 -->
             <div class="input_outer">
-              <input 
+              <input
                 v-model="password"
-                class="text-input" 
-                :type="showPassword ? 'text' : 'password'" 
+                class="text-input"
+                :type="showPassword ? 'text' : 'password'"
                 placeholder="请输入密码"
                 autocomplete="password"
+              />
+              <span
+                class="password-toggle"
+                @click="showPassword = !showPassword"
               >
-              <span class="password-toggle" @click="showPassword = !showPassword">
                 <el-icon v-if="showPassword"><Hide /></el-icon>
                 <el-icon v-else><View /></el-icon>
               </span>
             </div>
-            
+
             <!-- 确认密码输入 -->
             <div class="input_outer">
-              <input 
+              <input
                 v-model="confirmPassword"
-                class="text-input" 
-                :type="showConfirmPassword ? 'text' : 'password'" 
+                class="text-input"
+                :type="showConfirmPassword ? 'text' : 'password'"
                 placeholder="请确认密码"
                 autocomplete="new-password"
+              />
+              <span
+                class="password-toggle"
+                @click="showConfirmPassword = !showConfirmPassword"
               >
-              <span class="password-toggle" @click="showConfirmPassword = !showConfirmPassword">
                 <el-icon v-if="showConfirmPassword"><Hide /></el-icon>
                 <el-icon v-else><View /></el-icon>
               </span>
             </div>
-            
+
             <!-- 注册按钮 -->
             <div class="button-container">
-              <button 
-                type="button" 
+              <button
+                type="button"
                 class="register-button"
                 @click="handleRegister"
                 :disabled="loading"
@@ -113,7 +127,7 @@
                 {{ loading ? '注册中...' : '注册' }}
               </button>
             </div>
-            
+
             <!-- 登录链接 -->
             <div class="login-link">
               已有账号？
@@ -155,7 +169,7 @@ const router = useRouter();
 // 角色选项
 const roleOptions = [
   { label: '学生', value: 'STUDENT' },
-  { label: '教师', value: 'TEACHER' }
+  { label: '教师', value: 'TEACHER' },
 ];
 
 // 切换下拉框
@@ -180,16 +194,24 @@ const handleClickOutside = (e: MouseEvent) => {
 
 // 注册处理函数
 const handleRegister = async () => {
-  if (!username.value || !realName.value || !role.value || !email.value || !phone.value || !password.value || !confirmPassword.value) {
+  if (
+    !username.value ||
+    !realName.value ||
+    !role.value ||
+    !email.value ||
+    !phone.value ||
+    !password.value ||
+    !confirmPassword.value
+  ) {
     ElMessage.warning('请填写所有必填字段');
     return;
   }
-  
+
   if (password.value !== confirmPassword.value) {
     ElMessage.warning('两次输入的密码不一致');
     return;
   }
-  
+
   loading.value = true;
   try {
     const response = await request.post('/auth/register', {
@@ -198,9 +220,9 @@ const handleRegister = async () => {
       role: role.value,
       email: email.value,
       phone: phone.value,
-      password: password.value
+      password: password.value,
     });
-    
+
     if (response.code === 200) {
       ElMessage.success('注册成功，请等待管理员审核，审核通过后即可登录');
       router.push('/login');
@@ -216,14 +238,14 @@ const handleRegister = async () => {
 };
 
 // 动画相关变量
-let width: number, 
-    height: number, 
-    largeHeader: HTMLElement | null, 
-    canvas: HTMLCanvasElement | null, 
-    ctx: CanvasRenderingContext2D | null, 
-    points: any[], 
-    target: {x: number, y: number}, 
-    animateHeader = true;
+let width: number,
+  height: number,
+  largeHeader: HTMLElement | null,
+  canvas: HTMLCanvasElement | null,
+  ctx: CanvasRenderingContext2D | null,
+  points: any[],
+  target: { x: number; y: number },
+  animateHeader = true;
 let animationFrame: number;
 
 // 加载脚本
@@ -272,7 +294,7 @@ const initHeader = () => {
 
   canvas = document.getElementById('demo-canvas') as HTMLCanvasElement;
   if (!canvas) return;
-  
+
   canvas.width = width;
   canvas.height = height;
   ctx = canvas.getContext('2d');
@@ -281,8 +303,8 @@ const initHeader = () => {
   points = [];
   for (let x = 0; x < width; x = x + width / 20) {
     for (let y = 0; y < height; y = y + height / 20) {
-      const px = x + Math.random() * width / 20;
-      const py = y + Math.random() * height / 20;
+      const px = x + (Math.random() * width) / 20;
+      const py = y + (Math.random() * height) / 20;
       const p = { x: px, originX: px, y: py, originY: py };
       points.push(p);
     }
@@ -320,7 +342,11 @@ const initHeader = () => {
 
   // 为每个点分配一个圆
   for (const i in points) {
-    const c = new Circle(points[i], 2 + Math.random() * 2, 'rgba(255,255,255,0.3)');
+    const c = new Circle(
+      points[i],
+      2 + Math.random() * 2,
+      'rgba(255,255,255,0.3)',
+    );
     points[i].circle = c;
   }
 };
@@ -336,13 +362,18 @@ const addListeners = () => {
 };
 
 const mouseMove = (e: MouseEvent) => {
-  let posx = 0, posy = 0;
+  let posx = 0,
+    posy = 0;
   if (e.pageX || e.pageY) {
     posx = e.pageX;
     posy = e.pageY;
   } else if (e.clientX || e.clientY) {
-    posx = e.clientX + document.body.scrollLeft + document.documentElement.scrollLeft;
-    posy = e.clientY + document.body.scrollTop + document.documentElement.scrollTop;
+    posx =
+      e.clientX +
+      document.body.scrollLeft +
+      document.documentElement.scrollLeft;
+    posy =
+      e.clientY + document.body.scrollTop + document.documentElement.scrollTop;
   }
   target.x = posx;
   target.y = posy;
@@ -412,15 +443,18 @@ const shiftPoint = (p: any) => {
       ease: Circ.easeInOut,
       onComplete: () => {
         shiftPoint(p);
-      }
+      },
     });
   } else {
     // 如果 TweenLite 不可用，使用简单的 setTimeout 作为降级方案
-    setTimeout(() => {
-      p.x = p.originX - 50 + Math.random() * 100;
-      p.y = p.originY - 50 + Math.random() * 100;
-      shiftPoint(p);
-    }, 1000 + Math.random() * 1000);
+    setTimeout(
+      () => {
+        p.x = p.originX - 50 + Math.random() * 100;
+        p.y = p.originY - 50 + Math.random() * 100;
+        shiftPoint(p);
+      },
+      1000 + Math.random() * 1000,
+    );
   }
 };
 
@@ -468,7 +502,7 @@ const getDistance = (p1: any, p2: any) => {
 onMounted(async () => {
   // 先加载脚本
   await loadScripts();
-  
+
   // 确保DOM元素存在后初始化动画
   if (document.getElementById('demo-canvas')) {
     // 延迟一点确保脚本完全初始化
@@ -530,7 +564,7 @@ onBeforeUnmount(() => {
   width: 400px;
   height: 550px;
   padding: 35px;
-  color: #EEE;
+  color: #eee;
   position: absolute;
   left: 50%;
   top: 33%;
@@ -557,7 +591,7 @@ onBeforeUnmount(() => {
   margin-bottom: 15px;
   border-radius: 50px;
   position: relative;
-  border: rgba(255,255,255,0.2) 2px solid;
+  border: rgba(255, 255, 255, 0.2) 2px solid;
   display: flex;
   align-items: center;
   background: transparent;
@@ -568,10 +602,15 @@ onBeforeUnmount(() => {
   flex: 1;
   height: 100%;
   outline: none;
-  font: 20px "Microsoft YaHei", Helvetica, Tahoma, Arial, "Microsoft jhengHei";
+  font:
+    20px 'Microsoft YaHei',
+    Helvetica,
+    Tahoma,
+    Arial,
+    'Microsoft jhengHei';
   border: none;
   background: transparent;
-  color: #FFFFFF;
+  color: #ffffff;
   padding: 0 20px;
   box-sizing: border-box;
   text-align: center;
@@ -588,12 +627,12 @@ onBeforeUnmount(() => {
 }
 
 /* 隐藏浏览器默认的密码切换图标 */
-input[type="password"]::-ms-reveal,
-input[type="password"]::-ms-clear {
+input[type='password']::-ms-reveal,
+input[type='password']::-ms-clear {
   display: none;
 }
 
-input[type="password"]::-webkit-credentials-auto-fill-button {
+input[type='password']::-webkit-credentials-auto-fill-button {
   display: none !important;
   visibility: hidden;
   pointer-events: none;
@@ -602,7 +641,7 @@ input[type="password"]::-webkit-credentials-auto-fill-button {
 }
 
 /* 隐藏Chrome的密码管理器图标 */
-input[type="password"]::-webkit-password-toggle-button {
+input[type='password']::-webkit-password-toggle-button {
   display: none;
 }
 
@@ -687,7 +726,11 @@ input[type="password"]::-webkit-password-toggle-button {
 }
 
 .select-value {
-  font: 20px "Microsoft YaHei", Helvetica, Tahoma, Arial;
+  font:
+    20px 'Microsoft YaHei',
+    Helvetica,
+    Tahoma,
+    Arial;
   color: rgba(255, 255, 255, 0.7);
   text-align: center;
   flex: 1;
@@ -718,8 +761,12 @@ input[type="password"]::-webkit-password-toggle-button {
 
 .dropdown-item {
   padding: 12px 20px;
-  color:  rgba(255, 255, 255, 0.7);
-  font: 18px "Microsoft YaHei", Helvetica, Tahoma, Arial;
+  color: rgba(255, 255, 255, 0.7);
+  font:
+    18px 'Microsoft YaHei',
+    Helvetica,
+    Tahoma,
+    Arial;
   cursor: pointer;
   transition: background-color 0.3s;
   text-align: center;
@@ -750,7 +797,7 @@ input[type="password"]::-webkit-password-toggle-button {
   border-radius: 50px;
   background: rgba(0, 74, 114, 0.603);
   cursor: pointer;
-  color: #FFFFFF;
+  color: #ffffff;
   border: none;
   width: 100%;
   padding: 18px;
