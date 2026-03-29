@@ -110,7 +110,6 @@ const getMessages = async () => {
 
     const response = await request.get('/message/list', {
       params: {
-        userId: userStore.userInfo?.id,
         page: currentPage.value,
         size: pageSize.value,
         type,
@@ -118,7 +117,13 @@ const getMessages = async () => {
       }
     });
 
-    messages.value = response.data.records || [];
+    let records = response.data.records || [];
+    
+    if (activeTab.value === 'unread') {
+      records = records.filter((msg: any) => msg.isRead === 0);
+    }
+    
+    messages.value = records;
     total.value = response.data.total || 0;
   } catch (error) {
     console.error('获取消息列表失败:', error);
@@ -129,11 +134,7 @@ const getMessages = async () => {
 // 获取未读消息数量
 const getUnreadCount = async () => {
   try {
-    const response = await request.get('/message/unread-count', {
-      params: {
-        userId: userStore.userInfo?.id
-      }
-    });
+    const response = await request.get('/message/unread-count');
     unreadCount.value = response.data || 0;
   } catch (error) {
     console.error('获取未读消息数量失败:', error);
@@ -143,11 +144,7 @@ const getUnreadCount = async () => {
 // 标记消息为已读
 const markAsRead = async (messageId) => {
   try {
-    await request.put(`/message/read/${messageId}`, null, {
-      params: {
-        userId: userStore.userInfo?.id
-      }
-    });
+    await request.put(`/message/read/${messageId}`);
     // 更新本地消息状态
     const message = messages.value.find(msg => msg.id === messageId);
     if (message) {
@@ -164,11 +161,7 @@ const markAsRead = async (messageId) => {
 // 标记所有消息为已读
 const markAllAsRead = async () => {
   try {
-    await request.put('/message/read/all', null, {
-      params: {
-        userId: userStore.userInfo?.id
-      }
-    });
+    await request.put('/message/read-all');
     // 更新本地消息状态
     messages.value.forEach(message => {
       message.isRead = 1;
@@ -247,10 +240,8 @@ const getMessageTypeText = (type) => {
 
 // 页面加载时获取消息
 onMounted(() => {
-  if (userStore.userInfo?.id) {
-    getMessages();
-    getUnreadCount();
-  }
+  getMessages();
+  getUnreadCount();
 });
 </script>
 
