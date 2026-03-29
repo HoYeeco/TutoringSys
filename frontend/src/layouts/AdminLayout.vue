@@ -10,48 +10,57 @@
 
 <script setup lang="ts">
 import AppLayout from './AppLayout.vue';
-import { House, User, School, Setting, Bell, Monitor, Files, Notebook } from '@element-plus/icons-vue';
+import {
+  House,
+  User,
+  School,
+  Setting,
+  Bell,
+  Monitor,
+  Files,
+  Notebook,
+} from '@element-plus/icons-vue';
 
 const menuItems = [
   {
     path: '/dashboard',
     title: '首页',
-    icon: House
+    icon: House,
   },
   {
     path: '/admin/users',
     title: '用户管理',
-    icon: Files
+    icon: Files,
   },
   {
     path: '/admin/courses',
     title: '课程管理',
-    icon: School
+    icon: School,
   },
   {
     path: '/admin/assignments',
     title: '作业管理',
-    icon: Notebook
+    icon: Notebook,
   },
   {
     path: '/admin/monitoring',
     title: '系统监控',
-    icon: Monitor
+    icon: Monitor,
   },
   {
     path: '/admin/config',
     title: '配置管理',
-    icon: Setting
+    icon: Setting,
   },
   {
     path: '/messages',
     title: '消息通知',
-    icon: Bell
+    icon: Bell,
   },
   {
     path: '/profile',
     title: '个人中心',
-    icon: User
-  }
+    icon: User,
+  },
 ];
 </script>
