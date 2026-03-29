@@ -44,6 +44,10 @@ public class QwenServiceImpl implements QwenService {
     private static final String GRADING_SYSTEM_PROMPT = """
         你是一个专业的作业批改助手。请根据题目、参考答案和学生答案进行评分。
         
+        重要规则：
+        1. 如果学生答案为空、空白、或只有无意义字符（如"无"、"不知道"、"略"等），必须给0分
+        2. 学生未作答时，feedback应写"学生未作答"，errors写"未提交答案"，suggestions写建议学生认真作答
+        
         请以JSON格式返回评分结果，格式如下：
         {
             "score": <得分，整数>,
@@ -76,6 +80,15 @@ public class QwenServiceImpl implements QwenService {
 
     @Override
     public GradingResult gradeAnswer(String questionContent, String referenceAnswer, String studentAnswer, Integer maxScore) {
+        if (studentAnswer == null || studentAnswer.trim().isEmpty() || isNoAnswer(studentAnswer)) {
+            return GradingResult.builder()
+                .score(0)
+                .errors(java.util.List.of("学生未作答"))
+                .suggestions(java.util.List.of("建议学生认真完成作业"))
+                .feedback("学生未作答，得分为0分。")
+                .build();
+        }
+
         String userMessage = String.format("""
             题目：%s
             
@@ -86,6 +99,7 @@ public class QwenServiceImpl implements QwenService {
             满分：%d分
             
             请对学生的答案进行评分，返回JSON格式的结果。
+            注意：如果学生答案明显不完整或答非所问，应酌情扣分。
             """, questionContent, referenceAnswer, studentAnswer, maxScore);
 
         QwenResponse response = chatWithRetry(GRADING_SYSTEM_PROMPT, userMessage, maxRetries);
@@ -109,6 +123,21 @@ public class QwenServiceImpl implements QwenService {
             return null;
         }
         return response.getContent();
+    }
+
+    private boolean isNoAnswer(String answer) {
+        if (answer == null) return true;
+        String trimmed = answer.trim().toLowerCase();
+        if (trimmed.isEmpty()) return true;
+        
+        String[] noAnswerKeywords = {"无", "不知道", "略", "不会", "没做", "未答", "空", "none", "n/a", "null", "未作答"};
+        for (String keyword : noAnswerKeywords) {
+            if (trimmed.equals(keyword)) {
+                return true;
+            }
+        }
+        
+        return trimmed.length() < 3 && !trimmed.matches(".*[\\u4e00-\\u9fa5a-zA-Z0-9].*");
     }
 
     private QwenResponse doChat(String systemPrompt, String userMessage) {
