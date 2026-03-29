@@ -5,40 +5,47 @@
         <canvas id="demo-canvas"></canvas>
         <div class="logo_box">
           <div class="logo-image">
-            <img src="@/assets/images/Scoututor.png" alt="Scoututor" class="logo-img">
+            <img
+              src="@/assets/images/Scoututor.png"
+              alt="Scoututor"
+              class="logo-img"
+            />
           </div>
           <form @submit.prevent="handleLogin">
             <div class="input_outer">
               <span class="user"></span>
-              <input 
+              <input
                 v-model="username"
-                class="text" 
-                style="color: #FFFFFF !important" 
-                type="text" 
+                class="text"
+                style="color: #ffffff !important"
+                type="text"
                 placeholder="请输入账号"
-                autocomplete="username" 
-              >
+                autocomplete="username"
+              />
             </div>
             <div class="input_outer">
               <span class="user"></span>
-              <input 
+              <input
                 v-model="password"
-                class="text" 
-                style="color: #FFFFFF !important;" 
-                :type="showPassword ? 'text' : 'password'" 
+                class="text"
+                style="color: #ffffff !important"
+                :type="showPassword ? 'text' : 'password'"
                 placeholder="请输入密码"
-                autocomplete="password" 
+                autocomplete="password"
+              />
+              <span
+                class="password-toggle"
+                @click="showPassword = !showPassword"
               >
-              <span class="password-toggle" @click="showPassword = !showPassword">
                 <el-icon v-if="showPassword"><Hide /></el-icon>
                 <el-icon v-else><View /></el-icon>
               </span>
             </div>
             <div class="mb2">
-              <a 
-                class="act-but submit" 
-                href="javascript:;" 
-                style="color: #FFFFFF"
+              <a
+                class="act-but submit"
+                href="javascript:;"
+                style="color: #ffffff"
                 @click="handleLogin"
               >
                 {{ loading ? '登录中...' : '登录' }}
@@ -46,7 +53,9 @@
             </div>
             <div class="register-link">
               没有账号？
-              <a href="/register" style="color: #0096e6; text-decoration: none;">点击注册</a>
+              <a href="/register" style="color: #0096e6; text-decoration: none"
+                >点击注册</a
+              >
             </div>
           </form>
         </div>
@@ -60,6 +69,7 @@ import { ref, onMounted, onBeforeUnmount } from 'vue';
 import { useRouter } from 'vue-router';
 import { useUserStore } from '@/stores/user';
 import { ElMessage } from 'element-plus';
+import { View, Hide } from '@element-plus/icons-vue';
 import request from '@/utils/request';
 
 // 声明全局变量
@@ -74,14 +84,14 @@ const router = useRouter();
 const userStore = useUserStore();
 
 // 动画相关变量
-let width: number, 
-    height: number, 
-    largeHeader: HTMLElement | null, 
-    canvas: HTMLCanvasElement | null, 
-    ctx: CanvasRenderingContext2D | null, 
-    points: any[], 
-    target: {x: number, y: number}, 
-    animateHeader = true;
+let width: number,
+  height: number,
+  largeHeader: HTMLElement | null,
+  canvas: HTMLCanvasElement | null,
+  ctx: CanvasRenderingContext2D | null,
+  points: any[],
+  target: { x: number; y: number },
+  animateHeader = true;
 let animationFrame: number;
 
 // 加载脚本
@@ -130,7 +140,7 @@ const initHeader = () => {
 
   canvas = document.getElementById('demo-canvas') as HTMLCanvasElement;
   if (!canvas) return;
-  
+
   canvas.width = width;
   canvas.height = height;
   ctx = canvas.getContext('2d');
@@ -139,8 +149,8 @@ const initHeader = () => {
   points = [];
   for (let x = 0; x < width; x = x + width / 20) {
     for (let y = 0; y < height; y = y + height / 20) {
-      const px = x + Math.random() * width / 20;
-      const py = y + Math.random() * height / 20;
+      const px = x + (Math.random() * width) / 20;
+      const py = y + (Math.random() * height) / 20;
       const p = { x: px, originX: px, y: py, originY: py };
       points.push(p);
     }
@@ -178,7 +188,11 @@ const initHeader = () => {
 
   // 为每个点分配一个圆
   for (const i in points) {
-    const c = new Circle(points[i], 2 + Math.random() * 2, 'rgba(255,255,255,0.3)');
+    const c = new Circle(
+      points[i],
+      2 + Math.random() * 2,
+      'rgba(255,255,255,0.3)',
+    );
     points[i].circle = c;
   }
 };
@@ -193,13 +207,18 @@ const addListeners = () => {
 };
 
 const mouseMove = (e: MouseEvent) => {
-  let posx = 0, posy = 0;
+  let posx = 0,
+    posy = 0;
   if (e.pageX || e.pageY) {
     posx = e.pageX;
     posy = e.pageY;
   } else if (e.clientX || e.clientY) {
-    posx = e.clientX + document.body.scrollLeft + document.documentElement.scrollLeft;
-    posy = e.clientY + document.body.scrollTop + document.documentElement.scrollTop;
+    posx =
+      e.clientX +
+      document.body.scrollLeft +
+      document.documentElement.scrollLeft;
+    posy =
+      e.clientY + document.body.scrollTop + document.documentElement.scrollTop;
   }
   target.x = posx;
   target.y = posy;
@@ -269,15 +288,18 @@ const shiftPoint = (p: any) => {
       ease: Circ.easeInOut,
       onComplete: () => {
         shiftPoint(p);
-      }
+      },
     });
   } else {
     // 如果 TweenLite 不可用，使用简单的 setTimeout 作为降级方案
-    setTimeout(() => {
-      p.x = p.originX - 50 + Math.random() * 100;
-      p.y = p.originY - 50 + Math.random() * 100;
-      shiftPoint(p);
-    }, 1000 + Math.random() * 1000);
+    setTimeout(
+      () => {
+        p.x = p.originX - 50 + Math.random() * 100;
+        p.y = p.originY - 50 + Math.random() * 100;
+        shiftPoint(p);
+      },
+      1000 + Math.random() * 1000,
+    );
   }
 };
 
@@ -327,29 +349,22 @@ const handleLogin = async () => {
     ElMessage.warning('请输入用户名和密码');
     return;
   }
-  
+
   loading.value = true;
   try {
     const params = new URLSearchParams();
     params.append('username', username.value);
     params.append('password', password.value);
-    
+
     const response = await request.post('/auth/login', params, {
       headers: {
-        'Content-Type': 'application/x-www-form-urlencoded'
-      }
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
     });
-    
+
     if (response.code === 200) {
       userStore.setToken(response.data.token);
-      
-      const profileResponse = await request.get('/user/profile');
-      if (profileResponse.code === 200) {
-        userStore.setUserInfo(profileResponse.data);
-      } else {
-        userStore.setUserInfo(response.data);
-      }
-      
+      userStore.setUserInfo(response.data);
       ElMessage.success('登录成功');
       router.push('/dashboard');
     } else {
@@ -367,7 +382,7 @@ const handleLogin = async () => {
 onMounted(async () => {
   // 先加载脚本
   await loadScripts();
-  
+
   // 确保DOM元素存在后初始化动画
   if (document.getElementById('demo-canvas')) {
     // 延迟一点确保脚本完全初始化
@@ -412,7 +427,7 @@ onBeforeUnmount(() => {
   width: 400px;
   height: 500px;
   padding: 35px;
-  color: #EEE;
+  color: #eee;
   position: absolute;
   left: 50%;
   top: 50%;
@@ -438,7 +453,7 @@ onBeforeUnmount(() => {
   margin-bottom: 30px;
   border-radius: 50px;
   position: relative;
-  border: rgba(255,255,255,0.2) 2px solid !important;
+  border: rgba(255, 255, 255, 0.2) 2px solid !important;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -457,10 +472,15 @@ onBeforeUnmount(() => {
   flex: 1;
   height: 100%;
   outline: none;
-  font: 20px "Microsoft YaHei", Helvetica, Tahoma, Arial, "Microsoft jhengHei";
+  font:
+    20px 'Microsoft YaHei',
+    Helvetica,
+    Tahoma,
+    Arial,
+    'Microsoft jhengHei';
   border: none;
   background: none;
-  color: #FFFFFF;
+  color: #ffffff;
   padding: 0 40px;
   box-sizing: border-box;
   text-align: center;
@@ -473,12 +493,12 @@ onBeforeUnmount(() => {
 }
 
 /* 隐藏浏览器默认的密码切换图标 */
-input[type="password"]::-ms-reveal,
-input[type="password"]::-ms-clear {
+input[type='password']::-ms-reveal,
+input[type='password']::-ms-clear {
   display: none;
 }
 
-input[type="password"]::-webkit-credentials-auto-fill-button {
+input[type='password']::-webkit-credentials-auto-fill-button {
   display: none !important;
   visibility: hidden;
   pointer-events: none;
@@ -487,7 +507,7 @@ input[type="password"]::-webkit-credentials-auto-fill-button {
 }
 
 /* 隐藏Chrome的密码管理器图标 */
-input[type="password"]::-webkit-password-toggle-button {
+input[type='password']::-webkit-password-toggle-button {
   display: none;
 }
 
@@ -513,7 +533,7 @@ input[type="password"]::-webkit-password-toggle-button {
   border-radius: 50px;
   background: rgba(0, 74, 114, 0.603);
   cursor: pointer;
-  color: #FFFFFF;
+  color: #ffffff;
   border: none;
   width: 100%;
   padding: 18px;
