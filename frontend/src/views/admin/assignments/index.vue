@@ -58,16 +58,18 @@
         v-loading="loading"
         @row-click="showDetail"
         class="modern-table clickable-table"
+        :cell-style="{ textAlign: 'center' }"
+        :header-cell-style="{ textAlign: 'center' }"
       >
-        <el-table-column prop="assignmentName" label="作业名称" min-width="180">
+        <el-table-column prop="title" label="作业名称" min-width="180">
           <template #default="scope">
             <el-tooltip
-              :content="scope.row.assignmentName"
+              :content="scope.row.title"
               placement="top"
-              :disabled="!isOverflow(scope.row.assignmentName, 15)"
+              :disabled="!isOverflow(scope.row.title, 15)"
             >
               <span class="ellipsis-text">{{
-                scope.row.assignmentName || '-'
+                scope.row.title || '-'
               }}</span>
             </el-tooltip>
           </template>
@@ -95,7 +97,7 @@
             </div>
           </template>
         </el-table-column>
-        <el-table-column prop="totalScore" label="总分值" width="80" />
+        <el-table-column prop="totalScore" label="总分值" width="100" />
         <el-table-column prop="description" label="描述" min-width="180">
           <template #default="scope">
             <el-tooltip
@@ -121,7 +123,7 @@
                 {{ `${scope.row.submittedCount || 0}/${scope.row.totalStudents || 0}` }}
               </span>
               <el-progress
-                :percentage="scope.row.completionRate || 0"
+                :percentage="getCompletionRate(scope.row)"
                 :stroke-width="6"
                 :show-text="false"
                 class="completion-progress"
@@ -143,7 +145,7 @@
           <template #default="scope">
             <el-button
               size="small"
-              @click.stop="editAssignment(scope.row.assignmentId)"
+              @click.stop="editAssignment(scope.row.id)"
             >
               编辑
             </el-button>
@@ -172,14 +174,15 @@
 
     <el-dialog
       v-model="detailVisible"
-      :title="currentAssignment?.assignmentName || '作业详情'"
-      width="800px"
+      :title="currentAssignment?.title || '作业详情'"
+      width="600px"
       class="detail-dialog"
+      append-to-body
     >
       <div v-if="currentAssignment" class="detail-content">
         <el-descriptions :column="2" border>
           <el-descriptions-item label="作业名称" :span="2">
-            {{ currentAssignment.assignmentName }}
+            {{ currentAssignment.title }}
           </el-descriptions-item>
           <el-descriptions-item label="所属课程">
             {{ currentAssignment.courseName }}
@@ -198,16 +201,19 @@
           <el-descriptions-item label="总分值">
             {{ currentAssignment.totalScore }} 分
           </el-descriptions-item>
+          <el-descriptions-item label="题目数量">
+            {{ currentAssignment.questionCount || 0 }} 道
+          </el-descriptions-item>
           <el-descriptions-item label="状态">
             <el-tag
               :type="
                 currentAssignment.status === 'published' ? 'success' : 'warning'
               "
             >
-              {{ currentAssignment.status === 'published' ? '已发布' : '已逾期' }}
+              {{ currentAssignment.status === 'published' ? '已发布' : '草稿' }}
             </el-tag>
           </el-descriptions-item>
-          <el-descriptions-item label="截止时间" :span="2">
+          <el-descriptions-item label="截止时间">
             {{ formatDeadline(currentAssignment.deadline) }}
           </el-descriptions-item>
           <el-descriptions-item label="作业描述" :span="2">
@@ -216,17 +222,7 @@
         </el-descriptions>
 
         <div class="completion-detail">
-          <div class="completion-header">
-            <h4>完成情况详情</h4>
-            <el-button
-              type="warning"
-              @click="remindAllStudents"
-              :loading="remindLoading"
-            >
-              <el-icon><Bell /></el-icon>
-              一键提醒未提交学生
-            </el-button>
-          </div>
+          <h4>完成情况</h4>
           <el-row :gutter="20">
             <el-col :span="8">
               <el-statistic
@@ -259,116 +255,16 @@
           <div class="completion-rate">
             <span>完成率</span>
             <el-progress
-              :percentage="currentAssignment.completionRate || 0"
+              :percentage="getCompletionRate(currentAssignment)"
               :stroke-width="20"
               :text-inside="true"
             />
           </div>
         </div>
-
-        <div class="student-lists">
-          <el-tabs v-model="activeTab">
-            <el-tab-pane label="已提交学生" name="submitted">
-              <div class="student-list">
-                <el-table :data="submittedStudents" style="width: 100%" max-height="300">
-                  <el-table-column label="头像" width="70">
-                    <template #default="scope">
-                      <el-avatar :size="40" :src="scope.row.avatar || ''">
-                        {{ scope.row.studentName?.charAt(0) || '?' }}
-                      </el-avatar>
-                    </template>
-                  </el-table-column>
-                  <el-table-column prop="studentName" label="姓名" width="100" />
-                  <el-table-column prop="username" label="账号" width="120" />
-                  <el-table-column prop="email" label="邮箱" min-width="150" />
-                  <el-table-column prop="phone" label="电话" width="130" />
-                  <el-table-column prop="status" label="状态" width="80">
-                    <template #default="scope">
-                      <el-tag :type="scope.row.status === 1 ? 'success' : 'danger'" size="small">
-                        {{ scope.row.status === 1 ? '正常' : '禁用' }}
-                      </el-tag>
-                    </template>
-                  </el-table-column>
-                </el-table>
-              </div>
-            </el-tab-pane>
-            <el-tab-pane label="未提交学生" name="notSubmitted">
-              <div class="student-list">
-                <el-table :data="notSubmittedStudents" style="width: 100%" max-height="300">
-                  <el-table-column label="头像" width="70">
-                    <template #default="scope">
-                      <el-avatar :size="40" :src="scope.row.avatar || ''">
-                        {{ scope.row.studentName?.charAt(0) || '?' }}
-                      </el-avatar>
-                    </template>
-                  </el-table-column>
-                  <el-table-column prop="studentName" label="姓名" width="100" />
-                  <el-table-column prop="username" label="账号" width="120" />
-                  <el-table-column prop="email" label="邮箱" min-width="150" />
-                  <el-table-column prop="phone" label="电话" width="130" />
-                  <el-table-column prop="status" label="状态" width="80">
-                    <template #default="scope">
-                      <el-tag :type="scope.row.status === 1 ? 'success' : 'danger'" size="small">
-                        {{ scope.row.status === 1 ? '正常' : '禁用' }}
-                      </el-tag>
-                    </template>
-                  </el-table-column>
-                  <el-table-column label="操作" width="100">
-                    <template #default="scope">
-                      <el-button
-                        size="small"
-                        type="warning"
-                        @click="remindStudent(scope.row.studentId)"
-                      >
-                        提醒
-                      </el-button>
-                    </template>
-                  </el-table-column>
-                </el-table>
-              </div>
-            </el-tab-pane>
-            <el-tab-pane label="全部学生" name="all">
-              <div class="student-list">
-                <el-table :data="allStudents" style="width: 100%" max-height="300">
-                  <el-table-column label="头像" width="70">
-                    <template #default="scope">
-                      <el-avatar :size="40" :src="scope.row.avatar || ''">
-                        {{ scope.row.studentName?.charAt(0) || '?' }}
-                      </el-avatar>
-                    </template>
-                  </el-table-column>
-                  <el-table-column prop="studentName" label="姓名" width="100" />
-                  <el-table-column prop="username" label="账号" width="120" />
-                  <el-table-column prop="email" label="邮箱" min-width="150" />
-                  <el-table-column prop="phone" label="电话" width="130" />
-                  <el-table-column prop="status" label="状态" width="80">
-                    <template #default="scope">
-                      <el-tag :type="scope.row.status === 1 ? 'success' : 'danger'" size="small">
-                        {{ scope.row.status === 1 ? '正常' : '禁用' }}
-                      </el-tag>
-                    </template>
-                  </el-table-column>
-                  <el-table-column label="提交状态" width="100">
-                    <template #default="scope">
-                      <el-tag
-                        :type="
-                          isStudentSubmitted(scope.row.studentId) ? 'success' : 'warning'
-                        "
-                        size="small"
-                      >
-                        {{ isStudentSubmitted(scope.row.studentId) ? '已提交' : '未提交' }}
-                      </el-tag>
-                    </template>
-                  </el-table-column>
-                </el-table>
-              </div>
-            </el-tab-pane>
-          </el-tabs>
-        </div>
       </div>
       <template #footer>
         <el-button @click="detailVisible = false">关闭</el-button>
-        <el-button type="primary" @click="editAssignment(currentAssignment?.assignmentId)">
+        <el-button type="primary" @click="editAssignment(currentAssignment?.id)">
           编辑
         </el-button>
       </template>
@@ -380,7 +276,7 @@
 import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import { Plus, Search, Bell, Notebook } from '@element-plus/icons-vue';
+import { Plus, Search, Notebook } from '@element-plus/icons-vue';
 import request from '@/utils/request';
 
 interface Course {
@@ -389,8 +285,8 @@ interface Course {
 }
 
 interface Assignment {
-  assignmentId: number;
-  assignmentName: string;
+  id: number;
+  title: string;
   courseId: number;
   courseName: string;
   teacherId: number;
@@ -401,18 +297,11 @@ interface Assignment {
   deadline: string;
   submittedCount: number;
   totalStudents: number;
-  completionRate: number;
+  questionCount: number;
+  submissionCount: number;
   status: string;
-}
-
-interface StudentInfo {
-  studentId: number;
-  studentName: string;
-  username: string;
-  avatar: string;
-  email: string;
-  phone: string;
-  status: number;
+  createTime: string;
+  updateTime: string;
 }
 
 const router = useRouter();
@@ -430,11 +319,6 @@ const total = ref(0);
 const loading = ref(false);
 const detailVisible = ref(false);
 const currentAssignment = ref<Assignment | null>(null);
-const activeTab = ref('submitted');
-const submittedStudents = ref<StudentInfo[]>([]);
-const notSubmittedStudents = ref<StudentInfo[]>([]);
-const allStudents = ref<StudentInfo[]>([]);
-const remindLoading = ref(false);
 
 const formatDeadline = (deadline: string | null): string => {
   if (!deadline) return '-';
@@ -457,29 +341,26 @@ const isOverflow = (text: string | null, maxChars: number): boolean => {
   return text.length > maxChars;
 };
 
-const isStudentSubmitted = (studentId: number): boolean => {
-  return submittedStudents.value.some((s) => s.studentId === studentId);
+const getCompletionRate = (assignment: Assignment | null): number => {
+  if (!assignment || !assignment.totalStudents || assignment.totalStudents === 0) {
+    return 0;
+  }
+  return Math.round((assignment.submittedCount || 0) / assignment.totalStudents * 100);
 };
 
 const showDetail = async (row: Assignment) => {
   currentAssignment.value = row;
   detailVisible.value = true;
-  activeTab.value = 'submitted';
 
   try {
     const response = await request.get(
-      `/admin/assignments/${row.assignmentId}/submission-status`,
+      `/admin/assignments/${row.id}`,
     );
     if (response.data) {
-      submittedStudents.value = response.data.submittedStudents || [];
-      notSubmittedStudents.value = response.data.notSubmittedStudents || [];
-      allStudents.value = response.data.allStudents || [];
+      currentAssignment.value = response.data;
     }
   } catch (error) {
-    console.error('获取学生提交情况失败:', error);
-    submittedStudents.value = [];
-    notSubmittedStudents.value = [];
-    allStudents.value = [];
+    console.error('获取作业详情失败:', error);
   }
 };
 
@@ -551,7 +432,7 @@ const publishAssignment = async (assignmentId: number) => {
 const deleteAssignment = async (assignment: Assignment) => {
   try {
     await ElMessageBox.confirm(
-      `确定要删除作业「${assignment.assignmentName}」吗？`,
+      `确定要删除作业「${assignment.title}」吗？`,
       '提示',
       {
         confirmButtonText: '确定',
@@ -560,45 +441,13 @@ const deleteAssignment = async (assignment: Assignment) => {
       },
     );
 
-    await request.delete(`/admin/assignments/${assignment.assignmentId}`);
+    await request.delete(`/admin/assignments/${assignment.id}`);
     ElMessage.success('作业删除成功');
     getAssignments();
   } catch (error) {
     if (error !== 'cancel') {
       ElMessage.error('删除作业失败');
     }
-  }
-};
-
-const remindStudent = async (studentId: number) => {
-  try {
-    await request.post(
-      `/admin/assignments/${currentAssignment.value?.assignmentId}/remind`,
-      null,
-      { params: { studentId } },
-    );
-    ElMessage.success('提醒已发送');
-  } catch (error) {
-    ElMessage.error('发送提醒失败');
-  }
-};
-
-const remindAllStudents = async () => {
-  if (notSubmittedStudents.value.length === 0) {
-    ElMessage.warning('没有需要提醒的学生');
-    return;
-  }
-
-  try {
-    remindLoading.value = true;
-    await request.post(
-      `/admin/assignments/${currentAssignment.value?.assignmentId}/remind`,
-    );
-    ElMessage.success('已向所有未提交学生发送提醒');
-  } catch (error) {
-    ElMessage.error('发送提醒失败');
-  } finally {
-    remindLoading.value = false;
   }
 };
 
@@ -798,15 +647,8 @@ onMounted(() => {
   border-top: 1px solid #ebeef5;
 }
 
-.completion-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 16px;
-}
-
-.completion-header h4 {
-  margin: 0;
+.completion-detail h4 {
+  margin: 0 0 16px 0;
   color: #303133;
   font-size: 16px;
 }
@@ -826,15 +668,6 @@ onMounted(() => {
 
 .completion-rate .el-progress {
   flex: 1;
-}
-
-.student-lists {
-  margin-top: 24px;
-}
-
-.student-list {
-  max-height: 300px;
-  overflow-y: auto;
 }
 
 /* 响应式设计 */
