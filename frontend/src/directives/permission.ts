@@ -7,5 +7,5 @@ export const permission = {
     if (!roles.includes(userStore.role)) {
       el.parentNode?.removeChild(el);
     }
-  }
+  },
 };
