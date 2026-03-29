@@ -57,7 +57,7 @@
             </div>
           </template>
         </el-table-column>
-        <el-table-column prop="username" label="账号" min-width="150" show-overflow-tooltip sortable="custom" />
+        <el-table-column prop="username" label="账号" min-width="150" sortable="custom" />
         <el-table-column prop="realName" label="姓名" min-width="120" />
         <el-table-column prop="role" label="角色" width="120">
           <template #default="scope">
