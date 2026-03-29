@@ -11,7 +11,11 @@
             <span class="title">{{ report.assignmentTitle }}</span>
           </div>
           <div class="header-right">
-            <el-tag :type="getScoreTagType(report.studentScore, report.totalScore)" effect="dark" size="large">
+            <el-tag
+              :type="getScoreTagType(report.studentScore, report.totalScore)"
+              effect="dark"
+              size="large"
+            >
               {{ report.studentScore }}/{{ report.totalScore }}分
             </el-tag>
           </div>
@@ -36,7 +40,10 @@
         </div>
         <div class="summary-item">
           <span class="label">批改方式：</span>
-          <el-tag :type="report.gradingType === 'AI' ? 'primary' : 'success'" size="small">
+          <el-tag
+            :type="report.gradingType === 'AI' ? 'primary' : 'success'"
+            size="small"
+          >
             {{ report.gradingType === 'AI' ? '智能批改' : '人工复核' }}
           </el-tag>
         </div>
@@ -47,19 +54,23 @@
       <template #header>
         <div class="section-header">
           <span class="section-title">客观题批改详情</span>
-          <el-button type="primary" size="small" @click="addAllToErrorBook('objective')">
+          <el-button
+            type="primary"
+            size="small"
+            @click="addAllToErrorBook('objective')"
+          >
             <el-icon><Plus /></el-icon>
             一键加入错题本
           </el-button>
         </div>
       </template>
-      
+
       <div class="question-list">
-        <div 
-          v-for="(question, index) in objectiveQuestions" 
-          :key="question.questionId" 
+        <div
+          v-for="(question, index) in objectiveQuestions"
+          :key="question.questionId"
           class="question-card"
-          :class="{ 'correct': question.isCorrect, 'wrong': !question.isCorrect }"
+          :class="{ correct: question.isCorrect, wrong: !question.isCorrect }"
         >
           <div class="question-header">
             <div class="question-number">
@@ -69,28 +80,32 @@
               </el-tag>
             </div>
             <div class="question-score">
-              <span :class="question.isCorrect ? 'score-correct' : 'score-wrong'">
+              <span
+                :class="question.isCorrect ? 'score-correct' : 'score-wrong'"
+              >
                 {{ question.score }}分
               </span>
             </div>
           </div>
-          
+
           <div class="question-content">
             <div class="content-label">题干：</div>
             <div class="content-text" v-html="question.content"></div>
           </div>
-          
+
           <div class="question-options" v-if="question.options">
             <div class="options-label">选项：</div>
             <div class="options-list">
-              <div 
-                v-for="(option, optKey) in parseOptions(question.options)" 
+              <div
+                v-for="(option, optKey) in parseOptions(question.options)"
                 :key="optKey"
                 class="option-item"
-                :class="{ 
-                  'selected': isOptionSelected(question.studentAnswer, optKey),
-                  'correct': isCorrectOption(question.correctAnswer, optKey),
-                  'wrong': isOptionSelected(question.studentAnswer, optKey) && !isCorrectOption(question.correctAnswer, optKey)
+                :class="{
+                  selected: isOptionSelected(question.studentAnswer, optKey),
+                  correct: isCorrectOption(question.correctAnswer, optKey),
+                  wrong:
+                    isOptionSelected(question.studentAnswer, optKey) &&
+                    !isCorrectOption(question.correctAnswer, optKey),
                 }"
               >
                 <span class="option-key">{{ optKey }}.</span>
@@ -98,29 +113,40 @@
               </div>
             </div>
           </div>
-          
+
           <div class="answer-section">
             <div class="answer-row">
               <span class="answer-label">学生答案：</span>
-              <span class="answer-value" :class="question.isCorrect ? 'correct' : 'wrong'">
+              <span
+                class="answer-value"
+                :class="question.isCorrect ? 'correct' : 'wrong'"
+              >
                 {{ formatAnswer(question.studentAnswer, question.type) }}
               </span>
-              <el-icon v-if="question.isCorrect" class="correct-icon"><CircleCheck /></el-icon>
+              <el-icon v-if="question.isCorrect" class="correct-icon"
+                ><CircleCheck
+              /></el-icon>
               <el-icon v-else class="wrong-icon"><CircleClose /></el-icon>
             </div>
             <div class="answer-row" v-if="!question.isCorrect">
               <span class="answer-label">标准答案：</span>
-              <span class="answer-value correct">{{ formatAnswer(question.correctAnswer, question.type) }}</span>
+              <span class="answer-value correct">{{
+                formatAnswer(question.correctAnswer, question.type)
+              }}</span>
             </div>
           </div>
-          
+
           <div class="analysis-section" v-if="question.analysis">
             <div class="analysis-label">题目解析：</div>
             <div class="analysis-content">{{ question.analysis }}</div>
           </div>
-          
+
           <div class="question-footer" v-if="!question.isCorrect">
-            <el-button type="warning" size="small" @click="addToErrorBook(question)">
+            <el-button
+              type="warning"
+              size="small"
+              @click="addToErrorBook(question)"
+            >
               <el-icon><Plus /></el-icon>
               加入错题本
             </el-button>
@@ -135,11 +161,11 @@
           <span class="section-title">主观题批改详情</span>
         </div>
       </template>
-      
+
       <div class="question-list">
-        <div 
-          v-for="(question, index) in subjectiveQuestions" 
-          :key="question.questionId" 
+        <div
+          v-for="(question, index) in subjectiveQuestions"
+          :key="question.questionId"
           class="question-card subjective"
         >
           <div class="question-header">
@@ -148,49 +174,66 @@
               <el-tag type="info" size="small">简答题</el-tag>
             </div>
             <div class="question-score">
-              <span class="score-value">{{ question.score }}/{{ question.maxScore }}分</span>
+              <span class="score-value"
+                >{{ question.score }}/{{ question.maxScore }}分</span
+              >
             </div>
           </div>
-          
+
           <div class="question-content">
             <div class="content-label">题干：</div>
             <div class="content-text" v-html="question.content"></div>
           </div>
-          
+
           <div class="student-answer-section">
             <div class="section-label">学生答案：</div>
             <div class="answer-content" v-html="question.studentAnswer"></div>
           </div>
-          
+
           <div class="ai-feedback-section" v-if="question.aiFeedback">
             <div class="section-label">AI 结构化反馈：</div>
-            
-            <div class="feedback-tags" v-if="question.errorTags && question.errorTags.length > 0">
+
+            <div
+              class="feedback-tags"
+              v-if="question.errorTags && question.errorTags.length > 0"
+            >
               <span class="tags-label">核心错误点：</span>
-              <el-tag 
-                v-for="tag in question.errorTags" 
-                :key="tag" 
-                type="danger" 
+              <el-tag
+                v-for="tag in question.errorTags"
+                :key="tag"
+                type="danger"
                 effect="plain"
                 class="error-tag"
               >
                 {{ tag }}
               </el-tag>
             </div>
-            
-            <div class="suggestions" v-if="question.suggestions && question.suggestions.length > 0">
+
+            <div
+              class="suggestions"
+              v-if="question.suggestions && question.suggestions.length > 0"
+            >
               <div class="suggestions-label">修正建议：</div>
               <ul class="suggestions-list">
-                <li v-for="(suggestion, idx) in question.suggestions" :key="idx" class="suggestion-item">
+                <li
+                  v-for="(suggestion, idx) in question.suggestions"
+                  :key="idx"
+                  class="suggestion-item"
+                >
                   <span class="suggestion-text">{{ suggestion }}</span>
-                  <el-button text type="primary" size="small" @click="copySuggestion(suggestion)">
+                  <el-button
+                    text
+                    type="primary"
+                    size="small"
+                    @click="copySuggestion(suggestion)"
+                  >
                     <el-icon><CopyDocument /></el-icon>
                   </el-button>
                 </li>
               </ul>
             </div>
           </div>
-          
+
           <div class="score-section">
             <div class="score-row">
               <span class="score-label">最终得分：</span>
@@ -203,7 +246,7 @@
               <el-tag type="success" size="small">教师复核</el-tag>
             </div>
           </div>
-          
+
           <div class="teacher-comment-section" v-if="question.teacherComment">
             <div class="section-label">教师评语：</div>
             <div class="comment-content">{{ question.teacherComment }}</div>
@@ -218,8 +261,13 @@
 import { ref, computed, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
-import { 
-  ArrowLeft, Plus, CircleCheck, CircleClose, CopyDocument, Right 
+import {
+  ArrowLeft,
+  Plus,
+  CircleCheck,
+  CircleClose,
+  CopyDocument,
+  Right,
 } from '@element-plus/icons-vue';
 import request from '@/utils/request';
 
@@ -236,12 +284,12 @@ const report = ref<any>({
   accuracy: 0,
   gradingTime: '',
   gradingType: 'AI',
-  questions: []
+  questions: [],
 });
 
 const objectiveQuestions = computed(() => {
-  return report.value.questions.filter((q: any) => 
-    ['single', 'multiple', 'judgment'].includes(q.type)
+  return report.value.questions.filter((q: any) =>
+    ['single', 'multiple', 'judgment'].includes(q.type),
   );
 });
 
@@ -251,7 +299,9 @@ const subjectiveQuestions = computed(() => {
 
 const getReportDetail = async () => {
   try {
-    const response = await request.get(`/student/grading/${submissionId.value}`);
+    const response = await request.get(
+      `/student/grading/${submissionId.value}`,
+    );
     const data = response.data || {};
     report.value = {
       assignmentTitle: data.assignmentTitle || '作业批改详情',
@@ -262,7 +312,7 @@ const getReportDetail = async () => {
       accuracy: data.accuracy || 0,
       gradingTime: data.gradingTime || '',
       gradingType: data.gradingType || 'AI',
-      questions: data.questions || []
+      questions: data.questions || [],
     };
   } catch (error) {
     console.error('获取批改详情失败:', error);
@@ -282,7 +332,7 @@ const getQuestionTypeTag = (type: string) => {
   const map: Record<string, string> = {
     single: 'primary',
     multiple: 'success',
-    judgment: 'warning'
+    judgment: 'warning',
   };
   return map[type] || 'info';
 };
@@ -291,7 +341,7 @@ const getQuestionTypeLabel = (type: string) => {
   const map: Record<string, string> = {
     single: '单选题',
     multiple: '多选题',
-    judgment: '判断题'
+    judgment: '判断题',
   };
   return map[type] || '未知';
 };
@@ -340,7 +390,7 @@ const formatDate = (date: string) => {
 const addToErrorBook = async (question: any) => {
   try {
     await request.post('/student/error-book/add', {
-      questionId: question.questionId
+      questionId: question.questionId,
     });
     ElMessage.success('已加入错题本');
   } catch (error) {
@@ -350,17 +400,18 @@ const addToErrorBook = async (question: any) => {
 };
 
 const addAllToErrorBook = async (type: string) => {
-  const questions = type === 'objective' ? objectiveQuestions.value : subjectiveQuestions.value;
+  const questions =
+    type === 'objective' ? objectiveQuestions.value : subjectiveQuestions.value;
   const wrongQuestions = questions.filter((q: any) => !q.isCorrect);
-  
+
   if (wrongQuestions.length === 0) {
     ElMessage.info('没有错题需要加入');
     return;
   }
-  
+
   try {
     await request.post('/student/error-book/batch-add', {
-      questionIds: wrongQuestions.map((q: any) => q.questionId)
+      questionIds: wrongQuestions.map((q: any) => q.questionId),
     });
     ElMessage.success(`已将 ${wrongQuestions.length} 道错题加入错题本`);
   } catch (error) {
@@ -370,11 +421,14 @@ const addAllToErrorBook = async (type: string) => {
 };
 
 const copySuggestion = (text: string) => {
-  navigator.clipboard.writeText(text).then(() => {
-    ElMessage.success('已复制到剪贴板');
-  }).catch(() => {
-    ElMessage.error('复制失败');
-  });
+  navigator.clipboard
+    .writeText(text)
+    .then(() => {
+      ElMessage.success('已复制到剪贴板');
+    })
+    .catch(() => {
+      ElMessage.error('复制失败');
+    });
 };
 
 const goBack = () => {
@@ -744,13 +798,13 @@ onMounted(() => {
     flex-direction: column;
     gap: 12px;
   }
-  
+
   .question-header {
     flex-direction: column;
     align-items: flex-start;
     gap: 8px;
   }
-  
+
   .score-section {
     flex-direction: column;
     align-items: flex-start;

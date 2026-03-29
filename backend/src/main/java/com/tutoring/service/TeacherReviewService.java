@@ -22,4 +22,6 @@ public interface TeacherReviewService {
 
     void batchModify(Long teacherId, List<Long> answerIds, Integer newScore, String teacherFeedback);
 
+    ReviewDetailVO regradeWithAi(Long teacherId, Long answerId);
+
 }

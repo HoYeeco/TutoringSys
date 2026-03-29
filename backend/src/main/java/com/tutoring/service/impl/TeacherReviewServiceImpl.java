@@ -3,13 +3,16 @@ package com.tutoring.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.tutoring.dto.GradingResult;
 import com.tutoring.dto.ReviewDetailVO;
 import com.tutoring.dto.ReviewListVO;
 import com.tutoring.entity.*;
 import com.tutoring.exception.BusinessException;
 import com.tutoring.mapper.*;
+import com.tutoring.service.QwenService;
 import com.tutoring.service.TeacherReviewService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -19,6 +22,7 @@ import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class TeacherReviewServiceImpl implements TeacherReviewService {
@@ -29,6 +33,7 @@ public class TeacherReviewServiceImpl implements TeacherReviewService {
     private final QuestionMapper questionMapper;
     private final UserMapper userMapper;
     private final SubmissionMapper submissionMapper;
+    private final QwenService qwenService;
 
     @Override
     public Page<ReviewListVO> getReviewList(Long teacherId, Integer page, Integer size,
@@ -121,6 +126,9 @@ public class TeacherReviewServiceImpl implements TeacherReviewService {
                 User student = studentMap.get(answer.getStudentId());
                 Question question = questionMap.get(answer.getQuestionId());
 
+                String questionType = question != null ? question.getType() : "未知";
+                String questionTypeCategory = categorizeQuestionType(questionType);
+
                 return ReviewListVO.builder()
                     .answerId(answer.getId())
                     .studentId(answer.getStudentId())
@@ -130,7 +138,8 @@ public class TeacherReviewServiceImpl implements TeacherReviewService {
                     .courseId(assignment != null ? assignment.getCourseId() : null)
                     .courseName(course != null ? course.getName() : "未知课程")
                     .questionId(answer.getQuestionId())
-                    .questionType(question != null ? question.getType() : "未知")
+                    .questionType(questionType)
+                    .questionTypeCategory(questionTypeCategory)
                     .questionContent(question != null ? question.getContent() : "")
                     .aiScore(answer.getAiScore())
                     .finalScore(answer.getFinalScore())
@@ -301,6 +310,137 @@ public class TeacherReviewServiceImpl implements TeacherReviewService {
             submission.setReviewTime(LocalDateTime.now());
             submissionMapper.updateById(submission);
         }
+    }
+
+    private String categorizeQuestionType(String type) {
+        if (type == null) {
+            return "综合题";
+        }
+        
+        String upperType = type.toUpperCase();
+        switch (upperType) {
+            case "SINGLE":
+            case "MULTIPLE":
+            case "JUDGE":
+                return "客观题";
+            case "SUBJECTIVE":
+                return "主观题";
+            default:
+                return "综合题";
+        }
+    }
+
+    @Override
+    @Transactional
+    public ReviewDetailVO regradeWithAi(Long teacherId, Long answerId) {
+        StudentAnswer answer = studentAnswerMapper.selectById(answerId);
+        if (answer == null) {
+            throw new BusinessException("答案不存在");
+        }
+
+        Assignment assignment = assignmentMapper.selectById(answer.getAssignmentId());
+        if (assignment == null) {
+            throw new BusinessException("作业不存在");
+        }
+
+        Course course = courseMapper.selectById(assignment.getCourseId());
+        if (course == null || !course.getTeacherId().equals(teacherId)) {
+            throw new BusinessException("无权访问该答案");
+        }
+
+        Question question = questionMapper.selectById(answer.getQuestionId());
+        if (question == null) {
+            throw new BusinessException("题目不存在");
+        }
+
+        String questionContent = question.getContent();
+        String referenceAnswer = question.getReferenceAnswer();
+        String studentAnswerContent = answer.getAnswerContent() != null 
+            ? answer.getAnswerContent() 
+            : answer.getAnswer();
+        int maxScore = question.getScore();
+
+        log.info("智辅批改: answerId={}, questionId={}, maxScore={}, studentAnswer={}", 
+            answerId, question.getId(), maxScore, studentAnswerContent);
+
+        if (studentAnswerContent == null || studentAnswerContent.trim().isEmpty() || isNoAnswer(studentAnswerContent)) {
+            log.info("学生未作答，直接返回0分: answerId={}", answerId);
+            
+            answer.setAiScore(0);
+            answer.setScore(0);
+            answer.setAiFeedback("学生未作答，得分为0分。");
+            answer.setUpdateTime(LocalDateTime.now());
+            studentAnswerMapper.updateById(answer);
+            
+            return getReviewDetail(teacherId, answerId);
+        }
+
+        GradingResult result = qwenService.gradeAnswer(
+            questionContent, 
+            referenceAnswer, 
+            studentAnswerContent, 
+            maxScore
+        );
+
+        int aiScore = result.getScore() != null ? result.getScore() : 0;
+        aiScore = Math.min(aiScore, maxScore);
+        aiScore = Math.max(aiScore, 0);
+
+        String aiFeedback = buildAiFeedback(result);
+
+        answer.setAiScore(aiScore);
+        answer.setScore(aiScore);
+        answer.setAiFeedback(aiFeedback);
+        answer.setUpdateTime(LocalDateTime.now());
+        studentAnswerMapper.updateById(answer);
+
+        log.info("智辅批改完成: answerId={}, newAiScore={}", answerId, aiScore);
+
+        return getReviewDetail(teacherId, answerId);
+    }
+
+    private boolean isNoAnswer(String answer) {
+        if (answer == null) return true;
+        String trimmed = answer.trim().toLowerCase();
+        if (trimmed.isEmpty()) return true;
+        
+        String[] noAnswerKeywords = {"无", "不知道", "略", "不会", "没做", "未答", "空", "none", "n/a", "null", "未作答", "未做"};
+        for (String keyword : noAnswerKeywords) {
+            if (trimmed.equals(keyword)) {
+                return true;
+            }
+        }
+        
+        return trimmed.length() < 2;
+    }
+
+    private String buildAiFeedback(GradingResult result) {
+        StringBuilder feedback = new StringBuilder();
+        
+        if (result.getErrors() != null && !result.getErrors().isEmpty()) {
+            feedback.append("【核心错误点】");
+            for (int i = 0; i < result.getErrors().size(); i++) {
+                feedback.append(result.getErrors().get(i));
+                if (i < result.getErrors().size() - 1) {
+                    feedback.append("|||");
+                }
+            }
+        }
+        
+        if (result.getSuggestions() != null && !result.getSuggestions().isEmpty()) {
+            if (feedback.length() > 0) {
+                feedback.append("|||");
+            }
+            feedback.append("【修正建议】");
+            for (int i = 0; i < result.getSuggestions().size(); i++) {
+                feedback.append(result.getSuggestions().get(i));
+                if (i < result.getSuggestions().size() - 1) {
+                    feedback.append("；");
+                }
+            }
+        }
+        
+        return feedback.toString();
     }
 
 }

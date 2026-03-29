@@ -1,181 +1,226 @@
 <template>
-  <div class="teacher-grading-detail">
-    <el-card shadow="never" class="page-header">
-      <template #header>
-        <div class="card-header">
-          <span>复核详情</span>
-          <el-button @click="goBack">返回列表</el-button>
-        </div>
-      </template>
-    </el-card>
-
-    <el-card shadow="never" class="info-card">
-      <div class="info-row">
-        <div class="info-item">
-          <span class="info-label">作业名称：</span>
-          <span class="info-value">{{ submissionInfo.assignmentName }}</span>
-        </div>
-        <div class="info-item">
-          <span class="info-label">所属课程：</span>
-          <span class="info-value">{{ submissionInfo.courseName }}</span>
-        </div>
-        <div class="info-item">
-          <span class="info-label">学生姓名：</span>
-          <span class="info-value">{{ submissionInfo.studentName }}</span>
-        </div>
-        <div class="info-item">
-          <span class="info-label">提交时间：</span>
-          <span class="info-value">{{ submissionInfo.submitTime }}</span>
+  <div class="review-page">
+    <div class="page-header">
+      <div class="header-left">
+        <el-button text @click="goBack" class="back-btn">
+          <el-icon><ArrowLeft /></el-icon>
+          返回列表
+        </el-button>
+        <div class="header-title">
+          <h2>批改复核</h2>
         </div>
       </div>
-    </el-card>
-
-    <div class="review-container">
-      <div class="questions-list">
-        <el-card
-          v-for="(question, index) in questions"
-          :key="question.questionId"
-          shadow="never"
-          class="question-card"
-        >
-          <template #header>
-            <div class="question-header">
-              <span class="question-title">
-                {{ index + 1 }}. {{ question.questionType === 'single' ? '单选题' : question.questionType === 'multiple' ? '多选题' : question.questionType === 'truefalse' ? '判断题' : '主观题' }}
-              </span>
-              <span class="question-score">{{ question.score }}分</span>
-            </div>
-          </template>
-          <div class="question-content" v-html="question.content"></div>
-          
-          <!-- 客观题选项 -->
-          <div v-if="['single', 'multiple', 'truefalse'].includes(question.questionType)" class="options-list">
-            <div
-              v-for="(option, optionIndex) in question.options"
-              :key="optionIndex"
-              class="option-item"
-              :class="{
-                'selected': studentAnswer.selectedOptions.includes(String.fromCharCode(65 + optionIndex)),
-                'correct': question.correctAnswer?.includes(String.fromCharCode(65 + optionIndex)),
-                'incorrect': studentAnswer.selectedOptions.includes(String.fromCharCode(65 + optionIndex)) && !question.correctAnswer?.includes(String.fromCharCode(65 + optionIndex))
-              }"
-            >
-              <span class="option-label">{{ String.fromCharCode(65 + optionIndex) }}.</span>
-              <span class="option-content">{{ option }}</span>
-            </div>
-          </div>
-          
-          <!-- 主观题答案 -->
-          <div v-else class="subjective-answer">
-            <div class="answer-label">学生答案：</div>
-            <div class="answer-content" v-html="studentAnswer.subjectiveAnswer"></div>
-          </div>
-        </el-card>
+      <div class="header-info">
+        <span class="info-item">
+          <el-icon><User /></el-icon>
+          {{ reviewDetail.studentName }}
+        </span>
+        <span class="info-item">
+          <el-icon><Document /></el-icon>
+          {{ reviewDetail.assignmentTitle }}
+        </span>
+        <span class="info-item">
+          <el-icon><Clock /></el-icon>
+          {{ formatDateTime(reviewDetail.submitTime) }}
+        </span>
       </div>
+    </div>
 
-      <div class="ai-feedback">
-        <el-card shadow="never" class="feedback-card">
-          <template #header>
-            <span>智能批改结果</span>
-          </template>
-          
-          <!-- 客观题批改结果 -->
-          <div v-for="(question, index) in questions" :key="question.questionId" class="feedback-item">
-            <div class="feedback-header">
-              <span class="feedback-title">{{ index + 1 }}. {{ question.questionType === 'single' ? '单选题' : question.questionType === 'multiple' ? '多选题' : question.questionType === 'truefalse' ? '判断题' : '主观题' }}</span>
-            </div>
-            
-            <!-- 客观题反馈 -->
-            <div v-if="['single', 'multiple', 'truefalse'].includes(question.questionType)" class="objective-feedback">
-              <div class="feedback-info">
-                <span class="feedback-label">正确答案：</span>
-                <span class="feedback-value">{{ question.correctAnswer?.join(', ') }}</span>
+    <div class="review-content" v-loading="loading">
+      <div class="question-block">
+        <div class="block-main" :class="{ 'full-width': isObjectiveQuestion }">
+          <div class="left-section">
+            <div class="question-box">
+              <div class="box-header">
+                <span class="box-title">题目</span>
+                <span class="score-tag">满分 {{ reviewDetail.maxScore }} 分</span>
+                <el-tag size="small" :type="isObjectiveQuestion ? 'info' : 'warning'">
+                  {{ getQuestionTypeLabel(reviewDetail.questionType) }}
+                </el-tag>
               </div>
-              <div class="feedback-info">
-                <span class="feedback-label">学生答案：</span>
-                <span class="feedback-value">{{ studentAnswer.selectedOptions.join(', ') }}</span>
-              </div>
-              <div class="feedback-info">
-                <span class="feedback-label">得分：</span>
-                <span class="feedback-value" :class="{ 'correct': aiResult.questionScores[index] === question.score, 'incorrect': aiResult.questionScores[index] < question.score }">
-                  {{ aiResult.questionScores[index] || 0 }}/{{ question.score }}
-                </span>
+              <div class="box-content">
+                <div class="question-text" v-html="reviewDetail.questionContent"></div>
+                <div v-if="reviewDetail.questionOptions && reviewDetail.questionOptions.length > 0" class="options-list">
+                  <div
+                    v-for="(option, idx) in reviewDetail.questionOptions"
+                    :key="idx"
+                    class="option-item"
+                    :class="{ 'is-correct': reviewDetail.correctAnswer?.includes(String.fromCharCode(65 + idx)) }"
+                  >
+                    <span class="option-letter">{{ String.fromCharCode(65 + idx) }}</span>
+                    <span class="option-text">{{ option }}</span>
+                  </div>
+                </div>
               </div>
             </div>
-            
-            <!-- 主观题反馈 -->
-            <div v-else class="subjective-feedback">
-              <div class="feedback-info">
-                <span class="feedback-label">AI评分：</span>
-                <span class="feedback-value">{{ aiResult.questionScores[index] }}/{{ question.score }}</span>
+
+            <div class="answer-box">
+              <div class="box-header">
+                <span class="box-title">学生作答</span>
+                <el-tag v-if="isObjectiveQuestion" :type="isCorrect ? 'success' : 'danger'" size="small">
+                  {{ isCorrect ? '正确' : '错误' }}
+                </el-tag>
+                <el-tag v-else-if="!reviewDetail.studentAnswer" type="info" size="small">未作答</el-tag>
               </div>
-              <div class="feedback-info">
-                <span class="feedback-label">错误点标注：</span>
+              <div class="box-content">
+                <div class="answer-text" :class="{ 'empty': !reviewDetail.studentAnswer }">
+                  {{ reviewDetail.studentAnswer || '学生未作答' }}
+                </div>
+                <div v-if="isObjectiveQuestion && reviewDetail.correctAnswer" class="correct-answer">
+                  正确答案：{{ reviewDetail.correctAnswer }}
+                </div>
               </div>
-              <div class="feedback-content" v-html="aiResult.feedback[index]?.errorPoints"></div>
-              <div class="feedback-info">
-                <span class="feedback-label">修正建议：</span>
-              </div>
-              <div class="feedback-content" v-html="aiResult.feedback[index]?.suggestions"></div>
             </div>
           </div>
-        </el-card>
 
-        <!-- 教师操作区 -->
-        <el-card shadow="never" class="action-card">
-          <template #header>
-            <span>教师操作</span>
-          </template>
-          
-          <div class="action-section">
-            <div class="action-item">
-              <span class="action-label">AI反馈：</span>
-              <div class="action-buttons">
+          <div v-if="!isObjectiveQuestion" class="right-section">
+            <div class="ai-box">
+              <div class="box-header">
+                <span class="box-title">AI批改</span>
+                <el-button 
+                  type="primary" 
+                  size="small" 
+                  :loading="regrading"
+                  @click="handleRegrade"
+                  plain
+                >
+                  智辅批改
+                </el-button>
+              </div>
+              <div class="box-content">
+                <div class="score-row">
+                  <span class="score-label">得分</span>
+                  <span class="score-value" :class="getScoreClass(reviewDetail.aiScore, reviewDetail.maxScore)">
+                    {{ reviewDetail.aiScore ?? '-' }}
+                  </span>
+                  <span class="score-max">/ {{ reviewDetail.maxScore }}</span>
+                  <el-tag v-if="regraded" type="success" size="small">已重新评分</el-tag>
+                </div>
+
+                <div v-if="parsedFeedback.errors.length > 0 || parsedFeedback.suggestions" class="ai-feedback">
+                  <div v-if="parsedFeedback.errors.length > 0" class="error-tags">
+                    <span class="feedback-label">核心错误点</span>
+                    <div class="tag-list">
+                      <el-tag 
+                        v-for="(error, idx) in parsedFeedback.errors" 
+                        :key="idx" 
+                        type="danger" 
+                        size="small"
+                        effect="plain"
+                      >
+                        {{ error }}
+                      </el-tag>
+                    </div>
+                  </div>
+                  <div v-if="parsedFeedback.suggestions" class="suggestion-text">
+                    <span class="feedback-label">修正建议</span>
+                    <p class="suggestion-content" :class="{ 'is-truncated': shouldTruncateSuggestion }">
+                      {{ parsedFeedback.suggestions }}
+                    </p>
+                    <el-button 
+                      v-if="shouldTruncateSuggestion" 
+                      type="primary" 
+                      text 
+                      size="small"
+                      @click="showFullFeedback"
+                    >
+                      查看完整内容
+                    </el-button>
+                  </div>
+                </div>
+                <div v-else-if="reviewDetail.aiFeedback" class="ai-feedback">
+                  <p class="feedback-raw" :class="{ 'is-truncated': shouldTruncateFeedback }">
+                    {{ reviewDetail.aiFeedback }}
+                  </p>
+                  <el-button 
+                    v-if="shouldTruncateFeedback" 
+                    type="primary" 
+                    text 
+                    size="small"
+                    @click="showFullFeedback"
+                  >
+                    查看完整内容
+                  </el-button>
+                </div>
+                <div v-else class="empty-feedback">
+                  <span>暂无AI批改结果</span>
+                  <span class="hint">点击"智辅批改"获取评分建议</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div v-if="!isObjectiveQuestion" class="block-footer">
+          <div class="teacher-action">
+            <div class="action-row">
+              <span class="action-label">复核操作</span>
+              <div class="action-btns">
                 <el-button
-                  type="primary"
-                  :class="{ 'active': feedbackAction === 'adopt' }"
+                  :type="feedbackAction === 'adopt' ? 'primary' : 'default'"
                   @click="feedbackAction = 'adopt'"
                 >
-                  采用
+                  <el-icon><Check /></el-icon>
+                  采用AI评分
                 </el-button>
                 <el-button
-                  :class="{ 'active': feedbackAction === 'modify' }"
+                  :type="feedbackAction === 'modify' ? 'warning' : 'default'"
                   @click="feedbackAction = 'modify'"
                 >
-                  修改
+                  <el-icon><Edit /></el-icon>
+                  修改分数
                 </el-button>
               </div>
-            </div>
-            
-            <!-- 人工评分 -->
-            <div v-if="feedbackAction === 'modify'" class="action-item">
-              <span class="action-label">人工评分：</span>
-              <el-input-number
-                v-model="manualScore"
-                :min="0"
-                :max="totalScore"
-                step="1"
-                class="score-input"
-              />
-            </div>
-            
-            <!-- 教师评语 -->
-            <div class="action-item">
-              <span class="action-label">教师评语：</span>
-              <div class="editor-container">
-                <div ref="editorRef" class="editor"></div>
+              <div v-if="feedbackAction === 'modify'" class="modify-score">
+                <el-input-number
+                  v-model="manualScore"
+                  :min="0"
+                  :max="reviewDetail.maxScore || 100"
+                  size="small"
+                />
+                <span class="score-unit">分</span>
               </div>
             </div>
+            <div class="feedback-row">
+              <span class="action-label">教师评语</span>
+              <el-input
+                v-model="teacherFeedbackText"
+                type="textarea"
+                :rows="2"
+                placeholder="可选填写教师评语"
+                resize="none"
+              />
+            </div>
+            <div class="submit-row">
+              <el-button @click="goBack">取消</el-button>
+              <el-button type="primary" @click="completeReview" :loading="submitting">
+                确认复核
+              </el-button>
+            </div>
           </div>
-        </el-card>
+        </div>
       </div>
     </div>
 
-    <div class="bottom-actions">
-      <el-button @click="goBack">返回列表</el-button>
-      <el-button @click="saveDraft">保存草稿</el-button>
-      <el-button type="primary" @click="completeReview">复核完成</el-button>
-    </div>
+    <el-dialog v-model="showFeedbackDialog" title="修正建议详情" width="600px">
+      <div class="dialog-content">
+        <div v-if="parsedFeedback.errors.length > 0" class="dialog-section">
+          <div class="section-title">核心错误点</div>
+          <div class="error-tag-list">
+            <el-tag v-for="(error, idx) in parsedFeedback.errors" :key="idx" type="danger" effect="plain">
+              {{ error }}
+            </el-tag>
+          </div>
+        </div>
+        <div v-if="parsedFeedback.suggestions" class="dialog-section">
+          <div class="section-title">修正建议</div>
+          <p class="suggestion-full">{{ parsedFeedback.suggestions }}</p>
+        </div>
+        <div v-if="!parsedFeedback.errors.length && !parsedFeedback.suggestions && reviewDetail.aiFeedback" class="dialog-section">
+          <p class="feedback-full">{{ reviewDetail.aiFeedback }}</p>
+        </div>
+      </div>
+    </el-dialog>
   </div>
 </template>
 
@@ -183,424 +228,674 @@
 import { ref, onMounted, computed } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { ElMessage } from 'element-plus';
-import { useRequest } from '@/composables/useRequest';
-import Quill from 'quill';
-import 'quill/dist/quill.snow.css';
+import { ArrowLeft, User, Document, Clock, Check, Edit } from '@element-plus/icons-vue';
+import request from '@/utils/request';
 
-interface SubmissionInfo {
-  assignmentName: string;
-  courseName: string;
+interface ReviewDetail {
+  answerId: number;
+  studentId: number;
   studentName: string;
-  submitTime: string;
-}
-
-interface Question {
+  assignmentId: number;
+  assignmentTitle: string;
+  courseId: number;
+  courseName: string;
   questionId: number;
   questionType: string;
-  content: string;
-  options?: string[];
-  correctAnswer?: string[];
-  score: number;
-}
-
-interface StudentAnswer {
-  selectedOptions: string[];
-  subjectiveAnswer: string;
-}
-
-interface Feedback {
-  errorPoints?: string;
-  suggestions?: string;
-}
-
-interface AIResult {
-  questionScores: number[];
-  feedback: Feedback[];
+  questionContent: string;
+  questionOptions: string[];
+  maxScore: number;
+  studentAnswer: string;
+  correctAnswer: string;
+  aiScore: number;
+  aiFeedback: string;
+  finalScore: number;
+  teacherFeedback: string;
+  graderType: string;
+  reviewStatus: number;
+  submitTime: string;
+  aiGradeTime: string;
 }
 
 const router = useRouter();
 const route = useRoute();
-const editorRef = ref<HTMLElement | null>(null);
+const loading = ref(false);
+const submitting = ref(false);
+const regrading = ref(false);
+const regraded = ref(false);
+const showFeedbackDialog = ref(false);
+const teacherFeedbackText = ref('');
 
-const submissionId = computed(() => route.params.id as string);
+const answerId = computed(() => route.params.id as string);
 
-const submissionInfo = ref<SubmissionInfo>({
-  assignmentName: '数据结构作业1',
-  courseName: '数据结构',
-  studentName: '张三',
-  submitTime: '2024-01-15 14:30:00'
-});
-
-const questions = ref<Question[]>([
-  {
-    questionId: 1,
-    questionType: 'single',
-    content: '数据结构中，栈的特点是？',
-    options: ['先进先出', '后进先出', '随机访问', '顺序访问'],
-    correctAnswer: ['B'],
-    score: 5
-  },
-  {
-    questionId: 2,
-    questionType: 'multiple',
-    content: '以下哪些是线性数据结构？',
-    options: ['数组', '链表', '树', '图'],
-    correctAnswer: ['A', 'B'],
-    score: 8
-  },
-  {
-    questionId: 3,
-    questionType: 'subjective',
-    content: '请简述冒泡排序的基本原理。',
-    score: 12
-  }
-]);
-
-const studentAnswer = ref<StudentAnswer>({
-  selectedOptions: ['B', 'A'],
-  subjectiveAnswer: '<p>冒泡排序是一种简单的排序算法，它重复地走访过要排序的数列，一次比较两个元素，如果它们的顺序错误就把它们交换过来。</p><p>走访数列的工作是重复地进行直到没有再需要交换的元素，也就是说该数列已经排序完成。</p>'
-});
-
-const aiResult = ref<AIResult>({
-  questionScores: [5, 4, 10],
-  feedback: [
-    {},
-    {},
-    {
-      errorPoints: '<p>· 缺少对冒泡排序时间复杂度的分析</p><p>· 未提及冒泡排序的优化方法</p>',
-      suggestions: '<p>1. 可以添加时间复杂度分析：最好情况O(n)，最坏情况O(n²)</p><p>2. 可以提到优化方法，如设置标志位判断是否已经有序</p>'
-    }
-  ]
-});
-
-const totalScore = computed(() => {
-  return questions.value.reduce((sum, q) => sum + q.score, 0);
+const reviewDetail = ref<ReviewDetail>({
+  answerId: 0,
+  studentId: 0,
+  studentName: '',
+  assignmentId: 0,
+  assignmentTitle: '',
+  courseId: 0,
+  courseName: '',
+  questionId: 0,
+  questionType: '',
+  questionContent: '',
+  questionOptions: [],
+  maxScore: 0,
+  studentAnswer: '',
+  correctAnswer: '',
+  aiScore: 0,
+  aiFeedback: '',
+  finalScore: 0,
+  teacherFeedback: '',
+  graderType: '',
+  reviewStatus: 0,
+  submitTime: '',
+  aiGradeTime: ''
 });
 
 const feedbackAction = ref('adopt');
 const manualScore = ref(0);
 
-const getSubmissionDetail = async () => {
+const isObjectiveQuestion = computed(() => {
+  const type = reviewDetail.value.questionType?.toUpperCase();
+  return type === 'SINGLE' || type === 'MULTIPLE' || type === 'JUDGE';
+});
+
+const isCorrect = computed(() => {
+  if (!reviewDetail.value.correctAnswer || !reviewDetail.value.studentAnswer) {
+    return false;
+  }
+  const correct = reviewDetail.value.correctAnswer.trim().toUpperCase();
+  const student = reviewDetail.value.studentAnswer.trim().toUpperCase();
+  return correct === student;
+});
+
+const parsedFeedback = computed(() => {
+  const feedback = reviewDetail.value.aiFeedback || '';
+  const errors: string[] = [];
+  let suggestions = '';
+  
+  if (feedback.includes('【核心错误点】')) {
+    const parts = feedback.split('|||');
+    for (const part of parts) {
+      if (part.includes('【核心错误点】')) {
+        const errorStr = part.replace('【核心错误点】', '').trim();
+        if (errorStr) {
+          errors.push(...errorStr.split('|||').map(e => e.trim()).filter(e => e));
+        }
+      }
+      if (part.includes('【修正建议】')) {
+        suggestions = part.replace('【修正建议】', '').trim();
+      }
+    }
+  }
+  
+  if (feedback.includes('【修正建议】') && !suggestions) {
+    const suggestionMatch = feedback.match(/【修正建议】(.+)$/);
+    if (suggestionMatch) {
+      suggestions = suggestionMatch[1].trim();
+    }
+  }
+  
+  return { errors, suggestions };
+});
+
+const shouldTruncateSuggestion = computed(() => {
+  return parsedFeedback.value.suggestions.length > 100;
+});
+
+const shouldTruncateFeedback = computed(() => {
+  return (reviewDetail.value.aiFeedback?.length || 0) > 100;
+});
+
+const getQuestionTypeLabel = (type: string): string => {
+  const typeMap: Record<string, string> = {
+    SINGLE: '单选题',
+    MULTIPLE: '多选题',
+    JUDGE: '判断题',
+    SUBJECTIVE: '主观题',
+    single: '单选题',
+    multiple: '多选题',
+    judgment: '判断题',
+    essay: '主观题'
+  };
+  return typeMap[type] || '未知题型';
+};
+
+const getScoreClass = (score: number, maxScore: number): string => {
+  if (score === undefined || score === null) return '';
+  const percent = (score / maxScore) * 100;
+  if (percent >= 80) return 'score-high';
+  if (percent >= 60) return 'score-medium';
+  return 'score-low';
+};
+
+const formatDateTime = (date: string | number[] | null): string => {
+  if (!date) return '-';
   try {
-    // 实际项目中调用接口
-    // const response = await request.get(`/teacher/grading/submissions/${submissionId.value}`);
-    // return response.data;
-    
-    // 模拟数据
-    return {
-      submissionInfo: submissionInfo.value,
-      questions: questions.value,
-      studentAnswer: studentAnswer.value,
-      aiResult: aiResult.value
-    };
-  } catch (error) {
-    ElMessage.error('获取提交详情失败');
-    return null;
+    let d: Date;
+    if (Array.isArray(date)) {
+      const [year, month, day, hour = 0, minute = 0, second = 0] = date;
+      d = new Date(year, month - 1, day, hour, minute, second);
+    } else if (typeof date === 'string') {
+      if (date.includes('T')) {
+        d = new Date(date);
+      } else {
+        d = new Date(date);
+      }
+    } else {
+      d = new Date(date);
+    }
+    if (isNaN(d.getTime())) return '-';
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  } catch {
+    return '-';
   }
 };
 
-const { execute: fetchSubmissionDetail } = useRequest(getSubmissionDetail);
+const showFullFeedback = () => {
+  showFeedbackDialog.value = true;
+};
+
+const getReviewDetail = async () => {
+  loading.value = true;
+  try {
+    const response = await request.get(`/teacher/review/${answerId.value}`);
+    const data = response.data;
+    reviewDetail.value = {
+      answerId: data.answerId || 0,
+      studentId: data.studentId || 0,
+      studentName: data.studentName || '',
+      assignmentId: data.assignmentId || 0,
+      assignmentTitle: data.assignmentTitle || '',
+      courseId: data.courseId || 0,
+      courseName: data.courseName || '',
+      questionId: data.questionId || 0,
+      questionType: data.questionType || '',
+      questionContent: data.questionContent || '',
+      questionOptions: data.questionOptions || [],
+      maxScore: data.maxScore || 0,
+      studentAnswer: data.studentAnswer || '',
+      correctAnswer: data.correctAnswer || '',
+      aiScore: data.aiScore,
+      aiFeedback: data.aiFeedback || '',
+      finalScore: data.finalScore,
+      teacherFeedback: data.teacherFeedback || '',
+      graderType: data.graderType || '',
+      reviewStatus: data.reviewStatus || 0,
+      submitTime: data.submitTime || '',
+      aiGradeTime: data.aiGradeTime || ''
+    };
+    manualScore.value = data.aiScore || 0;
+    teacherFeedbackText.value = data.teacherFeedback || '';
+  } catch (error) {
+    ElMessage.error('获取复核详情失败');
+    router.push('/teacher/grading');
+  } finally {
+    loading.value = false;
+  }
+};
+
+const handleRegrade = async () => {
+  regrading.value = true;
+  try {
+    const response = await request.post(`/teacher/review/${answerId.value}/regrade`);
+    const data = response.data;
+    reviewDetail.value = {
+      answerId: data.answerId || 0,
+      studentId: data.studentId || 0,
+      studentName: data.studentName || '',
+      assignmentId: data.assignmentId || 0,
+      assignmentTitle: data.assignmentTitle || '',
+      courseId: data.courseId || 0,
+      courseName: data.courseName || '',
+      questionId: data.questionId || 0,
+      questionType: data.questionType || '',
+      questionContent: data.questionContent || '',
+      questionOptions: data.questionOptions || [],
+      maxScore: data.maxScore || 0,
+      studentAnswer: data.studentAnswer || '',
+      correctAnswer: data.correctAnswer || '',
+      aiScore: data.aiScore,
+      aiFeedback: data.aiFeedback || '',
+      finalScore: data.finalScore,
+      teacherFeedback: data.teacherFeedback || '',
+      graderType: data.graderType || '',
+      reviewStatus: data.reviewStatus || 0,
+      submitTime: data.submitTime || '',
+      aiGradeTime: data.aiGradeTime || ''
+    };
+    manualScore.value = data.aiScore || 0;
+    regraded.value = true;
+    ElMessage.success('智辅批改完成');
+  } catch (error) {
+    ElMessage.error('智辅批改失败，请稍后重试');
+  } finally {
+    regrading.value = false;
+  }
+};
 
 const goBack = () => {
   router.push('/teacher/grading');
 };
 
-const saveDraft = () => {
-  ElMessage.success('草稿保存成功');
-};
-
-const completeReview = () => {
-  ElMessage.success('复核完成');
-  router.push('/teacher/grading');
+const completeReview = async () => {
+  submitting.value = true;
+  try {
+    if (feedbackAction.value === 'adopt') {
+      await request.post(`/teacher/review/${answerId.value}/accept`, null, {
+        params: { teacherFeedback: teacherFeedbackText.value }
+      });
+    } else {
+      await request.post(`/teacher/review/${answerId.value}/modify`, null, {
+        params: { 
+          newScore: manualScore.value,
+          teacherFeedback: teacherFeedbackText.value
+        }
+      });
+    }
+    
+    ElMessage.success('复核完成');
+    router.push('/teacher/grading');
+  } catch (error) {
+    ElMessage.error('操作失败');
+  } finally {
+    submitting.value = false;
+  }
 };
 
 onMounted(() => {
-  fetchSubmissionDetail();
-  
-  // 初始化Quill编辑器
-  if (editorRef.value) {
-    new Quill(editorRef.value, {
-      theme: 'snow',
-      modules: {
-        toolbar: [
-          ['bold', 'italic', 'underline'],
-          ['list', 'bullet']
-        ]
-      }
-    });
-  }
+  getReviewDetail();
 });
 </script>
 
 <style scoped>
-.teacher-grading-detail {
-  padding: 20px;
+.review-page {
+  min-height: 100vh;
+  background: #f5f7fa;
 }
 
 .page-header {
-  margin-bottom: 20px;
-}
-
-.card-header {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  padding: 16px 24px;
+  color: #fff;
   display: flex;
   justify-content: space-between;
   align-items: center;
 }
 
-.info-card {
-  margin-bottom: 20px;
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
 }
 
-.info-row {
+.back-btn {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.header-title h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.header-info {
   display: flex;
-  flex-wrap: wrap;
   gap: 20px;
 }
 
 .info-item {
   display: flex;
   align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.9);
 }
 
-.info-label {
-  font-weight: bold;
-  margin-right: 8px;
-  color: #606266;
+.review-content {
+  padding: 20px;
 }
 
-.review-container {
+.question-block {
+  background: #fff;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+}
+
+.block-main {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 20px;
-  margin-bottom: 30px;
+  min-height: 400px;
 }
 
-.questions-list {
+.block-main.full-width {
+  grid-template-columns: 1fr;
+}
+
+.left-section,
+.right-section {
+  padding: 20px;
   display: flex;
   flex-direction: column;
-  gap: 20px;
 }
 
-.question-card {
-  border: 1px solid #e4e7ed;
-  border-radius: 8px;
+.left-section {
+  border-right: 1px solid #f0f0f0;
+  gap: 16px;
 }
 
-.question-header {
+.block-main.full-width .left-section {
+  border-right: none;
+}
+
+.question-box,
+.answer-box,
+.ai-box {
+  flex: 1;
   display: flex;
-  justify-content: space-between;
-  align-items: center;
+  flex-direction: column;
 }
 
-.question-title {
-  font-weight: bold;
+.box-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #f0f0f0;
+  margin-bottom: 12px;
+}
+
+.box-title {
+  font-size: 15px;
+  font-weight: 600;
   color: #303133;
 }
 
-.question-score {
-  color: #409eff;
-  font-weight: bold;
+.score-tag {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #fff;
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-size: 12px;
 }
 
-.question-content {
-  margin: 15px 0;
-  line-height: 1.6;
+.box-content {
+  flex: 1;
+  overflow: auto;
+}
+
+.question-text {
+  font-size: 14px;
+  line-height: 1.7;
+  color: #303133;
+  margin-bottom: 12px;
 }
 
 .options-list {
-  margin-top: 15px;
-}
-
-.option-item {
-  display: flex;
-  align-items: center;
-  padding: 8px 12px;
-  margin-bottom: 8px;
-  border-radius: 4px;
-  border: 1px solid #e4e7ed;
-}
-
-.option-item.selected {
-  background-color: #ecf5ff;
-  border-color: #c6e2ff;
-}
-
-.option-item.correct {
-  background-color: #f0f9eb;
-  border-color: #b7eb8f;
-}
-
-.option-item.incorrect {
-  background-color: #fef0f0;
-  border-color: #ffccc7;
-}
-
-.option-label {
-  font-weight: bold;
-  margin-right: 10px;
-  width: 20px;
-}
-
-.subjective-answer {
-  margin-top: 15px;
-}
-
-.answer-label {
-  font-weight: bold;
-  margin-bottom: 8px;
-  color: #303133;
-}
-
-.answer-content {
-  padding: 12px;
-  border: 1px solid #e4e7ed;
-  border-radius: 4px;
-  background-color: #f9f9f9;
-  line-height: 1.6;
-}
-
-.ai-feedback {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-.feedback-card {
-  border: 1px solid #e4e7ed;
-  border-radius: 8px;
-}
-
-.feedback-item {
-  margin-bottom: 20px;
-  padding-bottom: 20px;
-  border-bottom: 1px solid #e4e7ed;
-}
-
-.feedback-item:last-child {
-  margin-bottom: 0;
-  padding-bottom: 0;
-  border-bottom: none;
-}
-
-.feedback-header {
-  margin-bottom: 10px;
-}
-
-.feedback-title {
-  font-weight: bold;
-  color: #303133;
-}
-
-.feedback-info {
-  margin-bottom: 8px;
-  display: flex;
-  align-items: flex-start;
-}
-
-.feedback-label {
-  font-weight: bold;
-  margin-right: 8px;
-  color: #606266;
-  min-width: 80px;
-}
-
-.feedback-value.correct {
-  color: #67c23a;
-  font-weight: bold;
-}
-
-.feedback-value.incorrect {
-  color: #f56c6c;
-  font-weight: bold;
-}
-
-.feedback-content {
-  margin-left: 88px;
-  padding: 10px;
-  border: 1px solid #e4e7ed;
-  border-radius: 4px;
-  background-color: #f9f9f9;
-  line-height: 1.6;
-}
-
-.action-card {
-  border: 1px solid #e4e7ed;
-  border-radius: 8px;
-}
-
-.action-section {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-.action-item {
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
 
-.action-label {
-  font-weight: bold;
-  color: #303133;
+.option-item {
+  display: flex;
+  align-items: flex-start;
+  padding: 10px 12px;
+  background: #fafafa;
+  border-radius: 6px;
+  font-size: 13px;
 }
 
-.action-buttons {
+.option-item.is-correct {
+  background: #f0f9eb;
+}
+
+.option-letter {
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #e4e7ed;
+  border-radius: 50%;
+  font-weight: 600;
+  font-size: 12px;
+  margin-right: 10px;
+  flex-shrink: 0;
+}
+
+.option-item.is-correct .option-letter {
+  background: #67c23a;
+  color: #fff;
+}
+
+.option-text {
+  color: #303133;
+  line-height: 1.5;
+}
+
+.answer-text {
+  font-size: 14px;
+  line-height: 1.7;
+  color: #303133;
+  padding: 12px;
+  background: #fafafa;
+  border-radius: 6px;
+  min-height: 60px;
+}
+
+.answer-text.empty {
+  color: #909399;
+  background: #fef0f0;
+}
+
+.correct-answer {
+  margin-top: 10px;
+  padding: 10px 12px;
+  background: #f0f9eb;
+  border-radius: 6px;
+  font-size: 13px;
+  color: #67c23a;
+}
+
+.score-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.score-label {
+  font-size: 14px;
+  color: #909399;
+}
+
+.score-value {
+  font-size: 32px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.score-value.score-high { color: #67c23a; }
+.score-value.score-medium { color: #e6a23c; }
+.score-value.score-low { color: #f56c6c; }
+
+.score-max {
+  font-size: 16px;
+  color: #909399;
+}
+
+.ai-feedback {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.feedback-label {
+  font-size: 13px;
+  color: #909399;
+  margin-bottom: 6px;
+  display: block;
+}
+
+.error-tags .tag-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.suggestion-text {
+  margin-top: 8px;
+}
+
+.suggestion-content {
+  font-size: 14px;
+  line-height: 1.6;
+  color: #303133;
+  margin: 0;
+}
+
+.suggestion-content.is-truncated {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.feedback-raw {
+  font-size: 14px;
+  line-height: 1.6;
+  color: #303133;
+  margin: 0;
+}
+
+.feedback-raw.is-truncated {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.empty-feedback {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 30px;
+  color: #909399;
+  font-size: 14px;
+}
+
+.empty-feedback .hint {
+  font-size: 12px;
+  margin-top: 8px;
+}
+
+.block-footer {
+  border-top: 1px solid #f0f0f0;
+  padding: 20px;
+  background: #fafafa;
+}
+
+.teacher-action {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.action-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.action-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #606266;
+  min-width: 70px;
+}
+
+.action-btns {
   display: flex;
   gap: 10px;
 }
 
-.action-buttons .active {
-  border-color: #409eff;
-  background-color: #ecf5ff;
-  color: #409eff;
+.modify-score {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: 16px;
 }
 
-.score-input {
-  width: 120px;
+.score-unit {
+  font-size: 14px;
+  color: #909399;
 }
 
-.editor-container {
-  border: 1px solid #e4e7ed;
-  border-radius: 4px;
+.feedback-row {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 16px;
 }
 
-.editor {
-  min-height: 100px;
+.feedback-row .el-textarea {
+  flex: 1;
 }
 
-.bottom-actions {
+.submit-row {
   display: flex;
   justify-content: flex-end;
   gap: 10px;
-  margin-top: 20px;
 }
 
-@media (max-width: 1200px) {
-  .review-container {
+.dialog-content {
+  padding: 10px 0;
+}
+
+.dialog-section {
+  margin-bottom: 20px;
+}
+
+.dialog-section:last-child {
+  margin-bottom: 0;
+}
+
+.section-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #303133;
+  margin-bottom: 10px;
+}
+
+.error-tag-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.suggestion-full,
+.feedback-full {
+  font-size: 14px;
+  line-height: 1.8;
+  color: #303133;
+  margin: 0;
+}
+
+@media (max-width: 900px) {
+  .block-main {
     grid-template-columns: 1fr;
   }
-}
-
-@media (max-width: 768px) {
-  .info-row {
-    flex-direction: column;
-    gap: 10px;
+  
+  .left-section {
+    border-right: none;
+    border-bottom: 1px solid #f0f0f0;
   }
   
-  .card-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 10px;
-  }
-  
-  .bottom-actions {
-    flex-direction: column;
-    gap: 10px;
-  }
-  
-  .action-buttons {
-    flex-direction: column;
+  .header-info {
+    display: none;
   }
 }
 </style>

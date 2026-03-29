@@ -93,6 +93,14 @@ public class TeacherReviewController {
         return Result.success(null);
     }
 
+    @Operation(summary = "智辅批改（重新AI评分）")
+    @PostMapping("/{answerId}/regrade")
+    public Result<ReviewDetailVO> regradeWithAi(@PathVariable Long answerId) {
+        Long teacherId = getCurrentUserId();
+        ReviewDetailVO result = teacherReviewService.regradeWithAi(teacherId, answerId);
+        return Result.success(result);
+    }
+
     private Long getCurrentUserId() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || !authentication.isAuthenticated()) {

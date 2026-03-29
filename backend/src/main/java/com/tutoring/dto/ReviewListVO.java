@@ -22,6 +22,7 @@ public class ReviewListVO {
     private String courseName;
     private Long questionId;
     private String questionType;
+    private String questionTypeCategory;
     private String questionContent;
     private Integer aiScore;
     private Integer finalScore;
