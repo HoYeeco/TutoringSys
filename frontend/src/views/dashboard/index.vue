@@ -1,6 +1,10 @@
 <template>
   <div class="dashboard">
-    <h1>欢迎回来，{{ userStore.userInfo?.realName || userStore.userInfo?.username }}</h1>
+    <h1>
+      欢迎回来，{{
+        userStore.userInfo?.realName || userStore.userInfo?.username
+      }}
+    </h1>
     <div class="welcome-card">
       <h2>账号信息</h2>
       <div class="info-grid">
@@ -14,7 +18,9 @@
         </div>
         <div class="info-item">
           <span class="label">角色</span>
-          <span class="value">{{ getUserRoleText(userStore.userInfo?.role) }}</span>
+          <span class="value">{{
+            getUserRoleText(userStore.userInfo?.role)
+          }}</span>
         </div>
         <div class="info-item">
           <span class="label">登录时间</span>
