@@ -11,15 +11,24 @@
       <p v-else-if="question.type === 'multiple'">多选题</p>
       <p v-else-if="question.type === 'judgment'">判断题</p>
       <p v-else>主观题</p>
-      <div v-if="question.type === 'single' || question.type === 'multiple' || question.type === 'judgment'" class="options">
-        <div 
-          v-for="(option, index) in question.options" 
+      <div
+        v-if="
+          question.type === 'single' ||
+          question.type === 'multiple' ||
+          question.type === 'judgment'
+        "
+        class="options"
+      >
+        <div
+          v-for="(option, index) in question.options"
           :key="index"
           class="option-item"
           :class="{ active: selectedOptions.includes(index.toString()) }"
           @click="handleOptionClick(index.toString())"
         >
-          <span class="option-label">{{ String.fromCharCode(65 + index) }}.</span>
+          <span class="option-label"
+            >{{ String.fromCharCode(65 + index) }}.</span
+          >
           <span class="option-content">{{ option }}</span>
         </div>
       </div>
@@ -58,7 +67,10 @@ const subjectiveAnswer = ref('');
 const handleOptionClick = (optionIndex: string) => {
   if (props.question.type === 'single') {
     selectedOptions.value = [optionIndex];
-  } else if (props.question.type === 'multiple' || props.question.type === 'judgment') {
+  } else if (
+    props.question.type === 'multiple' ||
+    props.question.type === 'judgment'
+  ) {
     const index = selectedOptions.value.indexOf(optionIndex);
     if (index > -1) {
       selectedOptions.value.splice(index, 1);

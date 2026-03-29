@@ -9,11 +9,11 @@ describe('QuestionCard component', () => {
       title: '测试单选题',
       type: 'single' as const,
       options: ['选项A', '选项B', '选项C', '选项D'],
-      score: 10
+      score: 10,
     };
 
     const wrapper = mount(QuestionCard, {
-      props: { question }
+      props: { question },
     });
 
     expect(wrapper.find('.question-title').text()).toBe('测试单选题');
@@ -28,11 +28,11 @@ describe('QuestionCard component', () => {
       title: '测试多选题',
       type: 'multiple' as const,
       options: ['选项A', '选项B', '选项C'],
-      score: 15
+      score: 15,
     };
 
     const wrapper = mount(QuestionCard, {
-      props: { question }
+      props: { question },
     });
 
     expect(wrapper.find('.question-title').text()).toBe('测试多选题');
@@ -46,11 +46,11 @@ describe('QuestionCard component', () => {
       id: 3,
       title: '测试主观题',
       type: 'subjective' as const,
-      score: 20
+      score: 20,
     };
 
     const wrapper = mount(QuestionCard, {
-      props: { question }
+      props: { question },
     });
 
     expect(wrapper.find('.question-title').text()).toBe('测试主观题');
@@ -64,11 +64,11 @@ describe('QuestionCard component', () => {
       title: '测试单选题',
       type: 'single' as const,
       options: ['选项A', '选项B'],
-      score: 10
+      score: 10,
     };
 
     const wrapper = mount(QuestionCard, {
-      props: { question }
+      props: { question },
     });
 
     await wrapper.findAll('.option-item')[0].trigger('click');
@@ -82,11 +82,11 @@ describe('QuestionCard component', () => {
       id: 3,
       title: '测试主观题',
       type: 'subjective' as const,
-      score: 20
+      score: 20,
     };
 
     const wrapper = mount(QuestionCard, {
-      props: { question }
+      props: { question },
     });
 
     const textarea = wrapper.find('textarea');
