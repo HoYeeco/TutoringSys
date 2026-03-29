@@ -23,44 +23,64 @@
                 <el-icon><Search /></el-icon>
               </template>
             </el-input>
-            <el-button type="primary" @click="markAllAsRead" :disabled="unreadCount === 0">
+            <el-button
+              type="primary"
+              @click="markAllAsRead"
+              :disabled="unreadCount === 0"
+            >
               一键全部已读
             </el-button>
           </div>
         </div>
       </template>
-      
+
       <div class="message-tabs">
         <el-tabs v-model="activeTab" @tab-click="handleTabClick">
           <el-tab-pane label="全部" name="all">
-            <span v-if="unreadCount > 0" class="unread-badge">{{ unreadCount }}</span>
+            <span v-if="unreadCount > 0" class="unread-badge">{{
+              unreadCount
+            }}</span>
           </el-tab-pane>
           <el-tab-pane label="未读" name="unread">
-            <span v-if="unreadCount > 0" class="unread-badge">{{ unreadCount }}</span>
+            <span v-if="unreadCount > 0" class="unread-badge">{{
+              unreadCount
+            }}</span>
           </el-tab-pane>
           <el-tab-pane label="系统公告" name="announcement"></el-tab-pane>
           <el-tab-pane label="作业通知" name="assignment"></el-tab-pane>
           <el-tab-pane label="批改通知" name="grading"></el-tab-pane>
         </el-tabs>
       </div>
-      
+
       <div class="message-list">
         <div v-if="messages.length === 0" class="empty-container">
           <el-empty description="暂无消息" :image-size="160" />
         </div>
-        <el-card v-for="message in messages" :key="message.id" :class="{ 'message-card': true, 'unread': message.isRead === 0 }">
+        <el-card
+          v-for="message in messages"
+          :key="message.id"
+          :class="{ 'message-card': true, unread: message.isRead === 0 }"
+        >
           <div class="message-item" @click="handleMessageClick(message)">
             <div class="message-header-item">
               <div class="message-title">
                 {{ message.title }}
                 <span v-if="message.isRead === 0" class="unread-dot"></span>
               </div>
-              <div class="message-time">{{ formatTime(message.createTime) }}</div>
+              <div class="message-time">
+                {{ formatTime(message.createTime) }}
+              </div>
             </div>
             <div class="message-content">{{ message.content }}</div>
             <div class="message-footer">
-              <span class="message-type">{{ getMessageTypeText(message.type) }}</span>
-              <el-button type="text" size="small" @click.stop="markAsRead(message.id)">
+              <span class="message-type">{{
+                getMessageTypeText(message.type)
+              }}</span>
+              <el-button
+                type="text"
+                size="small"
+                @click.stop="markAsRead(message.id)"
+              >
                 {{ message.isRead === 0 ? '标记已读' : '已读' }}
               </el-button>
             </div>
@@ -104,26 +124,25 @@ const searchKeyword = ref('');
 const getMessages = async () => {
   try {
     let type = null;
-    if (activeTab.value === 'announcement' || activeTab.value === 'assignment' || activeTab.value === 'grading') {
+    if (
+      activeTab.value === 'announcement' ||
+      activeTab.value === 'assignment' ||
+      activeTab.value === 'grading'
+    ) {
       type = activeTab.value;
     }
 
     const response = await request.get('/message/list', {
       params: {
+        userId: userStore.userInfo?.id,
         page: currentPage.value,
         size: pageSize.value,
         type,
-        keyword: searchKeyword.value || undefined
-      }
+        keyword: searchKeyword.value || undefined,
+      },
     });
 
-    let records = response.data.records || [];
-    
-    if (activeTab.value === 'unread') {
-      records = records.filter((msg) => msg.isRead === 0);
-    }
-    
-    messages.value = records;
+    messages.value = response.data.records || [];
     total.value = response.data.total || 0;
   } catch (error) {
     console.error('获取消息列表失败:', error);
@@ -134,7 +153,11 @@ const getMessages = async () => {
 // 获取未读消息数量
 const getUnreadCount = async () => {
   try {
-    const response = await request.get('/message/unread-count');
+    const response = await request.get('/message/unread-count', {
+      params: {
+        userId: userStore.userInfo?.id,
+      },
+    });
     unreadCount.value = response.data || 0;
   } catch (error) {
     console.error('获取未读消息数量失败:', error);
@@ -144,9 +167,13 @@ const getUnreadCount = async () => {
 // 标记消息为已读
 const markAsRead = async (messageId) => {
   try {
-    await request.put(`/message/read/${messageId}`);
+    await request.put(`/message/read/${messageId}`, null, {
+      params: {
+        userId: userStore.userInfo?.id,
+      },
+    });
     // 更新本地消息状态
-    const message = messages.value.find(msg => msg.id === messageId);
+    const message = messages.value.find((msg) => msg.id === messageId);
     if (message) {
       message.isRead = 1;
     }
@@ -161,9 +188,13 @@ const markAsRead = async (messageId) => {
 // 标记所有消息为已读
 const markAllAsRead = async () => {
   try {
-    await request.put('/message/read-all');
+    await request.put('/message/read/all', null, {
+      params: {
+        userId: userStore.userInfo?.id,
+      },
+    });
     // 更新本地消息状态
-    messages.value.forEach(message => {
+    messages.value.forEach((message) => {
       message.isRead = 1;
     });
     unreadCount.value = 0;
@@ -180,7 +211,7 @@ const handleMessageClick = (message) => {
   if (message.isRead === 0) {
     markAsRead(message.id);
   }
-  
+
   // 根据消息类型跳转到对应页面
   if (message.relatedType === 'assignment' && message.relatedId) {
     if (message.type === 'assignment') {
@@ -220,7 +251,7 @@ const formatTime = (time) => {
     month: '2-digit',
     day: '2-digit',
     hour: '2-digit',
-    minute: '2-digit'
+    minute: '2-digit',
   });
 };
 
@@ -240,8 +271,10 @@ const getMessageTypeText = (type) => {
 
 // 页面加载时获取消息
 onMounted(() => {
-  getMessages();
-  getUnreadCount();
+  if (userStore.userInfo?.id) {
+    getMessages();
+    getUnreadCount();
+  }
 });
 </script>
 
@@ -436,15 +469,15 @@ onMounted(() => {
     flex-direction: column;
     align-items: flex-start;
   }
-  
+
   .header-actions {
     width: 100%;
   }
-  
+
   .message-title {
     font-size: 14px;
   }
-  
+
   .message-content {
     font-size: 13px;
   }
