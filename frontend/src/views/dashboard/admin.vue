@@ -3,7 +3,11 @@
     <el-card shadow="never" class="welcome-card">
       <div class="welcome-content">
         <div class="welcome-text">
-          <h1 class="welcome-title">{{ getGreeting() }}，{{ userStore.userInfo?.realName || userStore.userInfo?.username }}</h1>
+          <h1 class="welcome-title">
+            {{ getGreeting() }}，{{
+              userStore.userInfo?.realName || userStore.userInfo?.username
+            }}
+          </h1>
           <p class="welcome-subtitle">感谢你维持系统有序高效运转。</p>
         </div>
       </div>
@@ -18,14 +22,16 @@
           <span class="card-title__text">数据概览</span>
         </div>
       </template>
-      
+
       <div class="stats-grid">
         <el-card shadow="never" class="stat-card">
           <div class="stat-card__icon stat-card__icon--student">
             <el-icon><Reading /></el-icon>
           </div>
           <div class="stat-card__content">
-            <div class="stat-card__value">{{ adminStats.studentCount || 0 }}</div>
+            <div class="stat-card__value">
+              {{ adminStats.studentCount || 0 }}
+            </div>
             <div class="stat-card__label">学生总数</div>
           </div>
         </el-card>
@@ -35,7 +41,9 @@
             <el-icon><Avatar /></el-icon>
           </div>
           <div class="stat-card__content">
-            <div class="stat-card__value">{{ adminStats.teacherCount || 0 }}</div>
+            <div class="stat-card__value">
+              {{ adminStats.teacherCount || 0 }}
+            </div>
             <div class="stat-card__label">教师总数</div>
           </div>
         </el-card>
@@ -45,7 +53,9 @@
             <el-icon><OfficeBuilding /></el-icon>
           </div>
           <div class="stat-card__content">
-            <div class="stat-card__value">{{ adminStats.courseCount || 0 }}</div>
+            <div class="stat-card__value">
+              {{ adminStats.courseCount || 0 }}
+            </div>
             <div class="stat-card__label">课程总数</div>
           </div>
         </el-card>
@@ -55,7 +65,9 @@
             <el-icon><DocumentChecked /></el-icon>
           </div>
           <div class="stat-card__content">
-            <div class="stat-card__value">{{ adminStats.assignmentCount || 0 }}</div>
+            <div class="stat-card__value">
+              {{ adminStats.assignmentCount || 0 }}
+            </div>
             <div class="stat-card__label">作业总数</div>
           </div>
         </el-card>
@@ -140,7 +152,13 @@ import { ref, onMounted, onUnmounted, nextTick } from 'vue';
 import { useUserStore } from '@/stores/user';
 import request from '@/utils/request';
 import * as echarts from 'echarts';
-import { DataAnalysis, Reading, Avatar, OfficeBuilding, DocumentChecked } from '@element-plus/icons-vue';
+import {
+  DataAnalysis,
+  Reading,
+  Avatar,
+  OfficeBuilding,
+  DocumentChecked,
+} from '@element-plus/icons-vue';
 
 const userStore = useUserStore();
 
@@ -148,7 +166,7 @@ const adminStats = ref({
   studentCount: 0,
   teacherCount: 0,
   courseCount: 0,
-  assignmentCount: 0
+  assignmentCount: 0,
 });
 
 const recentLogs = ref([]);
@@ -173,22 +191,26 @@ const getGreeting = () => {
 
 const getAdminStats = async () => {
   try {
-    const [studentsRes, teachersRes, coursesRes] = await Promise.all([
-      request.get('/admin/users', { params: { role: 'STUDENT', size: 1 } }).catch(() => ({ data: { total: 0 } })),
-      request.get('/admin/users', { params: { role: 'TEACHER', size: 1 } }).catch(() => ({ data: { total: 0 } })),
-      request.get('/admin/courses', { params: { size: 100 } }).catch(() => ({ data: { records: [], total: 0 } }))
+    const [studentsRes, teachersRes, coursesRes, assignmentsRes] = await Promise.all([
+      request
+        .get('/admin/users', { params: { page: 1, size: 1, role: 'STUDENT' } })
+        .catch(() => ({ data: { total: 0 } })),
+      request
+        .get('/admin/users', { params: { page: 1, size: 1, role: 'TEACHER' } })
+        .catch(() => ({ data: { total: 0 } })),
+      request
+        .get('/admin/courses', { params: { page: 1, size: 1 } })
+        .catch(() => ({ data: { total: 0 } })),
+      request
+        .get('/admin/assignments', { params: { page: 1, size: 1 } })
+        .catch(() => ({ data: { total: 0 } })),
     ]);
-    
-    const coursesData = coursesRes.data || { records: [], total: 0 };
-    const totalAssignments = (coursesData.records || []).reduce(
-      (sum: number, course: any) => sum + (course.assignmentCount || 0), 0
-    );
-    
+
     adminStats.value = {
       studentCount: studentsRes.data?.total || 0,
       teacherCount: teachersRes.data?.total || 0,
-      courseCount: coursesData.total || 0,
-      assignmentCount: totalAssignments
+      courseCount: coursesRes.data?.total || 0,
+      assignmentCount: assignmentsRes.data?.total || 0,
     };
   } catch (error) {
     console.error('获取管理员统计数据失败:', error);
@@ -198,17 +220,15 @@ const getAdminStats = async () => {
 const getMonitoringData = async () => {
   try {
     const [llmRes, redisRes] = await Promise.all([
-      request.get('/admin/monitor/llm').catch(() => ({ data: { totalTokens: 0, failedCalls: 0 } })),
-      request.get('/admin/monitor/redis').catch(() => ({ data: { hitRate: 0, usedMemoryHuman: '' } }))
+      request
+        .get('/admin/monitor/llm')
+        .catch(() => ({ data: { tokenConsumption: 0, failureCount: 0 } })),
+      request
+        .get('/admin/monitor/redis')
+        .catch(() => ({ data: { hitRate: 0, memoryUsage: '' } })),
     ]);
-    llmStats.value = {
-      tokenConsumption: llmRes?.data?.totalTokens || 0,
-      failureCount: llmRes?.data?.failedCalls || 0
-    };
-    redisStats.value = {
-      hitRate: redisRes?.data?.hitRate || 0,
-      memoryUsage: redisRes?.data?.usedMemoryHuman || ''
-    };
+    llmStats.value = llmRes.data || { tokenConsumption: 0, failureCount: 0 };
+    redisStats.value = redisRes.data || { hitRate: 0, memoryUsage: '' };
   } catch (error) {
     console.error('获取监控数据失败:', error);
   }
@@ -216,13 +236,15 @@ const getMonitoringData = async () => {
 
 const getRecentLogs = async () => {
   try {
-    const response = await request.get('/admin/monitor/audit-logs', { params: { size: 5 } });
-    const logsData = response?.data || { records: [] };
+    const response = await request.get('/admin/monitor/audit-logs', {
+      params: { size: 5 },
+    });
+    const logsData = response.data || { records: [] };
     recentLogs.value = (logsData.records || []).map((log: any) => ({
-      time: log.operationTime || '-',
-      user: log.operator || '-',
-      action: log.operationType || '-',
-      result: log.success === 1 ? '成功' : '失败'
+      time: log.createTime || log.operationTime || '-',
+      user: log.operator || log.username || '-',
+      action: log.operation || log.operationType || '-',
+      result: log.success ? '成功' : '失败',
     }));
   } catch (error) {
     console.error('获取操作日志失败:', error);
@@ -239,12 +261,22 @@ const initAdminCharts = () => {
       grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
       xAxis: { type: 'category', data: ['学生', '教师', '课程', '作业'] },
       yAxis: { type: 'value' },
-      series: [{
-        data: [adminStats.value.studentCount, adminStats.value.teacherCount, adminStats.value.courseCount, adminStats.value.assignmentCount],
-        type: 'bar',
-        itemStyle: { color: (params: any) => ['#409eff', '#67c23a', '#e6a23c', '#f56c6c'][params.dataIndex] },
-        label: { show: true, position: 'top' }
-      }]
+      series: [
+        {
+          data: [
+            adminStats.value.studentCount,
+            adminStats.value.teacherCount,
+            adminStats.value.courseCount,
+            adminStats.value.assignmentCount,
+          ],
+          type: 'bar',
+          itemStyle: {
+            color: (params: any) =>
+              ['#409eff', '#67c23a', '#e6a23c', '#f56c6c'][params.dataIndex],
+          },
+          label: { show: true, position: 'top' },
+        },
+      ],
     });
   }
 
@@ -254,21 +286,25 @@ const initAdminCharts = () => {
     userTypeChart.setOption({
       tooltip: { trigger: 'item', formatter: '{a} <br/>{b}: {c} ({d}%)' },
       legend: { top: '5%', left: 'center' },
-      series: [{
-        name: '用户类型',
-        type: 'pie',
-        radius: ['40%', '70%'],
-        avoidLabelOverlap: false,
-        itemStyle: { borderRadius: 10, borderColor: '#fff', borderWidth: 2 },
-        label: { show: false, position: 'center' },
-        emphasis: { label: { show: true, fontSize: '18', fontWeight: 'bold' } },
-        labelLine: { show: false },
-        data: [
-          { value: adminStats.value.studentCount, name: '学生' },
-          { value: adminStats.value.teacherCount, name: '教师' }
-        ],
-        color: ['#409eff', '#67c23a']
-      }]
+      series: [
+        {
+          name: '用户类型',
+          type: 'pie',
+          radius: ['40%', '70%'],
+          avoidLabelOverlap: false,
+          itemStyle: { borderRadius: 10, borderColor: '#fff', borderWidth: 2 },
+          label: { show: false, position: 'center' },
+          emphasis: {
+            label: { show: true, fontSize: '18', fontWeight: 'bold' },
+          },
+          labelLine: { show: false },
+          data: [
+            { value: adminStats.value.studentCount, name: '学生' },
+            { value: adminStats.value.teacherCount, name: '教师' },
+          ],
+          color: ['#409eff', '#67c23a'],
+        },
+      ],
     });
   }
 };
@@ -280,11 +316,11 @@ const handleResize = () => {
 
 onMounted(async () => {
   await getAdminStats();
-  await getMonitoringData();
-  await getRecentLogs();
   nextTick(() => {
     initAdminCharts();
   });
+  getMonitoringData();
+  getRecentLogs();
   window.addEventListener('resize', handleResize);
 });
 
@@ -583,29 +619,29 @@ onUnmounted(() => {
   .stats-grid {
     grid-template-columns: 1fr;
   }
-  
+
   .welcome-title {
     font-size: 36px;
   }
-  
+
   .welcome-subtitle {
     font-size: 18px;
   }
-  
+
   .charts-container {
     grid-template-columns: 1fr;
   }
-  
+
   .monitoring-cards {
     grid-template-columns: 1fr;
   }
-  
+
   .llm-stats,
   .redis-stats {
     flex-direction: column;
     gap: 15px;
   }
-  
+
   .llm-stat-item:not(:last-child),
   .redis-stat-item:not(:last-child) {
     border-right: none;
