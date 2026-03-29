@@ -107,7 +107,9 @@
           <template #default="scope">
             <div class="completion-info">
               <span>
-                {{ `${scope.row.submittedCount || 0}/${scope.row.totalStudents || 0}` }}
+                {{
+                  `${scope.row.submittedCount || 0}/${scope.row.totalStudents || 0}`
+                }}
               </span>
               <el-progress
                 :percentage="scope.row.completionRate || 0"
@@ -182,7 +184,9 @@
                 currentAssignment.status === 'published' ? 'success' : 'warning'
               "
             >
-              {{ currentAssignment.status === 'published' ? '已发布' : '已逾期' }}
+              {{
+                currentAssignment.status === 'published' ? '已发布' : '已逾期'
+              }}
             </el-tag>
           </el-descriptions-item>
           <el-descriptions-item label="截止时间" :span="2">
@@ -248,7 +252,11 @@
           <el-tabs v-model="activeTab">
             <el-tab-pane label="已提交学生" name="submitted">
               <div class="student-list">
-                <el-table :data="submittedStudents" style="width: 100%" max-height="300">
+                <el-table
+                  :data="submittedStudents"
+                  style="width: 100%"
+                  max-height="300"
+                >
                   <el-table-column label="头像" width="70">
                     <template #default="scope">
                       <el-avatar :size="40" :src="scope.row.avatar || ''">
@@ -256,7 +264,11 @@
                       </el-avatar>
                     </template>
                   </el-table-column>
-                  <el-table-column prop="studentName" label="姓名" width="100" />
+                  <el-table-column
+                    prop="studentName"
+                    label="姓名"
+                    width="100"
+                  />
                   <el-table-column prop="username" label="账号" width="120" />
                   <el-table-column prop="email" label="邮箱" min-width="150" />
                   <el-table-column prop="phone" label="电话" width="130" />
@@ -265,7 +277,11 @@
             </el-tab-pane>
             <el-tab-pane label="未提交学生" name="notSubmitted">
               <div class="student-list">
-                <el-table :data="notSubmittedStudents" style="width: 100%" max-height="300">
+                <el-table
+                  :data="notSubmittedStudents"
+                  style="width: 100%"
+                  max-height="300"
+                >
                   <el-table-column label="头像" width="70">
                     <template #default="scope">
                       <el-avatar :size="40" :src="scope.row.avatar || ''">
@@ -273,7 +289,11 @@
                       </el-avatar>
                     </template>
                   </el-table-column>
-                  <el-table-column prop="studentName" label="姓名" width="100" />
+                  <el-table-column
+                    prop="studentName"
+                    label="姓名"
+                    width="100"
+                  />
                   <el-table-column prop="username" label="账号" width="120" />
                   <el-table-column prop="email" label="邮箱" min-width="150" />
                   <el-table-column prop="phone" label="电话" width="130" />
@@ -293,7 +313,11 @@
             </el-tab-pane>
             <el-tab-pane label="全部学生" name="all">
               <div class="student-list">
-                <el-table :data="allStudents" style="width: 100%" max-height="300">
+                <el-table
+                  :data="allStudents"
+                  style="width: 100%"
+                  max-height="300"
+                >
                   <el-table-column label="头像" width="70">
                     <template #default="scope">
                       <el-avatar :size="40" :src="scope.row.avatar || ''">
@@ -301,7 +325,11 @@
                       </el-avatar>
                     </template>
                   </el-table-column>
-                  <el-table-column prop="studentName" label="姓名" width="100" />
+                  <el-table-column
+                    prop="studentName"
+                    label="姓名"
+                    width="100"
+                  />
                   <el-table-column prop="username" label="账号" width="120" />
                   <el-table-column prop="email" label="邮箱" min-width="150" />
                   <el-table-column prop="phone" label="电话" width="130" />
@@ -309,11 +337,17 @@
                     <template #default="scope">
                       <el-tag
                         :type="
-                          isStudentSubmitted(scope.row.studentId) ? 'success' : 'warning'
+                          isStudentSubmitted(scope.row.studentId)
+                            ? 'success'
+                            : 'warning'
                         "
                         size="small"
                       >
-                        {{ isStudentSubmitted(scope.row.studentId) ? '已提交' : '未提交' }}
+                        {{
+                          isStudentSubmitted(scope.row.studentId)
+                            ? '已提交'
+                            : '未提交'
+                        }}
                       </el-tag>
                     </template>
                   </el-table-column>
@@ -325,7 +359,10 @@
       </div>
       <template #footer>
         <el-button @click="detailVisible = false">关闭</el-button>
-        <el-button type="primary" @click="editAssignment(currentAssignment?.assignmentId)">
+        <el-button
+          type="primary"
+          @click="editAssignment(currentAssignment?.assignmentId)"
+        >
           编辑
         </el-button>
       </template>
@@ -438,8 +475,10 @@ const showDetail = async (row: Assignment) => {
 
 const getCourses = async () => {
   try {
-    const response = await request.get('/teacher/courses');
-    courses.value = response.data || [];
+    const response = await request.get('/teacher/courses/list', {
+      params: { page: 1, size: 100 }
+    });
+    courses.value = response.data?.records || [];
   } catch (error) {
     console.error('获取课程列表失败:', error);
     courses.value = [];
@@ -449,10 +488,10 @@ const getCourses = async () => {
 const getAssignments = async () => {
   loading.value = true;
   try {
-    const response = await request.get('/teacher/assignments', {
+    const response = await request.get('/teacher/assignments/list', {
       params: {
         page: currentPage.value,
-        pageSize: pageSize.value,
+        size: pageSize.value,
         courseId: filterForm.value.courseId || undefined,
         status: filterForm.value.status || undefined,
         keyword: searchKeyword.value || undefined,
@@ -782,7 +821,7 @@ onMounted(() => {
     flex-direction: column;
     align-items: stretch;
   }
-  
+
   .search-input,
   .filter-item {
     width: 100%;
@@ -794,7 +833,7 @@ onMounted(() => {
     flex-direction: column;
     align-items: flex-start;
   }
-  
+
   .teacher-assignments {
     padding: 16px;
   }

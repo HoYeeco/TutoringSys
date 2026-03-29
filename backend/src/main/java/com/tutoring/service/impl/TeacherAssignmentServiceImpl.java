@@ -212,7 +212,7 @@ public class TeacherAssignmentServiceImpl implements TeacherAssignmentService {
         assignment.setTeacherId(teacherId);
         assignment.setDeadline(request.getDeadline());
         assignment.setTotalScore(request.getTotalScore() != null ? request.getTotalScore() : 100);
-        assignment.setStatus("draft");
+        assignment.setStatus("published");
         assignmentMapper.insert(assignment);
 
         if (request.getQuestions() != null && !request.getQuestions().isEmpty()) {

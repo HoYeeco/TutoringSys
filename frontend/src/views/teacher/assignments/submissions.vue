@@ -31,9 +31,7 @@
         <el-table-column prop="score" label="得分" width="100" />
         <el-table-column prop="status" label="状态" width="100">
           <template #default="scope">
-            <el-tag
-              :type="scope.row.status === 'graded' ? 'success' : 'info'"
-            >
+            <el-tag :type="scope.row.status === 'graded' ? 'success' : 'info'">
               {{ scope.row.status === 'graded' ? '已批改' : '待批改' }}
             </el-tag>
           </template>
@@ -69,10 +67,16 @@
       :title="`${currentSubmission.studentName}的提交`"
       width="800px"
     >
-      <div v-for="(question, index) in currentSubmission.questions" :key="question.questionId" class="question-item">
+      <div
+        v-for="(question, index) in currentSubmission.questions"
+        :key="question.questionId"
+        class="question-item"
+      >
         <div class="question-header">
           <span class="question-number">{{ index + 1 }}.</span>
-          <span class="question-type">{{ getQuestionTypeText(question.type) }}</span>
+          <span class="question-type">{{
+            getQuestionTypeText(question.type)
+          }}</span>
           <span class="question-score">
             得分：
             <el-input-number
@@ -139,7 +143,7 @@ const submissions = ref([
     studentName: '张三',
     submitTime: '2026-03-10 10:00:00',
     score: 85,
-    status: 'graded'
+    status: 'graded',
   },
   {
     id: 2,
@@ -147,7 +151,7 @@ const submissions = ref([
     studentName: '李四',
     submitTime: '2026-03-10 11:00:00',
     score: 90,
-    status: 'graded'
+    status: 'graded',
   },
   {
     id: 3,
@@ -155,8 +159,8 @@ const submissions = ref([
     studentName: '王五',
     submitTime: '2026-03-10 12:00:00',
     score: 75,
-    status: 'graded'
-  }
+    status: 'graded',
+  },
 ]);
 
 const currentPage = ref(1);
@@ -167,7 +171,7 @@ const currentSubmission = ref({
   id: '',
   studentId: '',
   studentName: '',
-  questions: []
+  questions: [],
 });
 
 const getSubmissions = async () => {
@@ -175,14 +179,14 @@ const getSubmissions = async () => {
     // 实际项目中调用接口
     // const response = await request.get(`/teacher/assignments/${assignmentId.value}/submissions`);
     // return response.data;
-    
+
     // 模拟数据
     return {
       assignment: {
         title: '第一章 计算机基础作业',
         courseName: '计算机导论',
         deadline: '2026-03-10 23:59:59',
-        totalStudents: 3
+        totalStudents: 3,
       },
       submissions: [
         {
@@ -191,7 +195,7 @@ const getSubmissions = async () => {
           studentName: '张三',
           submitTime: '2026-03-10 10:00:00',
           score: 85,
-          status: 'graded'
+          status: 'graded',
         },
         {
           id: 2,
@@ -199,7 +203,7 @@ const getSubmissions = async () => {
           studentName: '李四',
           submitTime: '2026-03-10 11:00:00',
           score: 90,
-          status: 'graded'
+          status: 'graded',
         },
         {
           id: 3,
@@ -207,9 +211,9 @@ const getSubmissions = async () => {
           studentName: '王五',
           submitTime: '2026-03-10 12:00:00',
           score: 75,
-          status: 'graded'
-        }
-      ]
+          status: 'graded',
+        },
+      ],
     };
   } catch (error) {
     ElMessage.error('获取提交列表失败');
@@ -222,7 +226,7 @@ const getSubmissionDetail = async (submissionId: string) => {
     // 实际项目中调用接口
     // const response = await request.get(`/teacher/submissions/${submissionId}`);
     // return response.data;
-    
+
     // 模拟数据
     return {
       id: submissionId,
@@ -237,7 +241,7 @@ const getSubmissionDetail = async (submissionId: string) => {
           score: 10,
           maxScore: 10,
           feedback: '回答正确！',
-          type: 'single'
+          type: 'single',
         },
         {
           questionId: 2,
@@ -247,7 +251,7 @@ const getSubmissionDetail = async (submissionId: string) => {
           score: 7,
           maxScore: 15,
           feedback: '显示器是输出设备，不是输入设备。',
-          type: 'multiple'
+          type: 'multiple',
         },
         {
           questionId: 3,
@@ -257,19 +261,21 @@ const getSubmissionDetail = async (submissionId: string) => {
           score: 5,
           maxScore: 5,
           feedback: '回答正确！',
-          type: 'judgment'
+          type: 'judgment',
         },
         {
           questionId: 4,
           questionContent: '请简述计算机的发展历程。',
-          studentAnswer: '计算机的发展经历了四个阶段：电子管计算机、晶体管计算机、集成电路计算机和大规模集成电路计算机。',
-          correctAnswer: '计算机的发展经历了四个阶段：1. 电子管计算机（1946-1958）；2. 晶体管计算机（1958-1964）；3. 集成电路计算机（1964-1971）；4. 大规模集成电路计算机（1971至今）。',
+          studentAnswer:
+            '计算机的发展经历了四个阶段：电子管计算机、晶体管计算机、集成电路计算机和大规模集成电路计算机。',
+          correctAnswer:
+            '计算机的发展经历了四个阶段：1. 电子管计算机（1946-1958）；2. 晶体管计算机（1958-1964）；3. 集成电路计算机（1964-1971）；4. 大规模集成电路计算机（1971至今）。',
           score: 20,
           maxScore: 20,
           feedback: '回答基本正确，但缺少具体的时间范围。',
-          type: 'essay'
-        }
-      ]
+          type: 'essay',
+        },
+      ],
     };
   } catch (error) {
     ElMessage.error('获取提交详情失败');
@@ -282,7 +288,7 @@ const reviewSubmission = async (data: any) => {
     // 实际项目中调用接口
     // const response = await request.put(`/teacher/submissions/${data.id}/review`, data);
     // return response.data;
-    
+
     // 模拟成功
     return { success: true };
   } catch (error) {
@@ -296,7 +302,7 @@ const { execute: fetchSubmissionDetail } = useRequest(getSubmissionDetail);
 const { execute: submitReview } = useRequest(reviewSubmission);
 
 const viewSubmission = (submissionId: string) => {
-  fetchSubmissionDetail(submissionId).then(data => {
+  fetchSubmissionDetail(submissionId).then((data) => {
     if (data) {
       currentSubmission.value = data;
       submissionDialogVisible.value = true;
@@ -309,7 +315,7 @@ const confirmReview = () => {
     ElMessage.success('复核提交成功');
     submissionDialogVisible.value = false;
     // 重新获取提交列表
-    fetchSubmissions().then(data => {
+    fetchSubmissions().then((data) => {
       if (data) {
         submissions.value = data.submissions;
         totalSubmissions.value = data.submissions.length;
@@ -324,7 +330,7 @@ const getQuestionTypeText = (type: string) => {
     single: '单选题',
     multiple: '多选题',
     judgment: '判断题',
-    essay: '简答题'
+    essay: '简答题',
   };
   return typeMap[type] || type;
 };
@@ -344,7 +350,7 @@ const formatDate = (date: string) => {
 };
 
 onMounted(() => {
-  fetchSubmissions().then(data => {
+  fetchSubmissions().then((data) => {
     if (data) {
       assignmentTitle.value = data.assignment.title;
       courseName.value = data.assignment.courseName;
