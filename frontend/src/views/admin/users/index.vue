@@ -6,7 +6,7 @@
         <div class="card-header">
           <div class="card-header__title">
             <div class="card-header__icon">
-              <el-icon><User /></el-icon>
+              <el-icon><Files /></el-icon>
             </div>
             <span>用户管理</span>
           </div>
@@ -46,6 +46,7 @@
         :cell-style="{ textAlign: 'center' }" 
         :header-cell-style="{ textAlign: 'center' }"
         @selection-change="handleSelectionChange"
+        @sort-change="handleTableSortChange"
       >
         <el-table-column type="selection" width="55" />
         <el-table-column label="头像" width="80">
@@ -56,7 +57,7 @@
             </div>
           </template>
         </el-table-column>
-        <el-table-column prop="username" label="账号" min-width="150" show-overflow-tooltip />
+        <el-table-column prop="username" label="账号" min-width="150" show-overflow-tooltip sortable="custom" />
         <el-table-column prop="realName" label="姓名" min-width="120" />
         <el-table-column prop="role" label="角色" width="120">
           <template #default="scope">
@@ -148,11 +149,12 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import { Plus, User, Search, Delete } from '@element-plus/icons-vue';
+import { Plus, Files, Search, Delete } from '@element-plus/icons-vue';
 import { useRequest } from '@/composables/useRequest';
 import request from '@/utils/request';
 
 const users = ref([]);
+const allUsersData = ref([]);
 const total = ref(0);
 const currentPage = ref(1);
 const pageSize = ref(10);
@@ -162,6 +164,7 @@ const searchStatus = ref('');
 const dialogVisible = ref(false);
 const dialogType = ref('add');
 const selectedUserIds = ref<number[]>([]);
+const currentSortOrder = ref<'asc' | 'desc'>('asc');
 const userForm = ref({
   id: 0,
   username: '',
@@ -172,6 +175,36 @@ const userForm = ref({
   phone: '',
   status: 1
 });
+
+const getUsernameSortPriority = (username: string): number => {
+  if (username.startsWith('admin')) return 1;
+  if (username.startsWith('t')) return 2;
+  if (username.startsWith('s')) return 3;
+  return 4;
+};
+
+const sortByUsername = (a: any, b: any): number => {
+  const priorityA = getUsernameSortPriority(a.username);
+  const priorityB = getUsernameSortPriority(b.username);
+  
+  if (priorityA !== priorityB) {
+    return priorityA - priorityB;
+  }
+  
+  return a.username.localeCompare(b.username);
+};
+
+const applySortAndPaginate = (userList: any[], order: 'asc' | 'desc') => {
+  const sorted = [...userList].sort((a, b) => {
+    const result = sortByUsername(a, b);
+    return order === 'asc' ? result : -result;
+  });
+  
+  const startIndex = (currentPage.value - 1) * pageSize.value;
+  const endIndex = startIndex + pageSize.value;
+  
+  return sorted.slice(startIndex, endIndex);
+};
 
 const getUsers = async () => {
   try {
@@ -212,16 +245,14 @@ const getUsers = async () => {
     
     // 获取所有数据
     const allUsers = response?.data?.records || [];
+    allUsersData.value = allUsers;
     total.value = response?.data?.total || 0;
     
-    // 前端手动分页
-    const startIndex = (currentPage.value - 1) * pageSize.value;
-    const endIndex = startIndex + pageSize.value;
-    const pageUsers = allUsers.slice(startIndex, endIndex);
+    // 应用全列表排序后分页
+    const pageUsers = applySortAndPaginate(allUsers, currentSortOrder.value);
     
     console.log('前端分页后记录数:', pageUsers.length);
     
-    // 适配后端返回的字段名
     return {
       list: pageUsers,
       total: total.value
@@ -239,9 +270,23 @@ const getUsers = async () => {
 
 const { execute: fetchUsers } = useRequest(getUsers);
 
+const handleTableSortChange = ({ prop, order }: { prop: string; order: string | null }) => {
+  if (prop === 'username') {
+    if (order === 'ascending') {
+      currentSortOrder.value = 'asc';
+    } else if (order === 'descending') {
+      currentSortOrder.value = 'desc';
+    } else {
+      currentSortOrder.value = 'asc';
+    }
+    users.value = applySortAndPaginate(allUsersData.value, currentSortOrder.value);
+  }
+};
+
 const handleSearch = () => {
   console.log('搜索关键词:', searchKeyword.value);
   currentPage.value = 1;
+  currentSortOrder.value = 'asc';
   fetchUsers().then((data: any) => {
     console.log('搜索结果:', data);
     users.value = data.list;
@@ -361,26 +406,14 @@ const handleSaveUser = async () => {
 const handleSizeChange = (size: number) => {
   console.log('handleSizeChange被调用，新的分页大小:', size);
   pageSize.value = size;
-  currentPage.value = 1; // 重置为第一页
-  console.log('设置后的pageSize:', pageSize.value);
-  console.log('设置后的currentPage:', currentPage.value);
-  fetchUsers().then((data: any) => {
-    console.log('fetchUsers返回结果:', data);
-    users.value = data.list;
-    total.value = data.total;
-    console.log('更新后的users:', users.value.length);
-    console.log('更新后的total:', total.value);
-  });
+  currentPage.value = 1;
+  users.value = applySortAndPaginate(allUsersData.value, currentSortOrder.value);
 };
 
 const handleCurrentChange = (current: number) => {
   currentPage.value = current;
-  fetchUsers().then((data: any) => {
-    users.value = data.list;
-    total.value = data.total;
-    // 重置选择
-    selectedUserIds.value = [];
-  });
+  users.value = applySortAndPaginate(allUsersData.value, currentSortOrder.value);
+  selectedUserIds.value = [];
 };
 
 // 处理选择变化

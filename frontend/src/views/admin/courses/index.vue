@@ -6,7 +6,7 @@
         <div class="card-header">
           <div class="card-header__title">
             <div class="card-header__icon">
-              <el-icon><Notebook /></el-icon>
+              <el-icon><School /></el-icon>
             </div>
             <span>课程管理</span>
           </div>
@@ -46,8 +46,10 @@
         <el-table-column prop="teacherName" label="负责教师" min-width="150">
           <template #default="scope">
             <div class="teacher-info">
-              <el-avatar :size="24" :src="scope.row.teacherAvatar || ''">{{ scope.row.teacherName.charAt(0) }}</el-avatar>
-              <span>{{ scope.row.teacherName }}</span>
+              <el-avatar :size="24" :src="getTeacherAvatar(scope.row.teacherId)">
+                {{ scope.row.teacherName?.charAt(0) || '?' }}
+              </el-avatar>
+              <span>{{ scope.row.teacherName || getTeacherName(scope.row.teacherId) }}</span>
             </div>
           </template>
         </el-table-column>
@@ -151,7 +153,7 @@
 import { ref, reactive, onMounted, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import { Plus, Notebook, Search } from '@element-plus/icons-vue';
+import { Plus, School, Search } from '@element-plus/icons-vue';
 import request from '@/utils/request';
 
 const router = useRouter();
@@ -244,7 +246,7 @@ const getCourses = async () => {
     };
     
     if (filterForm.name) {
-      params.name = filterForm.name;
+      params.keyword = filterForm.name;
     }
     if (filterForm.teacherId) {
       params.teacherId = filterForm.teacherId;
@@ -259,6 +261,16 @@ const getCourses = async () => {
     courses.data = [];
     courses.total = 0;
   }
+};
+
+const getTeacherAvatar = (teacherId: number) => {
+  const teacher = teachers.value.find((t: any) => t.id === teacherId);
+  return teacher?.avatar || '';
+};
+
+const getTeacherName = (teacherId: number) => {
+  const teacher = teachers.value.find((t: any) => t.id === teacherId);
+  return teacher?.realName || '未知教师';
 };
 
 // 搜索

@@ -6,7 +6,7 @@
         <div class="card-header">
           <div class="card-header__title">
             <div class="card-header__icon">
-              <el-icon><Document /></el-icon>
+              <el-icon><Notebook /></el-icon>
             </div>
             <span>作业管理</span>
           </div>
@@ -380,7 +380,7 @@
 import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import { Plus, Search, Bell, Document } from '@element-plus/icons-vue';
+import { Plus, Search, Bell, Notebook } from '@element-plus/icons-vue';
 import request from '@/utils/request';
 
 interface Course {
