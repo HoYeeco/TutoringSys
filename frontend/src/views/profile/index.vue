@@ -12,15 +12,19 @@
           </div>
         </div>
       </template>
-      
+
       <div class="profile-content">
         <!-- 头像区域 -->
         <div class="avatar-section">
           <div class="avatar-display" @click="openAvatarModal">
             <div class="avatar-large">
-              <img v-if="userStore.userInfo?.avatar" :src="userStore.userInfo.avatar" alt="头像" />
+              <img
+                v-if="userStore.userInfo?.avatar"
+                :src="userStore.userInfo.avatar"
+                alt="头像"
+              />
               <div v-else class="avatar-placeholder">
-                {{ (userStore.userInfo?.realName || userStore.userInfo?.username).charAt(0).toUpperCase() }}
+                {{ getAvatarText() }}
               </div>
             </div>
             <div class="avatar-overlay">
@@ -38,7 +42,9 @@
                 <el-icon><User /></el-icon>
                 <span>账号</span>
               </div>
-              <div class="info-item__value">{{ userStore.userInfo?.username }}</div>
+              <div class="info-item__value">
+                {{ userStore.userInfo?.username }}
+              </div>
             </div>
 
             <div class="info-item">
@@ -46,7 +52,9 @@
                 <el-icon><UserFilled /></el-icon>
                 <span>姓名</span>
               </div>
-              <div class="info-item__value">{{ userStore.userInfo?.realName || '-' }}</div>
+              <div class="info-item__value">
+                {{ userStore.userInfo?.realName || '-' }}
+              </div>
             </div>
 
             <div class="info-item">
@@ -87,7 +95,7 @@
           </div>
         </div>
       </template>
-      
+
       <div class="settings-grid">
         <div class="setting-item" @click="openAvatarModal">
           <div class="setting-item__icon">
@@ -142,9 +150,13 @@
         <div class="avatar-preview-section">
           <div class="preview-title">当前头像</div>
           <div class="current-avatar">
-            <img v-if="userStore.userInfo?.avatar" :src="userStore.userInfo.avatar" alt="当前头像" />
+            <img
+              v-if="userStore.userInfo?.avatar"
+              :src="userStore.userInfo.avatar"
+              alt="当前头像"
+            />
             <div v-else class="avatar-placeholder-large">
-              {{ (userStore.userInfo?.realName || userStore.userInfo?.username).charAt(0).toUpperCase() }}
+              {{ getAvatarText() }}
             </div>
           </div>
         </div>
@@ -154,9 +166,13 @@
           <div class="preview-title">新头像预览</div>
           <div class="new-avatar-preview">
             <div class="avatar-preview-box">
-              <img v-if="previewAvatarUrl" :src="previewAvatarUrl" alt="新头像预览" />
+              <img
+                v-if="previewAvatarUrl"
+                :src="previewAvatarUrl"
+                alt="新头像预览"
+              />
               <div v-else class="avatar-placeholder-large">
-                {{ (userStore.userInfo?.realName || userStore.userInfo?.username).charAt(0).toUpperCase() }}
+                {{ getAvatarText() }}
               </div>
             </div>
           </div>
@@ -173,7 +189,9 @@
                 <el-icon><Upload /></el-icon> 选择图片
               </el-button>
             </el-upload>
-            <p class="upload-tip">支持 JPG、PNG、GIF、WebP 格式，大小不超过 10MB</p>
+            <p class="upload-tip">
+              支持 JPG、PNG、GIF、WebP 格式，大小不超过 10MB
+            </p>
           </div>
         </div>
       </div>
@@ -181,7 +199,11 @@
       <template #footer>
         <span class="dialog-footer">
           <el-button @click="avatarModalVisible = false">取消</el-button>
-          <el-button type="primary" @click="confirmAvatarChange" :disabled="!selectedAvatarFile">
+          <el-button
+            type="primary"
+            @click="confirmAvatarChange"
+            :disabled="!selectedAvatarFile"
+          >
             确定
           </el-button>
         </span>
@@ -196,7 +218,11 @@
       :close-on-click-modal="false"
     >
       <el-form :model="passwordForm" label-width="100px">
-        <el-form-item label="旧密码" prop="oldPassword" :error="passwordErrors.oldPassword">
+        <el-form-item
+          label="旧密码"
+          prop="oldPassword"
+          :error="passwordErrors.oldPassword"
+        >
           <el-input
             v-model="passwordForm.oldPassword"
             type="password"
@@ -205,7 +231,11 @@
             size="large"
           />
         </el-form-item>
-        <el-form-item label="新密码" prop="newPassword" :error="passwordErrors.newPassword">
+        <el-form-item
+          label="新密码"
+          prop="newPassword"
+          :error="passwordErrors.newPassword"
+        >
           <el-input
             v-model="passwordForm.newPassword"
             type="password"
@@ -214,7 +244,11 @@
             size="large"
           />
         </el-form-item>
-        <el-form-item label="确认新密码" prop="confirmPassword" :error="passwordErrors.confirmPassword">
+        <el-form-item
+          label="确认新密码"
+          prop="confirmPassword"
+          :error="passwordErrors.confirmPassword"
+        >
           <el-input
             v-model="passwordForm.confirmPassword"
             type="password"
@@ -227,7 +261,9 @@
       <template #footer>
         <span class="dialog-footer">
           <el-button @click="passwordModalVisible = false">取消</el-button>
-          <el-button type="primary" @click="confirmPasswordChange">确定</el-button>
+          <el-button type="primary" @click="confirmPasswordChange"
+            >确定</el-button
+          >
         </span>
       </template>
     </el-dialog>
@@ -240,8 +276,18 @@ import { useUserStore } from '@/stores/user';
 import { useRouter } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import {
-  User, UserFilled, Flag, CircleCheck, Camera, Setting,
-  Avatar, Lock, SwitchButton, ArrowRight, Upload, Link
+  User,
+  UserFilled,
+  Flag,
+  CircleCheck,
+  Camera,
+  Setting,
+  Avatar,
+  Lock,
+  SwitchButton,
+  ArrowRight,
+  Upload,
+  Link,
 } from '@element-plus/icons-vue';
 import request from '@/utils/request';
 
@@ -256,12 +302,12 @@ const passwordModalVisible = ref(false);
 const passwordForm = ref({
   oldPassword: '',
   newPassword: '',
-  confirmPassword: ''
+  confirmPassword: '',
 });
 const passwordErrors = ref({
   oldPassword: '',
   newPassword: '',
-  confirmPassword: ''
+  confirmPassword: '',
 });
 
 const getUserRoleText = (role) => {
@@ -290,6 +336,11 @@ const getUserRoleType = (role) => {
   }
 };
 
+const getAvatarText = () => {
+  const name = userStore.userInfo?.realName || userStore.userInfo?.username;
+  return name ? name.charAt(0).toUpperCase() : 'U';
+};
+
 const openAvatarModal = () => {
   selectedAvatarFile.value = null;
   previewAvatarUrl.value = userStore.userInfo?.avatar || '';
@@ -310,7 +361,7 @@ const handleAvatarUpload = (file) => {
   }
 
   selectedAvatarFile.value = file.raw;
-  
+
   const reader = new FileReader();
   reader.onload = (e) => {
     previewAvatarUrl.value = e.target.result;
@@ -323,19 +374,19 @@ const confirmAvatarChange = async () => {
     if (selectedAvatarFile.value) {
       const formData = new FormData();
       formData.append('file', selectedAvatarFile.value);
-      
+
       const response = await request.post('/user/avatar', formData, {
         headers: {
-          'Content-Type': 'multipart/form-data'
-        }
+          'Content-Type': 'multipart/form-data',
+        },
       });
-      
+
       const newAvatarUrl = response.data;
       userStore.setUserInfo({
         ...userStore.userInfo,
-        avatar: newAvatarUrl
+        avatar: newAvatarUrl,
       });
-      
+
       avatarModalVisible.value = false;
       ElMessage.success('头像修改成功');
     } else {
@@ -351,12 +402,12 @@ const openPasswordModal = () => {
   passwordForm.value = {
     oldPassword: '',
     newPassword: '',
-    confirmPassword: ''
+    confirmPassword: '',
   };
   passwordErrors.value = {
     oldPassword: '',
     newPassword: '',
-    confirmPassword: ''
+    confirmPassword: '',
   };
   passwordModalVisible.value = true;
 };
@@ -391,12 +442,12 @@ const confirmPasswordChange = async () => {
   try {
     await request.put('/user/password', {
       oldPassword: passwordForm.value.oldPassword,
-      newPassword: passwordForm.value.newPassword
+      newPassword: passwordForm.value.newPassword,
     });
 
     passwordModalVisible.value = false;
     ElMessage.success('密码修改成功，请重新登录');
-    
+
     // 退出登录
     setTimeout(() => {
       userStore.logout();
@@ -413,19 +464,17 @@ const confirmPasswordChange = async () => {
 };
 
 const handleLogout = () => {
-  ElMessageBox.confirm(
-    '确定要退出登录吗？',
-    '提示',
-    {
-      confirmButtonText: '确定',
-      cancelButtonText: '取消',
-      type: 'warning'
-    }
-  ).then(() => {
-    userStore.logout();
-    router.push('/login');
-    ElMessage.success('已退出登录');
-  }).catch(() => {});
+  ElMessageBox.confirm('确定要退出登录吗？', '提示', {
+    confirmButtonText: '确定',
+    cancelButtonText: '取消',
+    type: 'warning',
+  })
+    .then(() => {
+      userStore.logout();
+      router.push('/login');
+      ElMessage.success('已退出登录');
+    })
+    .catch(() => {});
 };
 </script>
 
