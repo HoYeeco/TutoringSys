@@ -20,11 +20,12 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, onMounted } from 'vue';
 import { useUserStore } from './stores/user';
 import AdminLayout from './layouts/AdminLayout.vue';
 import TeacherLayout from './layouts/TeacherLayout.vue';
 import StudentLayout from './layouts/StudentLayout.vue';
+import request from './utils/request';
 
 const userStore = useUserStore();
 
@@ -38,6 +39,27 @@ const currentLayout = computed(() => {
   }
   return null;
 });
+
+const refreshUserInfo = async () => {
+  if (userStore.token) {
+    try {
+      const response = await request.get('/user/profile');
+      if (response.data) {
+        userStore.setUserInfo({
+          ...userStore.userInfo,
+          ...response.data,
+          token: userStore.token,
+        });
+      }
+    } catch (error) {
+      console.error('获取用户信息失败:', error);
+    }
+  }
+};
+
+onMounted(() => {
+  refreshUserInfo();
+});
 </script>
 
 <style>
@@ -49,10 +71,12 @@ const currentLayout = computed(() => {
   color: #2c3e50;
 }
 
-.fade-enter-active, .fade-leave-active {
+.fade-enter-active,
+.fade-leave-active {
   transition: opacity 0.3s;
 }
-.fade-enter-from, .fade-leave-to {
+.fade-enter-from,
+.fade-leave-to {
   opacity: 0;
 }
 </style>
