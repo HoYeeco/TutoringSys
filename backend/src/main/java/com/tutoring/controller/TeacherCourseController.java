@@ -90,6 +90,7 @@ public class TeacherCourseController {
                 .id(user.getId())
                 .username(user.getUsername())
                 .realName(user.getRealName())
+                .avatar(user.getAvatar())
                 .email(user.getEmail())
                 .phone(user.getPhone())
                 .role(user.getRole())
