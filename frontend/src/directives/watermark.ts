@@ -16,5 +16,5 @@ export const watermark = {
     const base64Url = canvas.toDataURL('image/png');
     el.style.backgroundImage = `url(${base64Url})`;
     el.style.backgroundRepeat = 'repeat';
-  }
+  },
 };
