@@ -40,6 +40,8 @@
       <el-table
         :data="courses.data"
         class="modern-table"
+        :cell-style="{ textAlign: 'center' }"
+        :header-cell-style="{ textAlign: 'center' }"
         @sort-change="handleSortChange"
       >
         <el-table-column prop="name" label="课程名称" min-width="200" show-overflow-tooltip />
@@ -89,6 +91,8 @@
       v-model="dialogVisible"
       :title="dialogType === 'create' ? '新增课程' : '编辑课程'"
       width="700px"
+      append-to-body
+      destroy-on-close
     >
       <el-form :model="form" :rules="rules" ref="formRef">
         <el-form-item label="课程名称" prop="name">
@@ -494,6 +498,7 @@ onMounted(() => {
 .teacher-info {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
 }
 
