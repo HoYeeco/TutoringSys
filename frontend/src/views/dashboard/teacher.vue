@@ -3,7 +3,11 @@
     <el-card shadow="never" class="welcome-card">
       <div class="welcome-content">
         <div class="welcome-text">
-          <h1 class="welcome-title">{{ getGreeting() }}，{{ userStore.userInfo?.realName || userStore.userInfo?.username }}</h1>
+          <h1 class="welcome-title">
+            {{ getGreeting() }}，{{
+              userStore.userInfo?.realName || userStore.userInfo?.username
+            }}
+          </h1>
           <p class="welcome-subtitle">世界因为你分享知识而变得更美好。</p>
         </div>
       </div>
@@ -18,7 +22,7 @@
           <span class="card-title__text">教学数据</span>
         </div>
       </template>
-      
+
       <div class="stats-grid">
         <el-card shadow="never" class="stat-card">
           <div class="stat-card__icon stat-card__icon--course">
@@ -26,7 +30,9 @@
           </div>
           <div class="stat-card__content">
             <div class="stat-card__label">负责课程数</div>
-            <div class="stat-card__value">{{ teacherStats.courseCount || 0 }}</div>
+            <div class="stat-card__value">
+              {{ teacherStats.courseCount || 0 }}
+            </div>
           </div>
         </el-card>
 
@@ -36,7 +42,9 @@
           </div>
           <div class="stat-card__content">
             <div class="stat-card__label">对应学生数</div>
-            <div class="stat-card__value">{{ teacherStats.studentCount || 0 }}</div>
+            <div class="stat-card__value">
+              {{ teacherStats.studentCount || 0 }}
+            </div>
           </div>
         </el-card>
 
@@ -46,7 +54,9 @@
           </div>
           <div class="stat-card__content">
             <div class="stat-card__label">进行中作业</div>
-            <div class="stat-card__value">{{ teacherStats.ongoingAssignments || 0 }}</div>
+            <div class="stat-card__value">
+              {{ teacherStats.ongoingAssignments || 0 }}
+            </div>
           </div>
         </el-card>
 
@@ -56,7 +66,9 @@
           </div>
           <div class="stat-card__content">
             <div class="stat-card__label">待复核作业</div>
-            <div class="stat-card__value">{{ teacherStats.pendingReviews || 0 }}</div>
+            <div class="stat-card__value">
+              {{ teacherStats.pendingReviews || 0 }}
+            </div>
           </div>
         </el-card>
 
@@ -66,7 +78,9 @@
           </div>
           <div class="stat-card__content">
             <div class="stat-card__label">已逾期作业</div>
-            <div class="stat-card__value">{{ teacherStats.overdueAssignments || 0 }}</div>
+            <div class="stat-card__value">
+              {{ teacherStats.overdueAssignments || 0 }}
+            </div>
           </div>
         </el-card>
       </div>
@@ -83,7 +97,7 @@
       </template>
       <div ref="teacherChartRef" class="chart" style="height: 360px"></div>
     </el-card>
-    
+
     <el-card shadow="never" class="quick-section">
       <template #header>
         <div class="card-title">
@@ -93,7 +107,7 @@
           <span class="card-title__text">快捷操作</span>
         </div>
       </template>
-      
+
       <div class="quick-grid">
         <div class="quick-item" @click="goToCreateAssignment">
           <div class="quick-item__icon">
@@ -116,7 +130,11 @@
         <div class="quick-item" @click="goToSubmissions">
           <div class="quick-item__icon quick-item__icon--badge">
             <el-icon><Ticket /></el-icon>
-            <el-badge v-if="teacherStats.pendingReviews > 0" :value="teacherStats.pendingReviews" class="quick-badge" />
+            <el-badge
+              v-if="teacherStats.pendingReviews > 0"
+              :value="teacherStats.pendingReviews"
+              class="quick-badge"
+            />
           </div>
           <span class="quick-item__label">批改复核</span>
         </div>
@@ -131,7 +149,19 @@ import { useUserStore } from '@/stores/user';
 import { useRouter } from 'vue-router';
 import request from '@/utils/request';
 import * as echarts from 'echarts';
-import { School, Ticket, Warning, Edit, Notebook, Document, User, Clock, Histogram, Grid } from '@element-plus/icons-vue';
+import {
+  School,
+  Ticket,
+  Warning,
+  Edit,
+  Notebook,
+  Document,
+  User,
+  Clock,
+  Histogram,
+  Grid,
+  DataAnalysis,
+} from '@element-plus/icons-vue';
 
 const userStore = useUserStore();
 const router = useRouter();
@@ -141,7 +171,7 @@ const teacherStats = ref({
   studentCount: 0,
   ongoingAssignments: 0,
   pendingReviews: 0,
-  overdueAssignments: 0
+  overdueAssignments: 0,
 });
 
 const teacherChartRef = ref(null);
@@ -170,12 +200,18 @@ const getTeacherStats = async () => {
         studentCount: response.data.studentCount || 0,
         ongoingAssignments: response.data.ongoingAssignmentCount || 0,
         pendingReviews: response.data.pendingReviewCount || 0,
-        overdueAssignments: response.data.overdueAssignmentCount || 0
+        overdueAssignments: response.data.overdueAssignmentCount || 0,
       };
     }
   } catch (error) {
     console.error('获取教师统计数据失败:', error);
-    teacherStats.value = { courseCount: 0, studentCount: 0, ongoingAssignments: 0, pendingReviews: 0, overdueAssignments: 0 };
+    teacherStats.value = {
+      courseCount: 0,
+      studentCount: 0,
+      ongoingAssignments: 0,
+      pendingReviews: 0,
+      overdueAssignments: 0,
+    };
   }
 };
 
@@ -186,20 +222,30 @@ const initTeacherChart = () => {
   const option = {
     tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
     grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
-    xAxis: { type: 'category', data: ['负责课程', '对应学生', '进行中作业', '待复核', '已逾期'] },
+    xAxis: {
+      type: 'category',
+      data: ['负责课程', '对应学生', '进行中作业', '待复核', '已逾期'],
+    },
     yAxis: { type: 'value' },
-    series: [{
-      data: [
-        teacherStats.value.courseCount,
-        teacherStats.value.studentCount,
-        teacherStats.value.ongoingAssignments,
-        teacherStats.value.pendingReviews,
-        teacherStats.value.overdueAssignments
-      ],
-      type: 'bar',
-      itemStyle: { color: (params: any) => ['#409eff', '#67c23a', '#e6a23c', '#f56c6c', '#909399'][params.dataIndex] },
-      label: { show: true, position: 'top' }
-    }]
+    series: [
+      {
+        data: [
+          teacherStats.value.courseCount,
+          teacherStats.value.studentCount,
+          teacherStats.value.ongoingAssignments,
+          teacherStats.value.pendingReviews,
+          teacherStats.value.overdueAssignments,
+        ],
+        type: 'bar',
+        itemStyle: {
+          color: (params: any) =>
+            ['#409eff', '#67c23a', '#e6a23c', '#f56c6c', '#909399'][
+              params.dataIndex
+            ],
+        },
+        label: { show: true, position: 'top' },
+      },
+    ],
   };
   teacherChart.setOption(option);
 };
@@ -462,15 +508,15 @@ onUnmounted(() => {
   .stats-grid {
     grid-template-columns: 1fr;
   }
-  
+
   .quick-grid {
     grid-template-columns: 1fr;
   }
-  
+
   .welcome-title {
     font-size: 36px;
   }
-  
+
   .welcome-subtitle {
     font-size: 18px;
   }
