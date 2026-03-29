@@ -32,8 +32,10 @@ appStore.detectSystemTheme();
 
 // 监听系统主题变化
 if (window.matchMedia) {
-    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
-        appStore.detectSystemTheme();
+  window
+    .matchMedia('(prefers-color-scheme: dark)')
+    .addEventListener('change', () => {
+      appStore.detectSystemTheme();
     });
 }
 
