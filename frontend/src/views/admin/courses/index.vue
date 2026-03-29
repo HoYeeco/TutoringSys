@@ -231,6 +231,7 @@ const getStudents = async () => {
     const response = await request.get('/admin/users', {
       params: {
         role: 'STUDENT',
+        status: 1,
         page: 1,
         size: 100
       }
