@@ -22,24 +22,24 @@ import '@vueup/vue-quill/dist/vue-quill.snow.css';
 const props = defineProps({
   modelValue: {
     type: String,
-    default: ''
+    default: '',
   },
   placeholder: {
     type: String,
-    default: '请输入内容...'
+    default: '请输入内容...',
   },
   maxWords: {
     type: Number,
-    default: null
+    default: null,
   },
   minWords: {
     type: Number,
-    default: null
+    default: null,
   },
   showWordCount: {
     type: Boolean,
-    default: true
-  }
+    default: true,
+  },
 });
 
 const emit = defineEmits(['update:modelValue', 'wordCountChange']);
@@ -58,9 +58,9 @@ const editorOptions = {
       [{ list: 'ordered' }, { list: 'bullet' }],
       [{ script: 'sub' }, { script: 'super' }],
       ['link', 'image', 'video'],
-      ['clean']
-    ]
-  }
+      ['clean'],
+    ],
+  },
 };
 
 const wordCount = computed(() => {
@@ -74,9 +74,12 @@ watch(content, (newVal) => {
   emit('wordCountChange', wordCount.value);
 });
 
-watch(() => props.modelValue, (newVal) => {
-  content.value = newVal;
-});
+watch(
+  () => props.modelValue,
+  (newVal) => {
+    content.value = newVal;
+  },
+);
 
 const onReady = (quill) => {
   console.log('Quill editor ready');
@@ -109,7 +112,7 @@ const validateWordCount = () => {
 defineExpose({
   getHTML,
   getText,
-  validateWordCount
+  validateWordCount,
 });
 </script>
 
