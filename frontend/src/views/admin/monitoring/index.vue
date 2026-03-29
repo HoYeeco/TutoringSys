@@ -125,7 +125,7 @@
             <div class="stats-grid">
               <el-card shadow="never" class="stat-card">
                 <div class="stat-content">
-                  <div class="stat-value">{{ formatNumber(llmStats.tokenConsumption) }}</div>
+                  <div class="stat-value">{{ formatNumber(llmStats.totalTokens) }}</div>
                   <div class="stat-label">Token 消耗</div>
                 </div>
                 <div class="stat-icon">
@@ -134,11 +134,29 @@
               </el-card>
               <el-card shadow="never" class="stat-card">
                 <div class="stat-content">
-                  <div class="stat-value">{{ formatNumber(llmStats.failureCount) }}</div>
+                  <div class="stat-value">{{ formatNumber(llmStats.failedCalls) }}</div>
                   <div class="stat-label">失败次数</div>
                 </div>
                 <div class="stat-icon">
                   <el-icon class="icon-large"><Close /></el-icon>
+                </div>
+              </el-card>
+              <el-card shadow="never" class="stat-card">
+                <div class="stat-content">
+                  <div class="stat-value">{{ formatNumber(llmStats.totalCalls) }}</div>
+                  <div class="stat-label">总调用次数</div>
+                </div>
+                <div class="stat-icon">
+                  <el-icon class="icon-large"><DataAnalysis /></el-icon>
+                </div>
+              </el-card>
+              <el-card shadow="never" class="stat-card">
+                <div class="stat-content">
+                  <div class="stat-value">{{ llmStats.successRate || 0 }}%</div>
+                  <div class="stat-label">成功率</div>
+                </div>
+                <div class="stat-icon">
+                  <el-icon class="icon-large"><Check /></el-icon>
                 </div>
               </el-card>
             </div>
@@ -147,7 +165,7 @@
             <div class="stats-grid">
               <el-card shadow="never" class="stat-card">
                 <div class="stat-content">
-                  <div class="stat-value">{{ redisStats.hitRate }}%</div>
+                  <div class="stat-value">{{ redisStats.hitRate || 0 }}%</div>
                   <div class="stat-label">命中率</div>
                 </div>
                 <div class="stat-icon">
@@ -156,11 +174,29 @@
               </el-card>
               <el-card shadow="never" class="stat-card">
                 <div class="stat-content">
-                  <div class="stat-value">{{ redisStats.memoryUsage }}</div>
+                  <div class="stat-value">{{ redisStats.usedMemoryHuman || '-' }}</div>
                   <div class="stat-label">内存使用</div>
                 </div>
                 <div class="stat-icon">
                   <el-icon class="icon-large"><Monitor /></el-icon>
+                </div>
+              </el-card>
+              <el-card shadow="never" class="stat-card">
+                <div class="stat-content">
+                  <div class="stat-value">{{ formatNumber(redisStats.dbSize) }}</div>
+                  <div class="stat-label">缓存键数量</div>
+                </div>
+                <div class="stat-icon">
+                  <el-icon class="icon-large"><Document /></el-icon>
+                </div>
+              </el-card>
+              <el-card shadow="never" class="stat-card">
+                <div class="stat-content">
+                  <div class="stat-value">{{ formatNumber(redisStats.connectedClients) }}</div>
+                  <div class="stat-label">连接客户端</div>
+                </div>
+                <div class="stat-icon">
+                  <el-icon class="icon-large"><ChatLineSquare /></el-icon>
                 </div>
               </el-card>
             </div>
@@ -194,11 +230,11 @@
 
           <div class="logs-section">
             <h4 class="sub-section-title">登录日志</h4>
-            <el-table :data="loginLogs" style="width: 100%">
+            <el-table :data="loginLogs" style="width: 100%" v-loading="loginLogsLoading">
               <el-table-column prop="time" label="时间" width="180" />
               <el-table-column prop="user" label="用户" width="150" />
               <el-table-column prop="ip" label="IP 地址" width="150" />
-              <el-table-column prop="result" label="结果" width="100">
+              <el-table-column prop="result" label="登录结果" width="100">
                 <template #default="scope">
                   <el-tag :type="scope.row.result === '成功' ? 'success' : 'danger'">
                     {{ scope.row.result }}
@@ -210,18 +246,12 @@
 
           <div class="logs-section">
             <h4 class="sub-section-title">异常日志</h4>
-            <el-table :data="errorLogs" style="width: 100%">
+            <el-table :data="errorLogs" style="width: 100%" v-loading="errorLogsLoading">
               <el-table-column prop="time" label="时间" width="180" />
               <el-table-column prop="api" label="接口" width="200" />
               <el-table-column prop="error" label="错误信息" />
-              <el-table-column label="操作" width="120">
-                <template #default="scope">
-                  <el-button size="small" @click="viewErrorDetail(scope.row.id)">
-                    查看堆栈
-                  </el-button>
-                </template>
-              </el-table-column>
             </el-table>
+            <el-empty v-if="!errorLogsLoading && errorLogs.length === 0" description="暂无异常日志" :image-size="80" />
           </div>
         </el-tab-pane>
       </el-tabs>
@@ -231,7 +261,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, nextTick, watch } from 'vue';
-import { ElMessage, ElMessageBox } from 'element-plus';
+import { ElMessage } from 'element-plus';
 import { ChatLineSquare, Money, Close, Check, Monitor, Document, DataAnalysis, DocumentCopy } from '@element-plus/icons-vue';
 import request from '@/utils/request';
 import * as echarts from 'echarts';
@@ -242,6 +272,8 @@ const activeTab = ref('assignment');
 const courses = ref([]);
 const assignmentLoading = ref(false);
 const logsLoading = ref(false);
+const loginLogsLoading = ref(false);
+const errorLogsLoading = ref(false);
 
 const assignmentFilter = ref({
   dateRange: null,
@@ -260,14 +292,29 @@ const apiStatsChartRef = ref<HTMLElement | null>(null);
 let apiStatsChart: echarts.ECharts | null = null;
 
 const llmStats = ref({
-  tokenConsumption: 0,
-  costEstimate: 0,
-  failureCount: 0
+  totalCalls: 0,
+  successCalls: 0,
+  failedCalls: 0,
+  successRate: 0,
+  totalPromptTokens: 0,
+  totalCompletionTokens: 0,
+  totalTokens: 0
 });
 
 const redisStats = ref({
+  version: '',
+  mode: '',
+  uptimeInSeconds: 0,
+  connectedClients: 0,
+  totalConnectionsReceived: 0,
+  totalCommandsProcessed: 0,
+  keyspaceHits: 0,
+  keyspaceMisses: 0,
   hitRate: 0,
-  memoryUsage: ''
+  usedMemory: '',
+  usedMemoryPeak: '',
+  usedMemoryHuman: '',
+  dbSize: 0
 });
 
 const operationLogs = ref([]);
@@ -288,15 +335,27 @@ const getCourses = async () => {
 const getAssignmentSubmissions = async () => {
   assignmentLoading.value = true;
   try {
-    const response = await request.get('/admin/monitoring/assignments', {
-      params: {
-        page: assignmentPage.value.page,
-        pageSize: assignmentPage.value.pageSize,
-        courseId: assignmentFilter.value.courseId || undefined,
-        status: assignmentFilter.value.status || undefined
-      }
-    });
-    assignmentSubmissions.value = response.data?.records || [];
+    const params: any = {
+      page: assignmentPage.value.page,
+      size: assignmentPage.value.pageSize,
+    };
+    
+    if (assignmentFilter.value.courseId) {
+      params.courseId = assignmentFilter.value.courseId;
+    }
+    if (assignmentFilter.value.status) {
+      params.reviewStatus = assignmentFilter.value.status === 'pending' ? 0 : 
+                           assignmentFilter.value.status === 'completed' ? 1 : undefined;
+    }
+    
+    const response = await request.get('/admin/submissions', { params });
+    assignmentSubmissions.value = (response.data?.records || []).map((item: any) => ({
+      ...item,
+      assignmentName: item.assignmentTitle,
+      status: item.reviewStatus === 0 ? 'pending' : 
+              item.reviewStatus === 1 ? 'completed' : 'pending',
+      llmCallId: item.submissionId || '-',
+    }));
     assignmentPage.value.total = response.data?.total || 0;
   } catch (error) {
     console.error('获取作业提交记录失败:', error);
@@ -309,14 +368,14 @@ const getOperationLogs = async () => {
   logsLoading.value = true;
   try {
     const response = await request.get('/admin/monitor/audit-logs', {
-      params: { size: 20 }
+      params: { page: 1, size: 20 },
     });
     const logsData = response.data || { records: [] };
     operationLogs.value = (logsData.records || []).map((log: any) => ({
-      time: log.createTime || log.operationTime || '-',
-      user: log.operator || log.username || '-',
-      action: log.operation || log.operationType || '-',
-      result: log.success ? '成功' : '失败'
+      time: log.operationTime || '-',
+      user: log.operator || '-',
+      action: log.operationContent || log.operationType || '-',
+      result: log.success === 1 ? '成功' : '失败',
     }));
   } catch (error) {
     console.error('获取操作日志失败:', error);
@@ -326,10 +385,53 @@ const getOperationLogs = async () => {
   }
 };
 
+const getLoginLogs = async () => {
+  loginLogsLoading.value = true;
+  try {
+    const response = await request.get('/admin/monitor/login-records', {
+      params: { page: 1, size: 20 },
+    });
+    const logsData = response.data || { records: [] };
+    loginLogs.value = (logsData.records || []).map((log: any) => ({
+      time: log.loginTime || '-',
+      user: log.realName || log.username || '-',
+      ip: log.ipAddress || '-',
+      result: log.success === 1 ? '成功' : '失败',
+    }));
+  } catch (error) {
+    console.error('获取登录日志失败:', error);
+    loginLogs.value = [];
+  } finally {
+    loginLogsLoading.value = false;
+  }
+};
+
+const getErrorLogs = async () => {
+  errorLogsLoading.value = true;
+  try {
+    errorLogs.value = [];
+  } catch (error) {
+    console.error('获取异常日志失败:', error);
+    errorLogs.value = [];
+  } finally {
+    errorLogsLoading.value = false;
+  }
+};
+
 const getLlmStats = async () => {
   try {
     const response = await request.get('/admin/monitor/llm');
-    llmStats.value = response.data || { tokenConsumption: 0, costEstimate: 0, failureCount: 0 };
+    if (response.data) {
+      llmStats.value = {
+        totalCalls: response.data.totalCalls || 0,
+        successCalls: response.data.successCalls || 0,
+        failedCalls: response.data.failedCalls || 0,
+        successRate: response.data.successRate || 0,
+        totalPromptTokens: response.data.totalPromptTokens || 0,
+        totalCompletionTokens: response.data.totalCompletionTokens || 0,
+        totalTokens: response.data.totalTokens || 0
+      };
+    }
   } catch (error) {
     console.error('获取LLM统计失败:', error);
   }
@@ -338,7 +440,23 @@ const getLlmStats = async () => {
 const getRedisStats = async () => {
   try {
     const response = await request.get('/admin/monitor/redis');
-    redisStats.value = response.data || { hitRate: 0, memoryUsage: '' };
+    if (response.data) {
+      redisStats.value = {
+        version: response.data.version || '',
+        mode: response.data.mode || '',
+        uptimeInSeconds: response.data.uptimeInSeconds || 0,
+        connectedClients: response.data.connectedClients || 0,
+        totalConnectionsReceived: response.data.totalConnectionsReceived || 0,
+        totalCommandsProcessed: response.data.totalCommandsProcessed || 0,
+        keyspaceHits: response.data.keyspaceHits || 0,
+        keyspaceMisses: response.data.keyspaceMisses || 0,
+        hitRate: response.data.hitRate || 0,
+        usedMemory: response.data.usedMemory || '',
+        usedMemoryPeak: response.data.usedMemoryPeak || '',
+        usedMemoryHuman: response.data.usedMemoryHuman || '',
+        dbSize: response.data.dbSize || 0
+      };
+    }
   } catch (error) {
     console.error('获取Redis统计失败:', error);
   }
@@ -351,6 +469,35 @@ const initApiStatsChart = async () => {
         apiStatsChart.dispose();
       }
       apiStatsChart = echarts.init(apiStatsChartRef.value);
+      
+      const response = await request.get('/admin/monitor/audit-logs', {
+        params: { page: 1, size: 1000 },
+      });
+      
+      const logs = response.data?.records || [];
+      
+      const last10Days: string[] = [];
+      const callCounts: number[] = [];
+      
+      for (let i = 9; i >= 0; i--) {
+        const date = new Date();
+        date.setDate(date.getDate() - i);
+        const dateStr = `${date.getMonth() + 1}/${date.getDate()}`;
+        last10Days.push(dateStr);
+        
+        const dayStart = new Date(date);
+        dayStart.setHours(0, 0, 0, 0);
+        const dayEnd = new Date(date);
+        dayEnd.setHours(23, 59, 59, 999);
+        
+        const count = logs.filter((log: any) => {
+          const logTime = new Date(log.operationTime);
+          return logTime >= dayStart && logTime <= dayEnd;
+        }).length;
+        
+        callCounts.push(count);
+      }
+      
       const option = {
         tooltip: {
           trigger: 'axis',
@@ -366,22 +513,33 @@ const initApiStatsChart = async () => {
         },
         xAxis: {
           type: 'category',
-          data: ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
+          data: last10Days,
+          axisLabel: {
+            fontSize: 12
+          }
         },
         yAxis: [
           {
             type: 'value',
             name: '调用次数',
-            position: 'left'
+            position: 'left',
+            axisLabel: {
+              fontSize: 12
+            }
           }
         ],
         series: [
           {
             name: '调用次数',
             type: 'bar',
-            data: [0, 0, 0, 0, 0, 0, 0],
+            data: callCounts,
             itemStyle: {
               color: '#409eff'
+            },
+            label: {
+              show: true,
+              position: 'top',
+              fontSize: 12
             }
           }
         ]
@@ -428,20 +586,6 @@ const viewSubmissionDetail = (id: number) => {
   ElMessage.info('查看提交详情功能开发中');
 };
 
-const viewErrorDetail = (id: number) => {
-  ElMessageBox.alert(
-    '错误堆栈信息：\n' +
-    'Error: AI模型调用超时\n' +
-    '    at /api/llm/grade (line 45)\n' +
-    '    at async handleGrade (line 123)\n' +
-    '    at async router.post (line 56)',
-    '错误详情',
-    {
-      confirmButtonText: '确定'
-    }
-  );
-};
-
 const formatNumber = (num: number): string => {
   if (num === undefined || num === null) return '0';
   return num.toLocaleString('zh-CN');
@@ -467,6 +611,8 @@ watch(activeTab, (newVal) => {
     });
   } else if (newVal === 'logs') {
     getOperationLogs();
+    getLoginLogs();
+    getErrorLogs();
   }
 });
 </script>
@@ -781,9 +927,7 @@ watch(activeTab, (newVal) => {
   .stats-grid {
     grid-template-columns: 1fr;
   }
-  
 
-  
   .pagination-container {
     justify-content: center;
   }
