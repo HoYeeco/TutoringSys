@@ -20,7 +20,7 @@ describe('user store', () => {
       id: 1,
       username: 'testuser',
       realName: 'Test User',
-      role: 'student'
+      role: 'student',
     };
     const token = 'test-token';
 
@@ -38,7 +38,7 @@ describe('user store', () => {
       id: 1,
       username: 'testuser',
       realName: 'Test User',
-      role: 'student'
+      role: 'student',
     };
     const token = 'test-token';
 
