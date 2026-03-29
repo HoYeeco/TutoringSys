@@ -206,8 +206,8 @@
       <el-button @click="previewAssignment" :disabled="!canPreview">
         <el-icon><View /></el-icon> 预览模式
       </el-button>
-      <el-button @click="openScheduleDialog" :disabled="!canSave">
-        <el-icon><Clock /></el-icon> 预设发布
+      <el-button type="success" @click="saveDraftManual" :disabled="!canSave">
+        <el-icon><FolderChecked /></el-icon> 保存草稿
       </el-button>
       <el-button type="primary" @click="publishNow" :disabled="!canPublish">
         <el-icon><Promotion /></el-icon> 现在发布
@@ -243,29 +243,29 @@
 
     <el-dialog
       v-model="scheduleDialogVisible"
-      title="预设发布时间"
+      title="选择草稿"
       width="450px"
     >
-      <el-form :model="scheduleForm" label-width="100px">
-        <el-form-item label="发布时间" required>
-          <el-date-picker
-            v-model="scheduleForm.publishTime"
-            type="datetime"
-            placeholder="选择发布时间"
-            style="width: 100%"
-            :disabled-date="disabledScheduleDate"
-            format="YYYY-MM-DD HH:mm:ss"
-            value-format="YYYY-MM-DDTHH:mm:ss"
-          />
-        </el-form-item>
-        <el-form-item label="通知学生">
-          <el-switch v-model="scheduleForm.notifyStudents" />
-          <span class="switch-hint">发布时自动通知对应课程班的学生</span>
-        </el-form-item>
-      </el-form>
+      <el-empty v-if="drafts.length === 0" description="暂无草稿" />
+      <div v-else class="draft-list-dialog">
+        <el-card
+          v-for="draft in drafts"
+          :key="draft.id"
+          class="draft-item"
+          @click="loadDraft(draft.id)"
+        >
+          <div class="draft-header">
+            <span class="draft-title">{{ draft.title }}</span>
+            <span class="draft-course">{{ draft.courseName }}</span>
+          </div>
+          <div class="draft-info">
+            <span class="draft-time">保存时间：{{ formatDateTime(draft.saveTime) }}</span>
+            <span class="draft-questions">{{ draft.questionCount }}道题目</span>
+          </div>
+        </el-card>
+      </div>
       <template #footer>
-        <el-button @click="scheduleDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="confirmSchedule">确认预设</el-button>
+        <el-button @click="scheduleDialogVisible = false">关闭</el-button>
       </template>
     </el-dialog>
 
@@ -326,14 +326,14 @@
         <div class="preview-questions">
           <div v-for="(q, idx) in previewData.questions" :key="idx" class="preview-question">
             <div class="q-title">
-              <span class="q-number">{{ idx + 1 }}.</span>
+              <span class="q-number">{{ Number(idx) + 1 }}.</span>
               <span class="q-type">[{{ getQuestionTypeText(q.type) }}]</span>
               <span class="q-score">({{ q.score }}分)</span>
               <div class="q-content" v-html="q.content"></div>
             </div>
             <div class="question-options" v-if="q.type === 'single' || q.type === 'multiple'">
               <div v-for="(opt, optIdx) in q.options" :key="optIdx" class="option">
-                {{ String.fromCharCode(65 + optIdx) }}. {{ opt.value }}
+                {{ String.fromCharCode(65 + (typeof optIdx === 'number' ? optIdx : parseInt(optIdx))) }}. {{ opt.value }}
               </div>
             </div>
             <div class="question-answer" v-if="q.type === 'judgment'">
@@ -383,6 +383,7 @@ interface Question {
 }
 
 const assignment = ref({
+  id: null as number | null,
   title: '',
   courseId: null as number | null,
   description: '',
@@ -418,7 +419,20 @@ const editors = ref<Record<number, Quill>>({});
 const answerEditors = ref<Record<number, Quill>>({});
 const autoSaveTimer = ref<number | null>(null);
 
-const drafts = ref<any[]>([]);
+interface Draft {
+  id: number;
+  title: string;
+  courseId: number;
+  courseName: string;
+  description: string;
+  deadline: string;
+  questions: any[];
+  totalScore: number;
+  saveTime: string;
+  questionCount: number;
+}
+
+const drafts = ref<Draft[]>([]);
 const draftSearch = ref('');
 const draftCount = computed(() => drafts.value.length);
 const filteredDrafts = computed(() => {
@@ -464,9 +478,7 @@ const disabledDate = (time: Date) => {
   return time.getTime() < Date.now() - 8.64e7;
 };
 
-const disabledScheduleDate = (time: Date) => {
-  return time.getTime() < Date.now();
-};
+
 
 const setEditorRef = (el: any, tempId: number) => {
   if (el) editorRefs.value[tempId] = el;
@@ -489,15 +501,6 @@ const getCourses = async () => {
     courses.value = response.data?.records || [];
   } catch (error) {
     console.error('获取课程列表失败:', error);
-  }
-};
-
-const getDrafts = async () => {
-  try {
-    const response = await request.get('/admin/assignments/drafts');
-    drafts.value = response.data || [];
-  } catch (error) {
-    drafts.value = [];
   }
 };
 
@@ -648,25 +651,6 @@ const openDraftBox = () => {
   draftBoxDialogVisible.value = true;
 };
 
-const loadDraft = (draft: any) => {
-  ElMessageBox.confirm('你将查看该草稿，当前页面未保存内容可能丢失，是否继续？', '提示', {
-    confirmButtonText: '确定',
-    cancelButtonText: '取消',
-    type: 'warning'
-  }).then(() => {
-    assignment.value = {
-      title: draft.title || '',
-      courseId: draft.courseId,
-      description: draft.description || '',
-      deadline: draft.deadline || '',
-      courseName: draft.courseName || ''
-    };
-    questions.value = draft.questions || [];
-    draftBoxDialogVisible.value = false;
-    ElMessage.success('草稿加载成功');
-  }).catch(() => {});
-};
-
 const saveDraft = async () => {
   if (!assignment.value.title) return;
   
@@ -683,14 +667,174 @@ const saveDraft = async () => {
     const data = {
       ...assignment.value,
       questions: questions.value,
-      totalScore: totalScore.value
+      totalScore: totalScore.value,
+      status: 'draft' // 设置为草稿状态
     };
     
-    await request.post('/admin/assignments/draft', data);
+    // 如果是编辑模式，使用 PUT 更新；否则使用 POST 创建
+    if (assignmentId.value) {
+      await request.put(`/admin/assignments/${assignmentId.value}`, data);
+    } else {
+      await request.post('/admin/assignments', data);
+    }
+    
+    draftCount.value++;
     ElMessage.success('草稿已自动保存');
   } catch (error) {
     console.error('自动保存失败:', error);
   }
+};
+
+// 手动保存草稿
+const saveDraftManual = async () => {
+  if (!assignment.value.title) {
+    ElMessage.warning('请填写作业标题');
+    return;
+  }
+  
+  if (questions.value.length === 0) {
+    ElMessage.warning('请至少添加一道题目');
+    return;
+  }
+  
+  try {
+    questions.value.forEach(q => {
+      if (editors.value[q.tempId]) {
+        q.content = editors.value[q.tempId].root.innerHTML;
+      }
+      if (q.type === 'essay' && answerEditors.value[q.tempId]) {
+        q.referenceAnswer = answerEditors.value[q.tempId].root.innerHTML;
+      }
+    });
+    
+    const data = {
+      ...assignment.value,
+      questions: questions.value,
+      totalScore: totalScore.value,
+      status: 'draft' // 设置为草稿状态
+    };
+    
+    // 如果是编辑模式，使用 PUT 更新；否则使用 POST 创建
+    if (assignmentId.value) {
+      await request.put(`/admin/assignments/${assignmentId.value}`, data);
+    } else {
+      await request.post('/admin/assignments', data);
+    }
+    
+    draftCount.value++;
+    ElMessage.success('草稿保存成功');
+    // 刷新草稿列表
+    getDrafts();
+  } catch (error: any) {
+    ElMessage.error('保存草稿失败：' + (error?.message || '未知错误'));
+  }
+};
+
+// 获取草稿列表
+const getDrafts = async () => {
+  try {
+    // 从作业列表中获取草稿状态的作业
+    const response = await request.get('/admin/assignments', {
+      params: { status: 'draft', size: 100 }
+    });
+    const allAssignments = response.data?.records || [];
+    
+    // 筛选出草稿状态的作业
+    drafts.value = allAssignments
+      .filter((item: any) => item.status === 'draft')
+      .map((item: any) => ({
+        id: item.assignmentId,
+        title: item.assignmentName,
+        courseId: item.courseId,
+        courseName: item.courseName,
+        description: item.description,
+        deadline: item.deadline,
+        questions: item.questions || [],
+        totalScore: item.totalScore || 0,
+        saveTime: item.createTime || item.updateTime,
+        questionCount: item.questionCount || 0
+      }));
+  } catch (error) {
+    console.error('获取草稿列表失败:', error);
+  }
+};
+
+// 加载草稿
+const loadDraft = async (draftId: number) => {
+  try {
+    // 使用作业详情接口获取草稿数据
+    const response = await request.get(`/admin/assignments/${draftId}`);
+    const draft = response.data;
+    
+    // 加载作业信息
+    assignment.value = {
+      id: draft.id || draftId,
+      title: draft.title || draft.assignmentName,
+      courseId: draft.courseId,
+      description: draft.description,
+      deadline: draft.deadline
+    };
+    
+    // 加载题目
+    questions.value = draft.questions || [];
+    
+    // 关闭弹窗
+    scheduleDialogVisible.value = false;
+    
+    ElMessage.success('草稿加载成功');
+    
+    // 等待 DOM 更新后初始化编辑器
+    await nextTick();
+    initEditors();
+  } catch (error: any) {
+    ElMessage.error('加载草稿失败：' + (error?.message || '未知错误'));
+  }
+};
+
+// 初始化编辑器
+const initEditors = () => {
+  questions.value.forEach(q => {
+    if (q.tempId && editorRefs.value[q.tempId]) {
+      const editor = new Quill(editorRefs.value[q.tempId], {
+        theme: 'snow',
+        placeholder: '请输入题目内容...',
+        modules: {
+          toolbar: [
+            ['bold', 'italic', 'underline'],
+            [{ list: 'ordered' }, { list: 'bullet' }],
+            ['link', 'clean']
+          ]
+        }
+      });
+      
+      if (q.content) {
+        editor.root.innerHTML = q.content;
+      }
+      
+      editors.value[q.tempId] = editor;
+    }
+    
+    // 主观题需要初始化答案编辑器
+    if (q.type === 'essay' && q.tempId && answerEditorRefs.value[q.tempId]) {
+      const answerEditor = new Quill(answerEditorRefs.value[q.tempId], {
+        theme: 'snow',
+        placeholder: '请输入参考答案...',
+        modules: {
+          toolbar: [
+            ['bold', 'italic', 'underline'],
+            [{ list: 'ordered' }, { list: 'bullet' }],
+            ['link', 'clean']
+          ]
+        }
+      });
+      
+      if (q.referenceAnswer) {
+        answerEditor.root.innerHTML = q.referenceAnswer;
+      }
+      
+      answerEditors.value[q.tempId] = answerEditor;
+    }
+  });
 };
 
 const previewAssignment = async () => {
@@ -715,42 +859,7 @@ const previewAssignment = async () => {
 };
 
 const openScheduleDialog = () => {
-  scheduleForm.value = { publishTime: '', notifyStudents: true };
   scheduleDialogVisible.value = true;
-};
-
-const confirmSchedule = async () => {
-  if (!scheduleForm.value.publishTime) {
-    ElMessage.warning('请选择发布时间');
-    return;
-  }
-  
-  try {
-    await assignmentFormRef.value?.validate();
-    
-    questions.value.forEach(q => {
-      if (editors.value[q.tempId]) {
-        q.content = editors.value[q.tempId].root.innerHTML;
-      }
-    });
-    
-    const data = {
-      ...assignment.value,
-      questions: questions.value,
-      totalScore: totalScore.value,
-      publishTime: scheduleForm.value.publishTime,
-      notifyStudents: scheduleForm.value.notifyStudents
-    };
-    
-    await request.post('/admin/assignments/schedule', data);
-    ElMessage.success('作业已预设发布时间');
-    scheduleDialogVisible.value = false;
-    router.push('/admin/assignments');
-  } catch (error: any) {
-    if (error?.message !== 'cancel') {
-      ElMessage.error('预设发布失败');
-    }
-  }
 };
 
 const publishNow = async () => {
@@ -826,7 +935,7 @@ const startAutoSave = () => {
 
 onMounted(async () => {
   await getCourses();
-  await getDrafts();
+  await getDrafts(); // 获取草稿列表
   startAutoSave();
 });
 

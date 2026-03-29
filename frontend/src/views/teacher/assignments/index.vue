@@ -1,13 +1,18 @@
 <template>
   <div class="teacher-assignments">
-    <el-card shadow="never" class="page-header">
+    <el-card shadow="never" class="assignments-section">
       <template #header>
         <div class="card-header">
-          <span>作业管理</span>
+          <div class="card-header__title">
+            <div class="card-header__icon">
+              <el-icon><Document /></el-icon>
+            </div>
+            <span>作业管理</span>
+          </div>
           <div class="header-actions">
             <el-input
               v-model="searchKeyword"
-              placeholder="搜索作业名称、所属课程或补充说明"
+              placeholder="搜索作业名称"
               clearable
               @keyup.enter="handleSearch"
               class="search-input"
@@ -15,96 +20,127 @@
               <template #prefix>
                 <el-icon><Search /></el-icon>
               </template>
-              <template #suffix>
-                <el-button type="primary" @click="handleSearch">搜索</el-button>
-              </template>
             </el-input>
-            <el-select v-model="filterForm.courseId" placeholder="按课程筛选" class="filter-item">
-              <el-option label="全部" value="" />
+            <el-select
+              v-model="filterForm.courseId"
+              placeholder="按课程筛选"
+              class="filter-item"
+              clearable
+              @change="handleFilterChange"
+            >
               <el-option
                 v-for="course in courses"
-                :key="course.courseId"
-                :label="course.courseName"
-                :value="course.courseId"
+                :key="course.id"
+                :label="course.name"
+                :value="course.id"
               />
             </el-select>
-            <el-select v-model="filterForm.status" placeholder="按状态筛选" class="filter-item">
-              <el-option label="全部" value="" />
-              <el-option label="草稿" value="draft" />
+            <el-select
+              v-model="filterForm.status"
+              placeholder="按状态筛选"
+              class="filter-item"
+              clearable
+              @change="handleFilterChange"
+            >
               <el-option label="已发布" value="published" />
+              <el-option label="已逾期" value="overdue" />
             </el-select>
             <el-button type="primary" @click="createAssignment">
-              <el-icon><Plus /></el-icon> 发布作业
+              <el-icon><Plus /></el-icon> 创建作业
             </el-button>
-          </div>
-        </div>
-      </template>
-    </el-card>
-
-    <el-card shadow="never" class="mt-4">
-      <template #header>
-        <div class="card-header">
-          <span>作业列表</span>
-          <div class="sort-actions">
-            <span>排序：</span>
-            <el-select v-model="sortBy" @change="handleSort">
-              <el-option label="截止时间" value="deadline" />
-              <el-option label="完成情况" value="completion" />
-            </el-select>
-            <el-select v-model="sortOrder" @change="handleSort">
-              <el-option label="正序" value="asc" />
-              <el-option label="倒序" value="desc" />
-            </el-select>
           </div>
         </div>
       </template>
       <el-table
-        :data="filteredAssignments"
+        :data="assignments"
         style="width: 100%"
-        @selection-change="handleSelectionChange"
+        v-loading="loading"
+        @row-click="showDetail"
+        class="modern-table clickable-table"
       >
-        <el-table-column type="selection" width="55" />
-        <el-table-column prop="assignmentName" label="作业名称" min-width="200" />
-        <el-table-column prop="courseName" label="所属课程" width="150" />
-        <el-table-column prop="totalScore" label="总分值" width="100" />
-        <el-table-column prop="description" label="补充说明" min-width="200">
+        <el-table-column prop="assignmentName" label="作业名称" min-width="180">
           <template #default="scope">
-            <span v-if="scope.row.description.length > 50">{{ scope.row.description.substring(0, 50) }}...</span>
-            <span v-else>{{ scope.row.description }}</span>
-            <el-button v-if="scope.row.description.length > 50" size="small" @click="viewFullDescription(scope.row)">
-              查看完整
-            </el-button>
+            <el-tooltip
+              :content="scope.row.assignmentName"
+              placement="top"
+              :disabled="!isOverflow(scope.row.assignmentName, 15)"
+            >
+              <span class="ellipsis-text">{{
+                scope.row.assignmentName || '-'
+              }}</span>
+            </el-tooltip>
           </template>
         </el-table-column>
-        <el-table-column prop="deadline" label="截止时间" width="180" />
-        <el-table-column prop="completion" label="完成情况" width="150">
+        <el-table-column prop="courseName" label="所属课程" width="150">
+          <template #default="scope">
+            <el-tooltip
+              :content="scope.row.courseName"
+              placement="top"
+              :disabled="!isOverflow(scope.row.courseName, 10)"
+            >
+              <span class="ellipsis-text">{{
+                scope.row.courseName || '-'
+              }}</span>
+            </el-tooltip>
+          </template>
+        </el-table-column>
+        <el-table-column prop="totalScore" label="总分值" width="80" />
+        <el-table-column prop="description" label="描述" min-width="180">
+          <template #default="scope">
+            <el-tooltip
+              :content="scope.row.description"
+              placement="top"
+              :disabled="!isOverflow(scope.row.description, 20)"
+            >
+              <span class="ellipsis-text">{{
+                scope.row.description || '-'
+              }}</span>
+            </el-tooltip>
+          </template>
+        </el-table-column>
+        <el-table-column prop="deadline" label="截止时间" width="160">
+          <template #default="scope">
+            <span>{{ formatDeadline(scope.row.deadline) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="completion" label="完成情况" width="120">
           <template #default="scope">
             <div class="completion-info">
-              <span>{{ scope.row.submittedCount }}/{{ scope.row.totalStudents }}</span>
+              <span>
+                {{ `${scope.row.submittedCount || 0}/${scope.row.totalStudents || 0}` }}
+              </span>
               <el-progress
-                :percentage="scope.row.completionRate"
-                :stroke-width="8"
+                :percentage="scope.row.completionRate || 0"
+                :stroke-width="6"
                 :show-text="false"
                 class="completion-progress"
               />
             </div>
           </template>
         </el-table-column>
-        <el-table-column prop="status" label="状态" width="100">
+        <el-table-column prop="status" label="状态" width="80">
           <template #default="scope">
             <el-tag
-              :type="scope.row.status === 'published' ? 'success' : 'info'"
+              :type="scope.row.status === 'published' ? 'success' : 'warning'"
+              size="small"
             >
-              {{ scope.row.status === 'published' ? '已发布' : '草稿' }}
+              {{ scope.row.status === 'published' ? '已发布' : '已逾期' }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="180">
+        <el-table-column label="操作" width="160" @click.stop>
           <template #default="scope">
-            <el-button size="small" @click="editAssignment(scope.row.assignmentId)">
+            <el-button
+              size="small"
+              @click.stop="editAssignment(scope.row.assignmentId)"
+            >
               编辑
             </el-button>
-            <el-button size="small" type="danger" @click="deleteAssignment(scope.row)">
+            <el-button
+              size="small"
+              type="danger"
+              @click.stop="deleteAssignment(scope.row)"
+            >
               删除
             </el-button>
           </template>
@@ -123,26 +159,190 @@
       </div>
     </el-card>
 
-    <!-- 完整说明对话框 -->
     <el-dialog
-      v-model="descriptionDialogVisible"
-      title="补充说明"
-      width="600px"
+      v-model="detailVisible"
+      :title="currentAssignment?.assignmentName || '作业详情'"
+      width="800px"
+      class="detail-dialog"
     >
-      <p>{{ currentAssignment?.description }}</p>
+      <div v-if="currentAssignment" class="detail-content">
+        <el-descriptions :column="2" border>
+          <el-descriptions-item label="作业名称" :span="2">
+            {{ currentAssignment.assignmentName }}
+          </el-descriptions-item>
+          <el-descriptions-item label="所属课程">
+            {{ currentAssignment.courseName }}
+          </el-descriptions-item>
+          <el-descriptions-item label="总分值">
+            {{ currentAssignment.totalScore }} 分
+          </el-descriptions-item>
+          <el-descriptions-item label="状态">
+            <el-tag
+              :type="
+                currentAssignment.status === 'published' ? 'success' : 'warning'
+              "
+            >
+              {{ currentAssignment.status === 'published' ? '已发布' : '已逾期' }}
+            </el-tag>
+          </el-descriptions-item>
+          <el-descriptions-item label="截止时间" :span="2">
+            {{ formatDeadline(currentAssignment.deadline) }}
+          </el-descriptions-item>
+          <el-descriptions-item label="作业描述" :span="2">
+            {{ currentAssignment.description || '暂无描述' }}
+          </el-descriptions-item>
+        </el-descriptions>
+
+        <div class="completion-detail">
+          <div class="completion-header">
+            <h4>完成情况详情</h4>
+            <el-button
+              type="warning"
+              @click="remindAllStudents"
+              :loading="remindLoading"
+            >
+              <el-icon><Bell /></el-icon>
+              一键提醒未提交学生
+            </el-button>
+          </div>
+          <el-row :gutter="20">
+            <el-col :span="8">
+              <el-statistic
+                title="应交人数"
+                :value="currentAssignment.totalStudents || 0"
+              >
+                <template #suffix>人</template>
+              </el-statistic>
+            </el-col>
+            <el-col :span="8">
+              <el-statistic
+                title="已交人数"
+                :value="currentAssignment.submittedCount || 0"
+              >
+                <template #suffix>人</template>
+              </el-statistic>
+            </el-col>
+            <el-col :span="8">
+              <el-statistic
+                title="未交人数"
+                :value="
+                  (currentAssignment.totalStudents || 0) -
+                  (currentAssignment.submittedCount || 0)
+                "
+              >
+                <template #suffix>人</template>
+              </el-statistic>
+            </el-col>
+          </el-row>
+          <div class="completion-rate">
+            <span>完成率</span>
+            <el-progress
+              :percentage="currentAssignment.completionRate || 0"
+              :stroke-width="20"
+              :text-inside="true"
+            />
+          </div>
+        </div>
+
+        <div class="student-lists">
+          <el-tabs v-model="activeTab">
+            <el-tab-pane label="已提交学生" name="submitted">
+              <div class="student-list">
+                <el-table :data="submittedStudents" style="width: 100%" max-height="300">
+                  <el-table-column label="头像" width="70">
+                    <template #default="scope">
+                      <el-avatar :size="40" :src="scope.row.avatar || ''">
+                        {{ scope.row.studentName?.charAt(0) || '?' }}
+                      </el-avatar>
+                    </template>
+                  </el-table-column>
+                  <el-table-column prop="studentName" label="姓名" width="100" />
+                  <el-table-column prop="username" label="账号" width="120" />
+                  <el-table-column prop="email" label="邮箱" min-width="150" />
+                  <el-table-column prop="phone" label="电话" width="130" />
+                </el-table>
+              </div>
+            </el-tab-pane>
+            <el-tab-pane label="未提交学生" name="notSubmitted">
+              <div class="student-list">
+                <el-table :data="notSubmittedStudents" style="width: 100%" max-height="300">
+                  <el-table-column label="头像" width="70">
+                    <template #default="scope">
+                      <el-avatar :size="40" :src="scope.row.avatar || ''">
+                        {{ scope.row.studentName?.charAt(0) || '?' }}
+                      </el-avatar>
+                    </template>
+                  </el-table-column>
+                  <el-table-column prop="studentName" label="姓名" width="100" />
+                  <el-table-column prop="username" label="账号" width="120" />
+                  <el-table-column prop="email" label="邮箱" min-width="150" />
+                  <el-table-column prop="phone" label="电话" width="130" />
+                  <el-table-column label="操作" width="100">
+                    <template #default="scope">
+                      <el-button
+                        size="small"
+                        type="warning"
+                        @click="remindStudent(scope.row.studentId)"
+                      >
+                        提醒
+                      </el-button>
+                    </template>
+                  </el-table-column>
+                </el-table>
+              </div>
+            </el-tab-pane>
+            <el-tab-pane label="全部学生" name="all">
+              <div class="student-list">
+                <el-table :data="allStudents" style="width: 100%" max-height="300">
+                  <el-table-column label="头像" width="70">
+                    <template #default="scope">
+                      <el-avatar :size="40" :src="scope.row.avatar || ''">
+                        {{ scope.row.studentName?.charAt(0) || '?' }}
+                      </el-avatar>
+                    </template>
+                  </el-table-column>
+                  <el-table-column prop="studentName" label="姓名" width="100" />
+                  <el-table-column prop="username" label="账号" width="120" />
+                  <el-table-column prop="email" label="邮箱" min-width="150" />
+                  <el-table-column prop="phone" label="电话" width="130" />
+                  <el-table-column label="提交状态" width="100">
+                    <template #default="scope">
+                      <el-tag
+                        :type="
+                          isStudentSubmitted(scope.row.studentId) ? 'success' : 'warning'
+                        "
+                        size="small"
+                      >
+                        {{ isStudentSubmitted(scope.row.studentId) ? '已提交' : '未提交' }}
+                      </el-tag>
+                    </template>
+                  </el-table-column>
+                </el-table>
+              </div>
+            </el-tab-pane>
+          </el-tabs>
+        </div>
+      </div>
+      <template #footer>
+        <el-button @click="detailVisible = false">关闭</el-button>
+        <el-button type="primary" @click="editAssignment(currentAssignment?.assignmentId)">
+          编辑
+        </el-button>
+      </template>
     </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import { Plus, Search } from '@element-plus/icons-vue';
+import { Plus, Search, Bell, Document } from '@element-plus/icons-vue';
+import request from '@/utils/request';
 
 interface Course {
-  courseId: number;
-  courseName: string;
+  id: number;
+  name: string;
 }
 
 interface Assignment {
@@ -159,217 +359,235 @@ interface Assignment {
   status: string;
 }
 
-interface FilterForm {
-  courseId: string;
-  status: string;
+interface StudentInfo {
+  studentId: number;
+  studentName: string;
+  username: string;
+  avatar: string;
+  email: string;
+  phone: string;
 }
 
 const router = useRouter();
 
-const courses = ref<Course[]>([
-  { courseId: 1, courseName: '计算机导论' },
-  { courseId: 2, courseName: '数据结构' },
-  { courseId: 3, courseName: '算法设计与分析' }
-]);
-
+const courses = ref<Course[]>([]);
 const assignments = ref<Assignment[]>([]);
 const searchKeyword = ref('');
-const filterForm = ref<FilterForm>({
+const filterForm = ref({
   courseId: '',
-  status: ''
+  status: '',
 });
-const sortBy = ref('deadline');
-const sortOrder = ref('desc');
 const currentPage = ref(1);
 const pageSize = ref(10);
 const total = ref(0);
-const selectedAssignments = ref<number[]>([]);
-const descriptionDialogVisible = ref(false);
+const loading = ref(false);
+const detailVisible = ref(false);
 const currentAssignment = ref<Assignment | null>(null);
+const activeTab = ref('submitted');
+const submittedStudents = ref<StudentInfo[]>([]);
+const notSubmittedStudents = ref<StudentInfo[]>([]);
+const allStudents = ref<StudentInfo[]>([]);
+const remindLoading = ref(false);
 
-// 过滤后的作业列表
-const filteredAssignments = computed(() => {
-  let result = [...assignments.value];
-  
-  // 搜索过滤
-  if (searchKeyword.value) {
-    const keyword = searchKeyword.value.toLowerCase();
-    result = result.filter(assignment => {
-      return (
-        assignment.assignmentName.toLowerCase().includes(keyword) ||
-        assignment.courseName.toLowerCase().includes(keyword) ||
-        assignment.description.toLowerCase().includes(keyword)
-      );
-    });
-  }
-  
-  // 课程筛选
-  if (filterForm.value.courseId) {
-    result = result.filter(assignment => assignment.courseId === parseInt(filterForm.value.courseId));
-  }
-  
-  // 状态筛选
-  if (filterForm.value.status) {
-    result = result.filter(assignment => assignment.status === filterForm.value.status);
-  }
-  
-  // 排序
-  result.sort((a, b) => {
-    if (sortBy.value === 'deadline') {
-      const dateA = new Date(a.deadline).getTime();
-      const dateB = new Date(b.deadline).getTime();
-      return sortOrder.value === 'asc' ? dateA - dateB : dateB - dateA;
-    } else if (sortBy.value === 'completion') {
-      return sortOrder.value === 'asc' ? a.completionRate - b.completionRate : b.completionRate - a.completionRate;
-    }
-    return 0;
-  });
-  
-  return result;
-});
-
-// 获取作业列表
-const getAssignments = async () => {
+const formatDeadline = (deadline: string | null): string => {
+  if (!deadline) return '-';
   try {
-    // 模拟数据，实际项目中应该调用后端API
-    assignments.value = [
-      {
-        assignmentId: 1,
-        assignmentName: '数据结构作业1',
-        courseId: 2,
-        courseName: '数据结构',
-        totalScore: 100,
-        description: '本次作业主要考察栈和队列的基本概念和应用，包括栈的实现、队列的实现以及它们在实际问题中的应用。',
-        deadline: '2024-01-20 23:59:59',
-        submittedCount: 25,
-        totalStudents: 30,
-        completionRate: 83,
-        status: 'published'
-      },
-      {
-        assignmentId: 2,
-        assignmentName: '算法作业1',
-        courseId: 3,
-        courseName: '算法设计与分析',
-        totalScore: 120,
-        description: '本次作业主要考察排序算法的实现和分析，包括冒泡排序、选择排序、插入排序、归并排序和快速排序。',
-        deadline: '2024-01-25 23:59:59',
-        submittedCount: 18,
-        totalStudents: 25,
-        completionRate: 72,
-        status: 'published'
-      },
-      {
-        assignmentId: 3,
-        assignmentName: '计算机导论作业1',
-        courseId: 1,
-        courseName: '计算机导论',
-        totalScore: 80,
-        description: '本次作业主要考察计算机的基本组成、工作原理以及计算机网络的基本概念。',
-        deadline: '2024-01-15 23:59:59',
-        submittedCount: 28,
-        totalStudents: 35,
-        completionRate: 80,
-        status: 'published'
-      },
-      {
-        assignmentId: 4,
-        assignmentName: '数据结构作业2',
-        courseId: 2,
-        courseName: '数据结构',
-        totalScore: 100,
-        description: '本次作业主要考察树和图的基本概念和应用，包括二叉树的遍历、图的表示和遍历算法。',
-        deadline: '2024-02-01 23:59:59',
-        submittedCount: 0,
-        totalStudents: 30,
-        completionRate: 0,
-        status: 'draft'
-      }
-    ];
-    total.value = assignments.value.length;
-  } catch (error) {
-    ElMessage.error('获取作业列表失败');
-    assignments.value = [];
+    const date = new Date(deadline);
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    const seconds = String(date.getSeconds()).padStart(2, '0');
+    return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+  } catch {
+    return deadline;
   }
 };
 
-// 处理搜索
+const isOverflow = (text: string | null, maxChars: number): boolean => {
+  if (!text) return false;
+  return text.length > maxChars;
+};
+
+const isStudentSubmitted = (studentId: number): boolean => {
+  return submittedStudents.value.some((s) => s.studentId === studentId);
+};
+
+const showDetail = async (row: Assignment) => {
+  currentAssignment.value = row;
+  detailVisible.value = true;
+  activeTab.value = 'submitted';
+
+  try {
+    const response = await request.get(
+      `/teacher/assignments/${row.assignmentId}/submission-status`,
+    );
+    if (response.data) {
+      submittedStudents.value = response.data.submittedStudents || [];
+      notSubmittedStudents.value = response.data.notSubmittedStudents || [];
+      allStudents.value = response.data.allStudents || [];
+    }
+  } catch (error) {
+    console.error('获取学生提交情况失败:', error);
+    submittedStudents.value = [];
+    notSubmittedStudents.value = [];
+    allStudents.value = [];
+  }
+};
+
+const getCourses = async () => {
+  try {
+    const response = await request.get('/teacher/courses');
+    courses.value = response.data || [];
+  } catch (error) {
+    console.error('获取课程列表失败:', error);
+    courses.value = [];
+  }
+};
+
+const getAssignments = async () => {
+  loading.value = true;
+  try {
+    const response = await request.get('/teacher/assignments', {
+      params: {
+        page: currentPage.value,
+        pageSize: pageSize.value,
+        courseId: filterForm.value.courseId || undefined,
+        status: filterForm.value.status || undefined,
+        keyword: searchKeyword.value || undefined,
+      },
+    });
+    assignments.value = response.data?.records || [];
+    total.value = response.data?.total || 0;
+  } catch (error) {
+    console.error('获取作业列表失败:', error);
+    ElMessage.error('获取作业列表失败: ' + (error.message || '未知错误'));
+    assignments.value = [];
+    total.value = 0;
+  } finally {
+    loading.value = false;
+  }
+};
+
 const handleSearch = () => {
   currentPage.value = 1;
+  getAssignments();
 };
 
-// 处理排序
-const handleSort = () => {
-  // 排序逻辑已在computed中实现
+const handleFilterChange = () => {
+  currentPage.value = 1;
+  getAssignments();
 };
 
-// 处理分页
 const handleSizeChange = (size: number) => {
   pageSize.value = size;
   currentPage.value = 1;
+  getAssignments();
 };
 
 const handleCurrentChange = (current: number) => {
   currentPage.value = current;
+  getAssignments();
 };
 
-// 处理选择变化
-const handleSelectionChange = (val: Assignment[]) => {
-  selectedAssignments.value = val.map(item => item.assignmentId);
-};
-
-// 创建作业
 const createAssignment = () => {
   router.push('/teacher/assignments/create');
 };
 
-// 编辑作业
 const editAssignment = (assignmentId: number) => {
+  detailVisible.value = false;
   router.push(`/teacher/assignments/${assignmentId}/edit`);
 };
 
-// 删除作业
-const deleteAssignment = (assignment: Assignment) => {
-  ElMessageBox.confirm(
-    `确定要删除作业「${assignment.assignmentName}」吗？${assignment.status === 'published' ? '删除后将通知所有选课学生。' : ''}`,
-    '提示',
-    {
-      confirmButtonText: '确定',
-      cancelButtonText: '取消',
-      type: 'warning'
-    }
-  ).then(() => {
-    try {
-      // 模拟删除，实际项目中应该调用后端API
-      assignments.value = assignments.value.filter(a => a.assignmentId !== assignment.assignmentId);
-      total.value = assignments.value.length;
-      ElMessage.success('作业删除成功');
-      // 实际项目中应该发送通知给学生
-    } catch (error) {
+const publishAssignment = async (assignmentId: number) => {
+  // 此方法已删除
+};
+
+const deleteAssignment = async (assignment: Assignment) => {
+  try {
+    await ElMessageBox.confirm(
+      `确定要删除作业「${assignment.assignmentName}」吗？`,
+      '提示',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning',
+      },
+    );
+
+    await request.delete(`/teacher/assignments/${assignment.assignmentId}`);
+    ElMessage.success('作业删除成功');
+    getAssignments();
+  } catch (error) {
+    if (error !== 'cancel') {
       ElMessage.error('删除作业失败');
     }
-  });
+  }
 };
 
-// 查看完整说明
-const viewFullDescription = (assignment: Assignment) => {
-  currentAssignment.value = assignment;
-  descriptionDialogVisible.value = true;
+const remindStudent = async (studentId: number) => {
+  try {
+    await request.post(
+      `/teacher/assignments/${currentAssignment.value?.assignmentId}/remind`,
+      null,
+      { params: { studentId } },
+    );
+    ElMessage.success('提醒已发送');
+  } catch (error) {
+    ElMessage.error('发送提醒失败');
+  }
 };
 
-// 初始化
+const remindAllStudents = async () => {
+  if (notSubmittedStudents.value.length === 0) {
+    ElMessage.warning('没有需要提醒的学生');
+    return;
+  }
+
+  try {
+    remindLoading.value = true;
+    await request.post(
+      `/teacher/assignments/${currentAssignment.value?.assignmentId}/remind`,
+    );
+    ElMessage.success('已向所有未提交学生发送提醒');
+  } catch (error) {
+    ElMessage.error('发送提醒失败');
+  } finally {
+    remindLoading.value = false;
+  }
+};
+
 onMounted(() => {
+  getCourses();
   getAssignments();
 });
 </script>
 
 <style scoped>
 .teacher-assignments {
-  padding: 20px;
+  padding: 24px;
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(10px);
+  border-radius: 16px;
+  margin: 16px;
+  min-height: calc(100vh - 84px);
 }
 
-.page-header {
-  margin-bottom: 20px;
+:deep(.el-card) {
+  border: none;
+  border-radius: 16px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+}
+
+:deep(.el-card__header) {
+  padding: 16px 20px;
+  border-bottom: none;
+  background: transparent;
+}
+
+:deep(.el-card__body) {
+  padding: 20px;
 }
 
 .card-header {
@@ -377,28 +595,85 @@ onMounted(() => {
   justify-content: space-between;
   align-items: center;
   flex-wrap: wrap;
-  gap: 15px;
+  gap: 16px;
+}
+
+.card-header__title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 20px;
+  font-weight: 600;
+  color: #303133;
+}
+
+.card-header__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #fff;
+}
+
+.card-header__icon .el-icon {
+  font-size: 24px;
 }
 
 .header-actions {
   display: flex;
+  gap: 12px;
   align-items: center;
-  gap: 10px;
   flex-wrap: wrap;
 }
 
 .search-input {
-  min-width: 300px;
+  width: 200px;
 }
 
 .filter-item {
-  min-width: 150px;
+  width: 150px;
 }
 
-.sort-actions {
+.modern-table {
+  --el-table-border-radius: 12px;
+}
+
+.modern-table :deep(.el-table__header th) {
+  background: linear-gradient(135deg, #f5f7fa 0%, #e4e7ed 100%);
+  color: #606266;
+  font-weight: 600;
+  font-size: 14px;
+  padding: 12px 8px;
+}
+
+.modern-table :deep(.el-table__row) {
+  height: 60px;
+}
+
+.modern-table :deep(.el-table__row:hover) {
+  background-color: #f5f7fa;
+}
+
+.modern-table :deep(.el-table__cell) {
+  padding: 8px;
+  font-size: 13px;
+}
+
+.completion-info {
   display: flex;
-  align-items: center;
-  gap: 10px;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.completion-info .draft-status {
+  color: #909399;
+}
+
+.completion-progress {
+  width: 60px;
 }
 
 .pagination-container {
@@ -407,14 +682,99 @@ onMounted(() => {
   justify-content: flex-end;
 }
 
-.completion-info {
-  display: flex;
-  align-items: center;
-  gap: 10px;
+:deep(.el-dialog) {
+  border-radius: 16px;
+  overflow: hidden;
 }
 
-.completion-progress {
+:deep(.el-dialog__header) {
+  padding: 20px;
+  border-bottom: 1px solid #ebeef5;
+}
+
+:deep(.el-dialog__title) {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+:deep(.el-dialog__body) {
+  padding: 24px;
+}
+
+:deep(.el-dialog__footer) {
+  padding: 16px 24px;
+  border-top: 1px solid #ebeef5;
+}
+
+.dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.clickable-table :deep(.el-table__row) {
+  cursor: pointer;
+}
+
+.clickable-table :deep(.el-table__row:hover) {
+  background-color: #f5f7fa;
+}
+
+.ellipsis-text {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.detail-content {
+  padding: 10px 0;
+}
+
+.completion-detail {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid #ebeef5;
+}
+
+.completion-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.completion-header h4 {
+  margin: 0;
+  color: #303133;
+  font-size: 16px;
+}
+
+.completion-rate {
+  margin-top: 20px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.completion-rate span {
+  font-size: 14px;
+  color: #606266;
+  white-space: nowrap;
+}
+
+.completion-rate .el-progress {
   flex: 1;
+}
+
+.student-lists {
+  margin-top: 24px;
+}
+
+.student-list {
+  max-height: 300px;
+  overflow-y: auto;
 }
 
 @media (max-width: 1200px) {
@@ -435,14 +795,8 @@ onMounted(() => {
     align-items: flex-start;
   }
   
-  .sort-actions {
-    flex-direction: column;
-    align-items: flex-start;
-    width: 100%;
-  }
-  
-  .pagination-container {
-    justify-content: center;
+  .teacher-assignments {
+    padding: 16px;
   }
 }
 </style>

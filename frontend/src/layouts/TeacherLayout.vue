@@ -10,23 +10,43 @@
 
 <script setup lang="ts">
 import AppLayout from './AppLayout.vue';
-import { Book, Document, Edit, DataAnalysis, Ticket } from '@element-plus/icons-vue';
+import { Notebook, DataAnalysis, House, School, User, Bell, EditPen } from '@element-plus/icons-vue';
 
 const menuItems = [
   {
-    path: '/teacher/courses',
-    title: '我的课程',
-    icon: Book
+    path: '/dashboard',
+    title: '首页',
+    icon: House
   },
   {
-    path: '/teacher/assignments/create',
-    title: '创建作业',
-    icon: Edit
+    path: '/teacher/courses',
+    title: '课程管理',
+    icon: School
+  },
+  {
+    path: '/teacher/assignments',
+    title: '作业管理',
+    icon: Notebook
+  },
+  {
+    path: '/teacher/grading',
+    title: '批改复核',
+    icon: EditPen
   },
   {
     path: '/teacher/analysis',
-    title: '数据分析',
+    title: '学情分析',
     icon: DataAnalysis
+  },
+  {
+    path: '/messages',
+    title: '消息通知',
+    icon: Bell
+  },
+  {
+    path: '/profile',
+    title: '个人中心',
+    icon: User
   }
 ];
 </script>

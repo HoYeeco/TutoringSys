@@ -1,7 +1,35 @@
 <template>
   <div class="messages">
-    <h1>消息通知</h1>
-    <div class="message-header">
+    <!-- 消息通知模块 -->
+    <el-card shadow="never" class="messages-section">
+      <template #header>
+        <div class="card-header">
+          <div class="card-header__title">
+            <div class="card-header__icon">
+              <el-icon><Bell /></el-icon>
+            </div>
+            <span>消息通知</span>
+          </div>
+          <div class="header-actions">
+            <el-input
+              v-model="searchKeyword"
+              placeholder="搜索消息标题或内容"
+              clearable
+              @keyup.enter="handleSearch"
+              @clear="handleSearch"
+              class="search-input"
+            >
+              <template #prefix>
+                <el-icon><Search /></el-icon>
+              </template>
+            </el-input>
+            <el-button type="primary" @click="markAllAsRead" :disabled="unreadCount === 0">
+              一键全部已读
+            </el-button>
+          </div>
+        </div>
+      </template>
+      
       <div class="message-tabs">
         <el-tabs v-model="activeTab" @tab-click="handleTabClick">
           <el-tab-pane label="全部" name="all">
@@ -15,42 +43,40 @@
           <el-tab-pane label="批改通知" name="grading"></el-tab-pane>
         </el-tabs>
       </div>
-      <div class="message-actions">
-        <el-button type="primary" size="small" @click="markAllAsRead" :disabled="unreadCount === 0">
-          一键全部已读
-        </el-button>
-      </div>
-    </div>
-    <div class="message-list">
-      <el-empty v-if="messages.length === 0" description="暂无消息" />
-      <el-card v-for="message in messages" :key="message.id" :class="{ 'unread': message.isRead === 0 }">
-        <div class="message-item" @click="handleMessageClick(message)">
-          <div class="message-header-item">
-            <div class="message-title">
-              {{ message.title }}
-              <span v-if="message.isRead === 0" class="unread-dot"></span>
-            </div>
-            <div class="message-time">{{ formatTime(message.createTime) }}</div>
-          </div>
-          <div class="message-content">{{ message.content }}</div>
-          <div class="message-footer">
-            <span class="message-type">{{ getMessageTypeText(message.type) }}</span>
-            <el-button type="text" size="small" @click.stop="markAsRead(message.id)">
-              {{ message.isRead === 0 ? '标记已读' : '已读' }}
-            </el-button>
-          </div>
+      
+      <div class="message-list">
+        <div v-if="messages.length === 0" class="empty-container">
+          <el-empty description="暂无消息" :image-size="160" />
         </div>
-      </el-card>
-      <el-pagination
-        v-if="total > 0"
-        class="pagination"
-        :current-page="currentPage"
-        :page-size="pageSize"
-        :total="total"
-        layout="prev, pager, next"
-        @current-change="handlePageChange"
-      />
-    </div>
+        <el-card v-for="message in messages" :key="message.id" :class="{ 'message-card': true, 'unread': message.isRead === 0 }">
+          <div class="message-item" @click="handleMessageClick(message)">
+            <div class="message-header-item">
+              <div class="message-title">
+                {{ message.title }}
+                <span v-if="message.isRead === 0" class="unread-dot"></span>
+              </div>
+              <div class="message-time">{{ formatTime(message.createTime) }}</div>
+            </div>
+            <div class="message-content">{{ message.content }}</div>
+            <div class="message-footer">
+              <span class="message-type">{{ getMessageTypeText(message.type) }}</span>
+              <el-button type="text" size="small" @click.stop="markAsRead(message.id)">
+                {{ message.isRead === 0 ? '标记已读' : '已读' }}
+              </el-button>
+            </div>
+          </div>
+        </el-card>
+        <el-pagination
+          v-if="total > 0"
+          class="pagination"
+          :current-page="currentPage"
+          :page-size="pageSize"
+          :total="total"
+          layout="prev, pager, next"
+          @current-change="handlePageChange"
+        />
+      </div>
+    </el-card>
   </div>
 </template>
 
@@ -59,6 +85,7 @@ import { ref, computed, onMounted } from 'vue';
 import { useUserStore } from '@/stores/user';
 import { useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
+import { Bell, Search } from '@element-plus/icons-vue';
 import request from '@/utils/request';
 
 const userStore = useUserStore();
@@ -71,6 +98,7 @@ const total = ref(0);
 const currentPage = ref(1);
 const pageSize = ref(10);
 const unreadCount = ref(0);
+const searchKeyword = ref('');
 
 // 获取消息列表
 const getMessages = async () => {
@@ -85,7 +113,8 @@ const getMessages = async () => {
         userId: userStore.userInfo?.id,
         page: currentPage.value,
         size: pageSize.value,
-        type
+        type,
+        keyword: searchKeyword.value || undefined
       }
     });
 
@@ -183,6 +212,12 @@ const handlePageChange = (page) => {
   getMessages();
 };
 
+// 处理搜索
+const handleSearch = () => {
+  currentPage.value = 1;
+  getMessages();
+};
+
 // 格式化时间
 const formatTime = (time) => {
   if (!time) return '';
@@ -221,25 +256,79 @@ onMounted(() => {
 
 <style scoped>
 .messages {
-  padding: 20px;
+  padding: 24px;
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(10px);
+  border-radius: 16px;
+  margin: 16px;
+  min-height: calc(100vh - 84px);
 }
 
-.message-header {
+/* 通用卡片样式 */
+:deep(.el-card) {
+  border: none;
+  border-radius: 16px;
+  margin-bottom: 24px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+}
+
+:deep(.el-card__header) {
+  padding: 16px 20px;
+  border-bottom: none;
+  background: transparent;
+}
+
+:deep(.el-card__body) {
+  padding: 0 20px 20px;
+}
+
+/* 卡片头部 */
+.card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 16px;
 }
 
+.card-header__title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 20px;
+  font-weight: 600;
+  color: #303133;
+}
+
+.card-header__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #fff;
+}
+
+.card-header__icon .el-icon {
+  font-size: 24px;
+}
+
+.header-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.search-input {
+  width: 250px;
+}
+
+/* 消息标签 */
 .message-tabs {
-  flex: 1;
-  min-width: 300px;
-}
-
-.message-actions {
-  flex-shrink: 0;
+  margin-bottom: 20px;
 }
 
 .unread-badge {
@@ -252,22 +341,27 @@ onMounted(() => {
   margin-left: 5px;
 }
 
+/* 消息列表 */
 .message-list {
   margin-top: 20px;
 }
 
+.message-card {
+  margin-bottom: 16px;
+  transition: all 0.3s ease;
+}
+
+.message-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+}
+
+.message-card.unread {
+  border-left: 4px solid #409eff;
+}
+
 .message-item {
   cursor: pointer;
-  transition: all 0.3s;
-}
-
-.message-item:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-}
-
-.unread {
-  border-left: 4px solid #409eff;
 }
 
 .message-header-item {
@@ -279,8 +373,8 @@ onMounted(() => {
 
 .message-title {
   font-size: 16px;
-  font-weight: 500;
-  color: var(--color-text);
+  font-weight: 600;
+  color: #303133;
   display: flex;
   align-items: center;
 }
@@ -296,14 +390,14 @@ onMounted(() => {
 
 .message-time {
   font-size: 12px;
-  color: #999;
+  color: #909399;
 }
 
 .message-content {
   font-size: 14px;
-  color: var(--color-text-secondary);
+  color: #606266;
   margin-bottom: 10px;
-  line-height: 1.5;
+  line-height: 1.6;
 }
 
 .message-footer {
@@ -312,38 +406,47 @@ onMounted(() => {
   align-items: center;
   margin-top: 10px;
   padding-top: 10px;
-  border-top: 1px solid var(--color-border);
+  border-top: 1px solid #ebeef5;
 }
 
 .message-type {
   font-size: 12px;
-  color: #999;
-  background-color: var(--color-background-light);
-  padding: 2px 8px;
+  color: #909399;
+  background-color: #f5f7fa;
+  padding: 4px 10px;
   border-radius: 10px;
 }
 
 .pagination {
   margin-top: 20px;
-  text-align: right;
+  display: flex;
+  justify-content: center;
+}
+
+/* 空状态容器 */
+.empty-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+  padding: 60px 20px;
+  background: linear-gradient(135deg, #fafafa 0%, #f5f7fa 100%);
+  border-radius: 16px;
+}
+
+.empty-container :deep(.el-empty__description) {
+  color: #909399;
+  font-size: 16px;
 }
 
 /* 响应式设计 */
 @media (max-width: 768px) {
-  .message-header {
+  .card-header {
     flex-direction: column;
     align-items: flex-start;
   }
   
-  .message-tabs {
-    width: 100%;
-  }
-  
-  .message-actions {
-    width: 100%;
-  }
-  
-  .message-actions .el-button {
+  .header-actions {
     width: 100%;
   }
   

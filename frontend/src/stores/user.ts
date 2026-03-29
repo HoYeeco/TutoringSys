@@ -4,7 +4,7 @@ export const useUserStore = defineStore('user', {
     state: () => ({
         token: null as string | null,
         userInfo: null as any,
-        role: 'student' as string | null,
+        role: null as string | null,
     }),
     actions: {
         setToken(token: string) {
@@ -12,12 +12,12 @@ export const useUserStore = defineStore('user', {
         },
         setUserInfo(info: any) {
             this.userInfo = info;
-            this.role = info?.role || 'student';
+            this.role = info?.role?.toUpperCase() || null;
         },
         logout() {
             this.token = null;
             this.userInfo = null;
-            this.role = 'student';
+            this.role = null;
         },
     },
     persist: true,

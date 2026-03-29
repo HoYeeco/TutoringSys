@@ -5,7 +5,7 @@
         <canvas id="demo-canvas"></canvas>
         <div class="logo_box">
           <div class="logo-image">
-            <img src="@/assets/Scoututor.png" alt="Scoututor" class="logo-img">
+            <img src="@/assets/images/Scoututor.png" alt="Scoututor" class="logo-img">
           </div>
           <form @submit.prevent="handleLogin">
             <div class="input_outer">
@@ -330,14 +330,26 @@ const handleLogin = async () => {
   
   loading.value = true;
   try {
-    const response = await request.post('/auth/login', {
-      username: username.value,
-      password: password.value
+    const params = new URLSearchParams();
+    params.append('username', username.value);
+    params.append('password', password.value);
+    
+    const response = await request.post('/auth/login', params, {
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded'
+      }
     });
     
     if (response.code === 200) {
       userStore.setToken(response.data.token);
-      userStore.setUserInfo(response.data.userInfo);
+      
+      const profileResponse = await request.get('/user/profile');
+      if (profileResponse.code === 200) {
+        userStore.setUserInfo(profileResponse.data);
+      } else {
+        userStore.setUserInfo(response.data);
+      }
+      
       ElMessage.success('登录成功');
       router.push('/dashboard');
     } else {

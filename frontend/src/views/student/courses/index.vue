@@ -76,33 +76,8 @@ const filteredCourses = computed(() => {
 // 获取学生课程列表
 const getCourses = async () => {
   try {
-    // 模拟数据，实际项目中应该调用后端API
-    courses.value = [
-      {
-        id: 1,
-        name: '数学',
-        description: '高等数学基础课程，包括微积分、线性代数等内容',
-        teacherName: '张老师',
-        joinTime: new Date().toISOString(),
-        assignmentCount: 5
-      },
-      {
-        id: 2,
-        name: '英语',
-        description: '大学英语课程，注重听说读写综合能力',
-        teacherName: '李老师',
-        joinTime: new Date(Date.now() - 86400000).toISOString(),
-        assignmentCount: 3
-      },
-      {
-        id: 3,
-        name: '物理',
-        description: '大学物理课程，包括力学、电磁学等内容',
-        teacherName: '王老师',
-        joinTime: new Date(Date.now() - 172800000).toISOString(),
-        assignmentCount: 4
-      }
-    ];
+    const response = await request.get('/student/courses');
+    courses.value = response.data || [];
   } catch (error) {
     ElMessage.error('获取课程列表失败');
     courses.value = [];

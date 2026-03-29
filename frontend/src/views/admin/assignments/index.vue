@@ -1,9 +1,15 @@
 <template>
   <div class="admin-assignments">
-    <el-card shadow="never" class="page-header">
+    <!-- 作业列表模块 -->
+    <el-card shadow="never" class="assignments-section">
       <template #header>
         <div class="card-header">
-          <span>作业管理</span>
+          <div class="card-header__title">
+            <div class="card-header__icon">
+              <el-icon><Document /></el-icon>
+            </div>
+            <span>作业管理</span>
+          </div>
           <div class="header-actions">
             <el-input
               v-model="searchKeyword"
@@ -21,6 +27,7 @@
               placeholder="按课程筛选"
               class="filter-item"
               clearable
+              @change="handleFilterChange"
             >
               <el-option
                 v-for="course in courses"
@@ -34,22 +41,15 @@
               placeholder="按状态筛选"
               class="filter-item"
               clearable
+              @change="handleFilterChange"
             >
-              <el-option label="草稿" value="draft" />
               <el-option label="已发布" value="published" />
+              <el-option label="已逾期" value="overdue" />
             </el-select>
             <el-button type="primary" @click="createAssignment">
-              <el-icon><Plus /></el-icon> 发布作业
+              <el-icon><Plus /></el-icon> 创建作业
             </el-button>
           </div>
-        </div>
-      </template>
-    </el-card>
-
-    <el-card shadow="never" class="mt-4">
-      <template #header>
-        <div class="card-header">
-          <span>作业列表</span>
         </div>
       </template>
       <el-table
@@ -57,7 +57,7 @@
         style="width: 100%"
         v-loading="loading"
         @row-click="showDetail"
-        class="clickable-table"
+        class="modern-table clickable-table"
       >
         <el-table-column prop="assignmentName" label="作业名称" min-width="180">
           <template #default="scope">
@@ -117,14 +117,13 @@
         <el-table-column prop="completion" label="完成情况" width="120">
           <template #default="scope">
             <div class="completion-info">
-              <span :class="{ 'draft-status': scope.row.status === 'draft' }">
-                {{ scope.row.status === 'draft' ? '0/0' : `${scope.row.submittedCount || 0}/${scope.row.totalStudents || 0}` }}
+              <span>
+                {{ `${scope.row.submittedCount || 0}/${scope.row.totalStudents || 0}` }}
               </span>
               <el-progress
-                :percentage="scope.row.status === 'draft' ? 0 : (scope.row.completionRate || 0)"
+                :percentage="scope.row.completionRate || 0"
                 :stroke-width="6"
                 :show-text="false"
-                :color="scope.row.status === 'draft' ? '#c0c4cc' : undefined"
                 class="completion-progress"
               />
             </div>
@@ -133,14 +132,14 @@
         <el-table-column prop="status" label="状态" width="80">
           <template #default="scope">
             <el-tag
-              :type="scope.row.status === 'published' ? 'success' : 'info'"
+              :type="scope.row.status === 'published' ? 'success' : 'warning'"
               size="small"
             >
-              {{ scope.row.status === 'published' ? '已发布' : '草稿' }}
+              {{ scope.row.status === 'published' ? '已发布' : '已逾期' }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="220" @click.stop>
+        <el-table-column label="操作" width="160" @click.stop>
           <template #default="scope">
             <el-button
               size="small"
@@ -154,14 +153,6 @@
               @click.stop="deleteAssignment(scope.row)"
             >
               删除
-            </el-button>
-            <el-button
-              size="small"
-              type="success"
-              :disabled="scope.row.status !== 'draft'"
-              @click.stop="publishAssignment(scope.row.assignmentId)"
-            >
-              发布
             </el-button>
           </template>
         </el-table-column>
@@ -210,10 +201,10 @@
           <el-descriptions-item label="状态">
             <el-tag
               :type="
-                currentAssignment.status === 'published' ? 'success' : 'info'
+                currentAssignment.status === 'published' ? 'success' : 'warning'
               "
             >
-              {{ currentAssignment.status === 'published' ? '已发布' : '草稿' }}
+              {{ currentAssignment.status === 'published' ? '已发布' : '已逾期' }}
             </el-tag>
           </el-descriptions-item>
           <el-descriptions-item label="截止时间" :span="2">
@@ -389,7 +380,7 @@
 import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import { Plus, Search, Bell } from '@element-plus/icons-vue';
+import { Plus, Search, Bell, Document } from '@element-plus/icons-vue';
 import request from '@/utils/request';
 
 interface Course {
@@ -554,25 +545,7 @@ const editAssignment = (assignmentId: number) => {
 };
 
 const publishAssignment = async (assignmentId: number) => {
-  try {
-    await ElMessageBox.confirm(
-      '确定要发布此作业吗？发布后学生将可以看到并提交作业。',
-      '提示',
-      {
-        confirmButtonText: '确定',
-        cancelButtonText: '取消',
-        type: 'warning',
-      },
-    );
-
-    await request.post(`/admin/assignments/${assignmentId}/publish`);
-    ElMessage.success('作业发布成功');
-    getAssignments();
-  } catch (error) {
-    if (error !== 'cancel') {
-      ElMessage.error('发布作业失败');
-    }
-  }
+  // 此方法已删除
 };
 
 const deleteAssignment = async (assignment: Assignment) => {
@@ -637,40 +610,110 @@ onMounted(() => {
 
 <style scoped>
 .admin-assignments {
+  padding: 24px;
+  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  min-height: calc(100vh - 84px);
+}
+
+/* 通用卡片样式 */
+:deep(.el-card) {
+  border: none;
+  border-radius: 16px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+}
+
+:deep(.el-card__header) {
+  padding: 16px 20px;
+  border-bottom: none;
+  background: transparent;
+}
+
+:deep(.el-card__body) {
   padding: 20px;
 }
 
-.page-header {
-  margin-bottom: 20px;
-}
-
+/* 卡片头部 */
 .card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
   flex-wrap: wrap;
-  gap: 15px;
+  gap: 16px;
+}
+
+.card-header__title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 20px;
+  font-weight: 600;
+  color: #303133;
+}
+
+.card-header__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #fff;
+}
+
+.card-header__icon .el-icon {
+  font-size: 24px;
 }
 
 .header-actions {
   display: flex;
+  gap: 12px;
   align-items: center;
-  gap: 10px;
   flex-wrap: wrap;
 }
 
 .search-input {
-  min-width: 250px;
+  width: 200px;
 }
 
 .filter-item {
-  min-width: 150px;
+  width: 150px;
 }
 
-.pagination-container {
-  margin-top: 20px;
+/* 表格样式 */
+.modern-table {
+  --el-table-border-radius: 12px;
+}
+
+.modern-table :deep(.el-table__header th) {
+  background: linear-gradient(135deg, #f5f7fa 0%, #e4e7ed 100%);
+  color: #606266;
+  font-weight: 600;
+  font-size: 14px;
+  padding: 12px 8px;
+}
+
+.modern-table :deep(.el-table__row) {
+  height: 60px;
+}
+
+.modern-table :deep(.el-table__row:hover) {
+  background-color: #f5f7fa;
+}
+
+.modern-table :deep(.el-table__cell) {
+  padding: 8px;
+  font-size: 13px;
+}
+
+.teacher-info {
   display: flex;
-  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+}
+
+.teacher-info .el-avatar {
+  flex-shrink: 0;
 }
 
 .completion-info {
@@ -687,10 +730,42 @@ onMounted(() => {
   width: 60px;
 }
 
-.teacher-info {
+/* 分页 */
+.pagination-container {
+  margin-top: 20px;
   display: flex;
-  align-items: center;
-  gap: 8px;
+  justify-content: flex-end;
+}
+
+/* 对话框 */
+:deep(.el-dialog) {
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+:deep(.el-dialog__header) {
+  padding: 20px;
+  border-bottom: 1px solid #ebeef5;
+}
+
+:deep(.el-dialog__title) {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+:deep(.el-dialog__body) {
+  padding: 24px;
+}
+
+:deep(.el-dialog__footer) {
+  padding: 16px 24px;
+  border-top: 1px solid #ebeef5;
+}
+
+.dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
 }
 
 .mt-4 {
@@ -760,5 +835,29 @@ onMounted(() => {
 .student-list {
   max-height: 300px;
   overflow-y: auto;
+}
+
+/* 响应式设计 */
+@media (max-width: 1200px) {
+  .header-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .search-input,
+  .filter-item {
+    width: 100%;
+  }
+}
+
+@media (max-width: 768px) {
+  .card-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .admin-assignments {
+    padding: 16px;
+  }
 }
 </style>

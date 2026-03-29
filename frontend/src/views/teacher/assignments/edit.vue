@@ -2,17 +2,21 @@
   <div class="teacher-assignment-edit">
     <!-- 右侧草稿箱图标 -->
     <div class="draft-box-icon" @click="openDraftBox">
-      <el-icon class="icon"><Document /></el-icon>
-      <el-badge v-if="drafts.length > 0" :value="drafts.length" />
+      <el-icon class="icon"><FolderChecked /></el-icon>
+      <el-badge v-if="drafts.length > 0" :value="drafts.length" :max="99" />
     </div>
 
-    <el-card shadow="never" class="page-header">
+    <el-card shadow="never" class="config-section">
       <template #header>
-        <div class="card-header">
-          <span>{{ isEdit ? '编辑作业' : '创建作业' }}</span>
+        <div class="card-title">
+          <div class="card-title__icon">
+            <el-icon><Document /></el-icon>
+          </div>
+          <span class="card-title__text">作业信息</span>
         </div>
       </template>
-      <el-form :model="assignment" label-width="100px">
+      
+      <el-form :model="assignment" label-width="120px" class="config-form">
         <el-form-item label="作业标题" required>
           <el-input v-model="assignment.title" placeholder="请输入作业标题" />
         </el-form-item>
@@ -27,14 +31,14 @@
           </el-select>
         </el-form-item>
         <el-form-item label="总分值">
-          <el-input v-model="totalScore" disabled style="width: 100px" />
+          <el-input v-model="totalScore" disabled style="width: 120px" />
           <span class="score-hint">（自动累加题目分值）</span>
         </el-form-item>
         <el-form-item label="补充说明">
           <el-input
             v-model="assignment.description"
             type="textarea"
-            rows="3"
+            :rows="3"
             placeholder="请输入补充说明"
           />
         </el-form-item>
@@ -49,18 +53,21 @@
       </el-form>
     </el-card>
 
-    <el-card shadow="never" class="mt-4">
+    <el-card shadow="never" class="questions-section">
       <template #header>
-        <div class="card-header">
-          <span>题目配置</span>
-          <div>
-            <el-button type="primary" @click="openQuestionBankDialog">从题库选择</el-button>
-            <el-button type="success" @click="openQuestionTypeDialog">添加题目</el-button>
+        <div class="card-title">
+          <div class="card-title__icon">
+            <el-icon><List /></el-icon>
           </div>
+          <span class="card-title__text">题目配置</span>
+        </div>
+        <div class="header-actions">
+          <el-button type="success" @click="openQuestionTypeDialog">添加题目</el-button>
         </div>
       </template>
       
       <div v-if="questions.length === 0" class="empty-questions">
+        <el-empty description="暂无题目，请添加题目" :image-size="160" />
         <el-button type="success" @click="openQuestionTypeDialog">
           <el-icon><Plus /></el-icon> 添加题目
         </el-button>
@@ -93,7 +100,7 @@
           
           <el-form-item label="选项" v-if="['single', 'multiple'].includes(question.type)">
             <div v-for="(option, optIndex) in question.options" :key="optIndex" class="option-item">
-              <span class="option-label">{{ String.fromCharCode(65 + optIndex) }}.</span>
+              <span class="option-label">{{ String.fromCharCode(65 + Number(optIndex)) }}.</span>
               <el-input
                 v-model="option.value"
                 placeholder="请输入选项内容"
@@ -102,7 +109,7 @@
               <el-button
                 type="danger"
                 size="small"
-                @click="removeOption(question, optIndex)"
+                @click="removeOption(question, Number(optIndex))"
                 :disabled="question.options.length <= 3"
               >
                 删除
@@ -176,7 +183,7 @@
 
     <div class="action-buttons mt-4">
       <el-button @click="previewAssignment">预览模式</el-button>
-      <el-button @click="saveDraft">预设发布</el-button>
+      <el-button type="success" @click="saveDraftManual">保存草稿</el-button>
       <el-button type="primary" @click="publishAssignment">现在发布</el-button>
     </div>
 
@@ -200,31 +207,6 @@
       <template #footer>
         <span class="dialog-footer">
           <el-button @click="questionTypeDialogVisible = false">取消</el-button>
-        </span>
-      </template>
-    </el-dialog>
-
-    <!-- 题库选择弹窗 -->
-    <el-dialog
-      v-model="questionBankDialogVisible"
-      title="从题库选择题目"
-      width="800px"
-    >
-      <el-table :data="questionBank" style="width: 100%">
-        <el-table-column type="selection" width="55" />
-        <el-table-column prop="id" label="题目ID" width="80" />
-        <el-table-column prop="type" label="题型" width="100">
-          <template #default="scope">
-            {{ getQuestionTypeText(scope.row.type) }}
-          </template>
-        </el-table-column>
-        <el-table-column prop="content" label="题目内容" />
-        <el-table-column prop="score" label="分值" width="80" />
-      </el-table>
-      <template #footer>
-        <span class="dialog-footer">
-          <el-button @click="questionBankDialogVisible = false">取消</el-button>
-          <el-button type="primary" @click="confirmSelectQuestions">确定</el-button>
         </span>
       </template>
     </el-dialog>
@@ -266,13 +248,21 @@
 import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import { Document, Plus, Check, Delete, Edit } from '@element-plus/icons-vue';
+import { Document, Plus, Check, Delete, Edit, FolderChecked, List } from '@element-plus/icons-vue';
+import request from '@/utils/request';
 import Quill from 'quill';
 import 'quill/dist/quill.snow.css';
 
 const route = useRoute();
 const router = useRouter();
-const assignmentId = computed(() => route.params.id as string);
+const assignmentId = computed(() => {
+  const id = route.params.id as string;
+  // 如果是 "create" 或 undefined，返回 null
+  if (!id || id === 'create' || id === 'undefined') {
+    return null;
+  }
+  return id;
+});
 const isEdit = computed(() => !!assignmentId.value);
 
 const assignment = ref({
@@ -290,48 +280,21 @@ const courses = ref([
 ]);
 
 const questions = ref([]);
-const questionBank = ref([
-  {
-    id: 1,
-    type: 'single',
-    content: '计算机的基本组成部分不包括以下哪项？',
-    options: ['CPU', '内存', '硬盘', '打印机'],
-    correctAnswer: 'D',
-    score: 10
-  },
-  {
-    id: 2,
-    type: 'multiple',
-    content: '以下哪些是计算机的输入设备？',
-    options: ['键盘', '鼠标', '显示器', '打印机'],
-    correctAnswer: 'A,B',
-    score: 15
-  },
-  {
-    id: 3,
-    type: 'judgment',
-    content: '计算机病毒是一种程序。',
-    correctAnswer: 'true',
-    score: 5
-  }
-]);
 
-const drafts = ref([
-  {
-    id: 1,
-    title: '第一章 计算机基础作业',
-    courseName: '计算机导论',
-    saveTime: new Date(Date.now() - 3600000).toISOString(),
-    questionCount: 3
-  },
-  {
-    id: 2,
-    title: '第二章 数据结构作业',
-    courseName: '数据结构',
-    saveTime: new Date(Date.now() - 7200000).toISOString(),
-    questionCount: 2
-  }
-]);
+const drafts = ref<Draft[]>([]);
+
+interface Draft {
+  id: number;
+  title: string;
+  courseId: number;
+  courseName: string;
+  description: string;
+  deadline: string;
+  questions: any[];
+  totalScore: number;
+  saveTime: string;
+  questionCount: number;
+}
 
 const questionTypes = [
   { label: '单选题', value: 'single', icon: Check },
@@ -341,7 +304,6 @@ const questionTypes = [
 ];
 
 const questionTypeDialogVisible = ref(false);
-const questionBankDialogVisible = ref(false);
 const draftBoxDialogVisible = ref(false);
 
 const editorRefs = ref({});
@@ -422,28 +384,15 @@ const removeOption = (question: any, index: number) => {
 };
 
 const openQuestionBankDialog = () => {
-  questionBankDialogVisible.value = true;
+  // 题库功能已移除
 };
 
 const confirmSelectQuestions = () => {
-  questionBankDialogVisible.value = false;
-  ElMessage.success('题目添加成功');
+  // 题库功能已移除
 };
 
 const openDraftBox = () => {
   draftBoxDialogVisible.value = true;
-};
-
-const loadDraft = (draftId: number) => {
-  ElMessageBox.confirm('你将查看该草稿，当前页面未保存内容可能丢失，是否继续？', '提示', {
-    confirmButtonText: '确定',
-    cancelButtonText: '取消',
-    type: 'warning'
-  }).then(() => {
-    // 模拟加载草稿
-    ElMessage.success('草稿加载成功');
-    draftBoxDialogVisible.value = false;
-  });
 };
 
 const saveDraft = async () => {
@@ -458,11 +407,223 @@ const saveDraft = async () => {
       }
     });
     
-    // 实际项目中调用接口
-    ElMessage.success('草稿保存成功');
+    const data = {
+      ...assignment.value,
+      questions: questions.value,
+      totalScore: totalScore.value,
+      status: 'draft' // 设置为草稿状态
+    };
+    
+    // 如果是编辑模式，使用 PUT 更新；否则使用 POST 创建
+    if (assignmentId.value) {
+      await request.put(`/teacher/assignments/${assignmentId.value}`, data);
+    } else {
+      await request.post('/teacher/assignments', data);
+    }
+    
+    ElMessage.success('草稿已自动保存');
   } catch (error) {
-    ElMessage.error('保存草稿失败');
+    console.error('自动保存失败:', error);
   }
+};
+
+// 手动保存草稿
+const saveDraftManual = async () => {
+  if (!assignment.value.title) {
+    ElMessage.warning('请输入作业标题');
+    return;
+  }
+  
+  if (!assignment.value.courseId) {
+    ElMessage.warning('请选择所属课程');
+    return;
+  }
+  
+  if (questions.value.length === 0) {
+    ElMessage.warning('请添加至少一道题目');
+    return;
+  }
+  
+  try {
+    // 收集编辑器内容
+    questions.value.forEach(question => {
+      if (editors.value[question.id]) {
+        question.content = editors.value[question.id].root.innerHTML;
+      }
+      if (question.type === 'essay' && answerEditors.value[question.id]) {
+        question.referenceAnswer = answerEditors.value[question.id].root.innerHTML;
+      }
+    });
+    
+    const data = {
+      ...assignment.value,
+      questions: questions.value,
+      totalScore: totalScore.value,
+      status: 'draft' // 设置为草稿状态
+    };
+    
+    // 如果是编辑模式，使用 PUT 更新；否则使用 POST 创建
+    if (assignmentId.value) {
+      await request.put(`/teacher/assignments/${assignmentId.value}`, data);
+    } else {
+      await request.post('/teacher/assignments', data);
+    }
+    
+    ElMessage.success('草稿保存成功');
+    // 刷新草稿列表
+    getDrafts();
+  } catch (error: any) {
+    ElMessage.error('保存草稿失败：' + (error?.message || '未知错误'));
+  }
+};
+
+// 获取草稿列表
+const getDrafts = async () => {
+  try {
+    // 从作业列表中获取草稿状态的作业
+    const response = await request.get('/teacher/assignments', {
+      params: { status: 'draft', size: 100 }
+    });
+    const allAssignments = response.data?.records || [];
+    
+    // 筛选出草稿状态的作业
+    drafts.value = allAssignments
+      .filter((item: any) => item.status === 'draft')
+      .map((item: any) => ({
+        id: item.assignmentId,
+        title: item.assignmentName,
+        courseId: item.courseId,
+        courseName: item.courseName,
+        description: item.description,
+        deadline: item.deadline,
+        questions: item.questions || [],
+        totalScore: item.totalScore || 0,
+        saveTime: item.createTime || item.updateTime,
+        questionCount: item.questionCount || 0
+      }));
+  } catch (error) {
+    console.error('获取草稿列表失败:', error);
+  }
+};
+
+// 获取作业详情（编辑模式）
+const getAssignmentDetail = async (id: string) => {
+  try {
+    const response = await request.get(`/teacher/assignments/${id}`);
+    // response 已经是 { code: 200, data: {...}, msg: 'success' } 格式
+    // 真正的数据在 response.data 中
+    const data = response.data;
+    
+    if (!data) {
+      ElMessage.error('作业数据为空');
+      return;
+    }
+    
+    assignment.value = {
+      id: data.id,
+      title: data.title || '',
+      courseId: data.courseId,
+      description: data.description || '',
+      deadline: data.deadline || ''
+    };
+    
+    questions.value = data.questions || [];
+    
+    // 等待 DOM 更新后初始化编辑器
+    await nextTick();
+    initEditors();
+    
+    ElMessage.success('作业数据加载成功');
+  } catch (error: any) {
+    console.error('加载作业数据失败:', error);
+    ElMessage.error('加载作业数据失败：' + (error?.message || '未知错误'));
+  }
+};
+
+// 加载草稿
+const loadDraft = async (draftId: number) => {
+  try {
+    // 使用作业详情接口获取草稿数据
+    const response = await request.get(`/teacher/assignments/${draftId}`);
+    // response 已经是 { code: 200, data: {...}, msg: 'success' } 格式
+    // 真正的数据在 response.data 中
+    const draft = response.data;
+    
+    if (!draft) {
+      ElMessage.error('草稿数据为空');
+      return;
+    }
+    
+    // 加载作业信息
+    assignment.value = {
+      id: draft.id || draftId,
+      title: draft.title || draft.assignmentName || '',
+      courseId: draft.courseId,
+      description: draft.description || '',
+      deadline: draft.deadline || ''
+    };
+    
+    // 加载题目
+    questions.value = draft.questions || [];
+    
+    // 关闭弹窗
+    draftBoxDialogVisible.value = false;
+    
+    ElMessage.success('草稿加载成功');
+    
+    // 等待 DOM 更新后初始化编辑器
+    await nextTick();
+    initEditors();
+  } catch (error: any) {
+    console.error('加载草稿失败:', error);
+    ElMessage.error('加载草稿失败：' + (error?.message || '未知错误'));
+  }
+};
+
+// 初始化编辑器
+const initEditors = () => {
+  questions.value.forEach(question => {
+    if (question.id && editorRefs.value[question.id]) {
+      const editor = new Quill(editorRefs.value[question.id], {
+        theme: 'snow',
+        placeholder: '请输入题目内容...',
+        modules: {
+          toolbar: [
+            ['bold', 'italic', 'underline'],
+            [{ list: 'ordered' }, { list: 'bullet' }],
+            ['link', 'clean']
+          ]
+        }
+      });
+      
+      if (question.content) {
+        editor.root.innerHTML = question.content;
+      }
+      
+      editors.value[question.id] = editor;
+    }
+    
+    // 主观题需要初始化答案编辑器
+    if (question.type === 'essay' && question.id && answerEditorRefs.value[question.id]) {
+      const answerEditor = new Quill(answerEditorRefs.value[question.id], {
+        theme: 'snow',
+        placeholder: '请输入参考答案...',
+        modules: {
+          toolbar: [
+            ['bold', 'italic', 'underline'],
+            [{ list: 'ordered' }, { list: 'bullet' }],
+            ['link', 'clean']
+          ]
+        }
+      });
+      
+      if (question.referenceAnswer) {
+        answerEditor.root.innerHTML = question.referenceAnswer;
+      }
+      
+      answerEditors.value[question.id] = answerEditor;
+    }
+  });
 };
 
 const publishAssignment = async () => {
@@ -495,12 +656,29 @@ const publishAssignment = async () => {
       }
     });
     
-    ElMessageBox.confirm('确定要发布作业吗？发布后将通知所有学生。', '提示', {
-      confirmButtonText: '确定',
-      cancelButtonText: '取消',
-      type: 'warning'
-    }).then(() => {
-      // 实际项目中调用接口
+    ElMessageBox.confirm(
+      '确定要发布该作业吗？发布后将通知所有选课学生。',
+      '提示',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    ).then(async () => {
+      const data = {
+        ...assignment.value,
+        questions: questions.value,
+        totalScore: totalScore.value,
+        status: 'published' // 设置为已发布状态
+      };
+      
+      // 如果是编辑模式，使用 PUT 更新；否则使用 POST 创建
+      if (assignmentId.value) {
+        await request.put(`/teacher/assignments/${assignmentId.value}`, data);
+      } else {
+        await request.post('/teacher/assignments', data);
+      }
+      
       ElMessage.success('作业发布成功');
       router.push('/teacher/courses');
     });
@@ -572,6 +750,13 @@ const formatDate = (date: string) => {
 
 onMounted(() => {
   startAutoSave();
+  getDrafts(); // 获取草稿列表
+  
+  // 如果是编辑模式（有有效的 assignmentId），加载作业数据
+  if (assignmentId.value && assignmentId.value !== 'create') {
+    getAssignmentDetail(assignmentId.value);
+  }
+  
   nextTick(() => {
     initQuillEditors();
   });
@@ -586,75 +771,219 @@ onUnmounted(() => {
 
 <style scoped>
 .teacher-assignment-edit {
-  padding: 20px;
+  padding: 24px;
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(10px);
+  border-radius: 16px;
+  margin: 16px;
+  min-height: calc(100vh - 84px);
   position: relative;
-}
-
-.draft-box-icon {
-  position: fixed;
-  top: 20px;
-  right: 20px;
-  width: 50px;
-  height: 50px;
-  background-color: #409eff;
-  border-radius: 50%;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
-  z-index: 1000;
+  flex-direction: column;
+  gap: 24px;
 }
 
-.draft-box-icon .icon {
-  font-size: 24px;
-  color: white;
+/* 通用卡片样式 */
+:deep(.el-card) {
+  border: none;
+  border-radius: 16px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+  overflow: hidden;
 }
 
-.page-header {
-  margin-bottom: 20px;
+:deep(.el-card__header) {
+  padding: 16px 20px;
+  border-bottom: none;
+  background: transparent;
+  overflow: hidden;
 }
 
-.card-header {
+:deep(.el-card__body) {
+  padding: 0 20px 20px;
+  overflow: hidden;
+}
+
+/* 配置卡片 */
+.config-section {
+  margin-bottom: 0;
+}
+
+.questions-section {
+  margin-bottom: 0;
+}
+
+.questions-section :deep(.el-card__header) {
   display: flex;
   justify-content: space-between;
   align-items: center;
 }
 
-.empty-questions {
-  text-align: center;
-  padding: 40px 0;
+/* 卡片标题 */
+.card-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #303133;
 }
 
+.card-title__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #fff;
+}
+
+.card-title__icon .el-icon {
+  font-size: 18px;
+}
+
+.card-title__text {
+  color: #303133;
+}
+
+/* 表单样式 */
+.config-form {
+  padding: 10px 0;
+}
+
+:deep(.el-form-item) {
+  margin-bottom: 24px;
+}
+
+:deep(.el-form-item:last-child) {
+  margin-bottom: 0;
+}
+
+:deep(.el-form-item__label) {
+  font-weight: 600;
+  color: #303133;
+  font-size: 14px;
+}
+
+:deep(.el-input-number) {
+  width: 100%;
+}
+
+:deep(.el-select) {
+  width: 100%;
+}
+
+/* 按钮样式 */
+:deep(.el-button) {
+  border-radius: 8px;
+  padding: 10px 24px;
+  font-size: 14px;
+}
+
+:deep(.el-button--primary) {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: none;
+}
+
+:deep(.el-button--primary:hover) {
+  opacity: 0.9;
+}
+
+:deep(.el-button--success) {
+  background: linear-gradient(135deg, #67c23a 0%, #5daf34 100%);
+  border: none;
+}
+
+:deep(.el-button--danger) {
+  background: linear-gradient(135deg, #f56c6c 0%, #e74c3c 100%);
+  border: none;
+}
+
+/* 草稿箱图标 - 固定在右下角 */
+.draft-box-icon {
+  position: fixed;
+  bottom: 30px;
+  right: 30px;
+  width: 60px;
+  height: 60px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 4px 20px rgba(102, 126, 234, 0.4);
+  z-index: 1000;
+  transition: all 0.3s ease;
+}
+
+.draft-box-icon:hover {
+  transform: scale(1.1);
+  box-shadow: 0 6px 24px rgba(102, 126, 234, 0.6);
+}
+
+.draft-box-icon .icon {
+  font-size: 28px;
+  color: white;
+}
+
+:deep(.el-badge__content) {
+  background: linear-gradient(135deg, #f56c6c 0%, #e74c3c 100%);
+  border: none;
+}
+
+/* 空题目区域 */
+.empty-questions {
+  text-align: center;
+  padding: 60px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  background: linear-gradient(135deg, #fafafa 0%, #f5f7fa 100%);
+  border-radius: 12px;
+  margin: 20px 0;
+}
+
+.empty-questions :deep(.el-empty__description) {
+  color: #909399;
+  font-size: 16px;
+}
+
+/* 题目卡片 */
 .question-card {
   border: 1px solid #ebeef5;
-  border-radius: 4px;
-  padding: 16px;
-  margin-bottom: 16px;
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 20px;
+  background: #fafafa;
 }
 
 .question-header {
   display: flex;
   align-items: center;
-  margin-bottom: 16px;
+  margin-bottom: 20px;
 }
 
 .question-number {
-  font-weight: 500;
-  margin-right: 12px;
-  width: 30px;
+  font-weight: 600;
+  margin-right: 16px;
+  font-size: 16px;
+  color: #303133;
 }
 
 .option-item {
   display: flex;
   align-items: center;
-  margin-bottom: 8px;
+  margin-bottom: 12px;
 }
 
 .option-label {
-  width: 20px;
-  margin-right: 8px;
-  font-weight: 500;
+  width: 28px;
+  margin-right: 12px;
+  font-weight: 600;
+  color: #303133;
 }
 
 .option-item .el-button {
@@ -662,13 +991,13 @@ onUnmounted(() => {
 }
 
 .option-hint {
-  font-size: 12px;
+  font-size: 13px;
   color: #909399;
-  margin-top: 8px;
+  margin-top: 12px;
 }
 
 .score-hint {
-  margin-left: 12px;
+  margin-left: 16px;
   font-size: 14px;
   color: #909399;
 }
@@ -676,7 +1005,7 @@ onUnmounted(() => {
 .word-limit {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
 }
 
 .word-limit-separator {
@@ -685,40 +1014,42 @@ onUnmounted(() => {
 }
 
 .word-limit-hint {
-  margin-left: 12px;
+  margin-left: 16px;
   font-size: 14px;
   color: #909399;
 }
 
 .answer-hint {
-  font-size: 12px;
+  font-size: 13px;
   color: #909399;
-  margin-top: 8px;
+  margin-top: 12px;
 }
 
 .rich-text-editor {
-  margin-bottom: 12px;
+  margin-bottom: 16px;
 }
 
 .quill-editor {
-  min-height: 100px;
+  min-height: 120px;
   border: 1px solid #dcdfe6;
-  border-radius: 4px;
+  border-radius: 8px;
 }
 
 .total-score {
-  font-size: 16px;
-  font-weight: 500;
-  color: #409eff;
+  font-size: 18px;
+  font-weight: 600;
+  color: #667eea;
   text-align: right;
+  padding: 20px 0;
 }
 
 .action-buttons {
   display: flex;
   justify-content: flex-end;
-  gap: 12px;
+  gap: 16px;
 }
 
+/* 题型选择弹窗 */
 .question-type-list {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -729,73 +1060,106 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 20px;
+  padding: 24px;
   border: 1px solid #ebeef5;
-  border-radius: 8px;
+  border-radius: 12px;
   cursor: pointer;
   transition: all 0.3s ease;
 }
 
 .question-type-item:hover {
-  border-color: #409eff;
-  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+  border-color: #667eea;
+  box-shadow: 0 4px 16px rgba(102, 126, 234, 0.2);
+  transform: translateY(-2px);
 }
 
 .type-icon {
-  font-size: 32px;
-  color: #409eff;
-  margin-bottom: 10px;
+  font-size: 36px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin-bottom: 12px;
 }
 
 .type-name {
   font-size: 16px;
-  font-weight: 500;
+  font-weight: 600;
+  color: #303133;
 }
 
+/* 草稿箱弹窗 */
 .draft-list {
-  max-height: 400px;
+  max-height: 500px;
   overflow-y: auto;
+  padding: 10px;
 }
 
 .draft-item {
-  margin-bottom: 12px;
+  margin-bottom: 16px;
   cursor: pointer;
   transition: all 0.3s ease;
+  border-radius: 12px;
+  border: 1px solid #ebeef5;
+  background: linear-gradient(135deg, #fafafa 0%, #f5f7fa 100%);
 }
 
 .draft-item:hover {
-  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  transform: translateY(-2px);
+  border-color: #667eea;
 }
 
 .draft-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 8px;
+  padding: 16px 16px 12px;
 }
 
 .draft-title {
-  font-weight: 500;
+  font-weight: 600;
   font-size: 16px;
+  color: #303133;
 }
 
 .draft-course {
   font-size: 14px;
-  color: #909399;
+  color: #667eea;
+  font-weight: 500;
 }
 
 .draft-info {
   display: flex;
   justify-content: space-between;
-  font-size: 12px;
+  padding: 0 16px 16px;
+  font-size: 13px;
   color: #909399;
 }
 
+/* 响应式设计 */
 @media (max-width: 768px) {
-  .card-header {
+  .teacher-assignment-edit {
+    padding: 16px;
+  }
+  
+  .welcome-title {
+    font-size: 36px;
+  }
+  
+  .welcome-subtitle {
+    font-size: 18px;
+  }
+  
+  .questions-section :deep(.el-card__header) {
     flex-direction: column;
+    gap: 12px;
     align-items: flex-start;
-    gap: 10px;
+  }
+  
+  .header-actions {
+    width: 100%;
+    display: flex;
+    gap: 8px;
   }
   
   .action-buttons {
@@ -805,6 +1169,17 @@ onUnmounted(() => {
   
   .question-type-list {
     grid-template-columns: 1fr;
+  }
+  
+  .draft-box-icon {
+    bottom: 20px;
+    right: 20px;
+    width: 50px;
+    height: 50px;
+  }
+  
+  .draft-box-icon .icon {
+    font-size: 24px;
   }
 }
 </style>

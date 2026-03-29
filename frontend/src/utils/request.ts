@@ -30,9 +30,13 @@ service.interceptors.response.use(
     },
     error => {
         if (error.response?.status === 401) {
-            const userStore = useUserStore();
-            userStore.logout();
-            router.push('/login');
+            if (error.config?.url?.includes('/auth/login')) {
+                ElMessage.error(error.response?.data?.msg || '用户名或密码错误');
+            } else {
+                const userStore = useUserStore();
+                userStore.logout();
+                router.push('/login');
+            }
         } else if (error.response?.status === 403) {
             ElMessage.error('无权限访问');
             router.push('/403');

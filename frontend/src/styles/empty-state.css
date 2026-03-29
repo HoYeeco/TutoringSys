@@ -1,0 +1,207 @@
+/**
+ * 全局空状态样式
+ * 用于所有"暂无数据"场景
+ */
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  min-height: 400px;
+  background-color: #ffffff;
+  border-radius: 16px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+}
+
+.empty-state__icon {
+  width: 120px;
+  height: 120px;
+  margin-bottom: 24px;
+  opacity: 0.5;
+}
+
+.empty-state__icon svg {
+  width: 100%;
+  height: 100%;
+}
+
+.empty-state__text {
+  font-size: 16px;
+  color: #909399;
+  text-align: center;
+  margin-bottom: 8px;
+}
+
+.empty-state__subtext {
+  font-size: 14px;
+  color: #c0c4cc;
+  text-align: center;
+}
+
+/* 卡片内的空状态 */
+.card-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 80px 20px;
+  background-color: #fafafa;
+  border-radius: 12px;
+  min-height: 300px;
+}
+
+.card-empty .el-empty__description {
+  color: #909399;
+  font-size: 16px;
+}
+
+.card-empty .el-empty__image {
+  width: 160px;
+  height: 160px;
+  margin-bottom: 16px;
+  opacity: 0.6;
+}
+
+/* 列表空状态 */
+.list-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 100px 20px;
+  background: linear-gradient(135deg, #f5f7fa 0%, #e9ecef 100%);
+  border-radius: 16px;
+  min-height: 400px;
+}
+
+.list-empty .el-empty__description {
+  font-size: 18px;
+  color: #606266;
+  font-weight: 500;
+}
+
+.list-empty .el-empty__image {
+  width: 180px;
+  height: 180px;
+}
+
+/* 表格空状态 */
+.table-empty {
+  padding: 60px 20px;
+}
+
+.table-empty .el-empty__description {
+  color: #909399;
+}
+
+/* 图表空状态 */
+.chart-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 300px;
+  background-color: #fafafa;
+  border-radius: 12px;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .empty-state {
+    padding: 40px 16px;
+    min-height: 300px;
+  }
+  
+  .empty-state__icon {
+    width: 100px;
+    height: 100px;
+  }
+  
+  .empty-state__text {
+    font-size: 14px;
+  }
+  
+  .card-empty {
+    padding: 60px 16px;
+    min-height: 250px;
+  }
+  
+  .list-empty {
+    padding: 60px 16px;
+    min-height: 300px;
+  }
+}
+
+/* Element Plus el-empty 样式覆盖 */
+:deep(.el-empty) {
+  padding: 60px 20px;
+}
+
+:deep(.el-empty__image) {
+  width: 160px !important;
+  height: 160px !important;
+  margin-bottom: 20px !important;
+  opacity: 0.6;
+}
+
+:deep(.el-empty__description) {
+  font-size: 16px !important;
+  color: #909399 !important;
+}
+
+:deep(.el-empty__description p) {
+  margin: 0 !important;
+}
+
+/* 空状态动画 */
+@keyframes emptyFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+:deep(.el-empty) {
+  animation: emptyFadeIn 0.4s ease-out;
+}
+
+/* 空状态图标颜色 */
+:deep(.el-empty__image path) {
+  fill: #e0e0e0;
+}
+
+/* 自定义空状态插图 */
+.empty-illustration {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.empty-illustration__box {
+  width: 140px;
+  height: 140px;
+  background: linear-gradient(135deg, #f5f7fa 0%, #e9ecef 100%);
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 24px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.empty-illustration__icon {
+  font-size: 64px;
+  color: #c0c4cc;
+}
+
+.empty-illustration__text {
+  font-size: 16px;
+  color: #909399;
+  text-align: center;
+  font-weight: 500;
+}

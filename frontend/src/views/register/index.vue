@@ -5,7 +5,7 @@
         <canvas id="demo-canvas"></canvas>
         <div class="logo_box">
           <div class="logo-image">
-            <img src="@/assets/Scoututor.png" alt="Scoututor" class="logo-img">
+            <img src="@/assets/images/Scoututor.png" alt="Scoututor" class="logo-img">
           </div>
           <form @submit.prevent="handleRegister">
             <!-- 账号输入 -->

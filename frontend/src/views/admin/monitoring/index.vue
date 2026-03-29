@@ -1,61 +1,80 @@
 <template>
   <div class="admin-monitoring">
-    <el-card shadow="never" class="page-header">
+    <!-- 系统监控板块 -->
+    <el-card shadow="never" class="monitoring-section">
       <template #header>
         <div class="card-header">
-          <span>系统监控</span>
+          <div class="card-header__title">
+            <div class="card-header__icon">
+              <el-icon><Monitor /></el-icon>
+            </div>
+            <span>系统监控</span>
+          </div>
         </div>
       </template>
-    </el-card>
 
-    <el-tabs v-model="activeTab">
-      <!-- 作业监控 -->
-      <el-tab-pane label="作业监控" name="assignment">
-        <div class="filter-form">
-          <el-form :inline="true" :model="assignmentFilter" class="demo-form-inline">
-            <el-form-item label="时间范围">
-              <el-date-picker
-                v-model="assignmentFilter.dateRange"
-                type="daterange"
-                range-separator="至"
-                start-placeholder="开始日期"
-                end-placeholder="结束日期"
-              />
-            </el-form-item>
-            <el-form-item label="课程">
-              <el-select v-model="assignmentFilter.courseId" placeholder="选择课程">
-                <el-option label="全部" value="" />
-                <el-option
-                  v-for="course in courses"
-                  :key="course.id"
-                  :label="course.name"
-                  :value="course.id"
+      <el-tabs v-model="activeTab" class="monitoring-tabs">
+        <!-- 作业监控 -->
+        <el-tab-pane name="assignment">
+          <template #label>
+            <span class="tab-label">
+              <el-icon><Document /></el-icon>
+              作业监控
+            </span>
+          </template>
+
+          <div class="filter-form">
+            <el-form :inline="true" :model="assignmentFilter" class="demo-form-inline">
+              <el-form-item label="时间范围">
+                <el-date-picker
+                  v-model="assignmentFilter.dateRange"
+                  type="daterange"
+                  range-separator="至"
+                  start-placeholder="开始日期"
+                  end-placeholder="结束日期"
                 />
-              </el-select>
-            </el-form-item>
-            <el-form-item label="批改状态">
-              <el-select v-model="assignmentFilter.status" placeholder="选择状态">
-                <el-option label="全部" value="" />
-                <el-option label="待批改" value="pending" />
-                <el-option label="已批改" value="completed" />
-                <el-option label="异常" value="error" />
-              </el-select>
-            </el-form-item>
-            <el-form-item>
-              <el-button type="primary" @click="handleAssignmentSearch">查询</el-button>
-              <el-button @click="resetAssignmentFilter">重置</el-button>
-            </el-form-item>
-          </el-form>
-        </div>
+              </el-form-item>
+              <el-form-item label="课程">
+                <el-select v-model="assignmentFilter.courseId" placeholder="选择课程" clearable @change="handleFilterChange">
+                  <el-option
+                    v-for="course in courses"
+                    :key="course.id"
+                    :label="course.name"
+                    :value="course.id"
+                  />
+                </el-select>
+              </el-form-item>
+              <el-form-item label="批改状态">
+                <el-select v-model="assignmentFilter.status" placeholder="选择状态" clearable @change="handleFilterChange">
+                  <el-option label="待批改" value="pending" />
+                  <el-option label="已批改" value="completed" />
+                  <el-option label="异常" value="error" />
+                </el-select>
+              </el-form-item>
+              <el-form-item>
+                <el-button type="primary" @click="handleAssignmentSearch">查询</el-button>
+                <el-button @click="resetAssignmentFilter">重置</el-button>
+              </el-form-item>
+            </el-form>
+          </div>
 
-        <el-card shadow="never" class="mt-4">
-          <el-table :data="assignmentSubmissions" style="width: 100%">
-            <el-table-column prop="id" label="提交ID" width="100" />
-            <el-table-column prop="studentName" label="学生" width="120" />
-            <el-table-column prop="courseName" label="课程" width="150" />
-            <el-table-column prop="assignmentName" label="作业" width="200" />
-            <el-table-column prop="submitTime" label="提交时间" width="180" />
-            <el-table-column prop="status" label="批改状态" width="120">
+          <el-table
+            :data="assignmentSubmissions"
+            style="width: 100%"
+            v-loading="assignmentLoading"
+            class="modern-table"
+            :cell-style="{ textAlign: 'center' }"
+            :header-cell-style="{ textAlign: 'center' }"
+          >
+            <el-table-column prop="studentName" label="学生" min-width="120" />
+            <el-table-column prop="courseName" label="课程" min-width="280" />
+            <el-table-column prop="assignmentName" label="作业" min-width="280" />
+            <el-table-column label="提交时间" min-width="180">
+              <template #default="scope">
+                {{ formatDateTime(scope.row.submitTime) }}
+              </template>
+            </el-table-column>
+            <el-table-column prop="status" label="批改状态" min-width="120">
               <template #default="scope">
                 <el-tag
                   :type="{
@@ -72,14 +91,7 @@
                 </el-tag>
               </template>
             </el-table-column>
-            <el-table-column prop="llmCallId" label="AI调用ID" width="200" />
-            <el-table-column label="操作" width="120">
-              <template #default="scope">
-                <el-button size="small" @click="viewSubmissionDetail(scope.row.id)">
-                  查看详情
-                </el-button>
-              </template>
-            </el-table-column>
+            <el-table-column prop="llmCallId" label="AI 调用 ID" min-width="160" />
           </el-table>
           <div class="pagination-container">
             <el-pagination
@@ -92,145 +104,145 @@
               @current-change="handleAssignmentCurrentChange"
             />
           </div>
-        </el-card>
-      </el-tab-pane>
+        </el-tab-pane>
 
-      <!-- 性能监控 -->
-      <el-tab-pane label="性能监控" name="performance">
-        <div class="performance-section">
-          <h2 class="section-title">API统计</h2>
-          <el-card shadow="never" class="mt-2">
-            <div ref="apiStatsChartRef" class="chart" style="height: 300px"></div>
-          </el-card>
+        <!-- 性能监控 -->
+        <el-tab-pane name="performance">
+          <template #label>
+            <span class="tab-label">
+              <el-icon><DataAnalysis /></el-icon>
+              性能监控
+            </span>
+          </template>
 
-          <h2 class="section-title mt-4">大模型监控</h2>
-          <div class="stats-grid">
-            <el-card shadow="never" class="stat-card">
-              <div class="stat-content">
-                <div class="stat-value">{{ llmStats.tokenConsumption }}</div>
-                <div class="stat-label">Token消耗</div>
-              </div>
-              <div class="stat-icon">
-                <el-icon class="icon-large"><ChatLineSquare /></el-icon>
-              </div>
-            </el-card>
-            <el-card shadow="never" class="stat-card">
-              <div class="stat-content">
-                <div class="stat-value">{{ llmStats.costEstimate }} 元</div>
-                <div class="stat-label">成本预估</div>
-              </div>
-              <div class="stat-icon">
-                <el-icon class="icon-large"><Money /></el-icon>
-              </div>
-            </el-card>
-            <el-card shadow="never" class="stat-card">
-              <div class="stat-content">
-                <div class="stat-value">{{ llmStats.failureCount }}</div>
-                <div class="stat-label">失败次数</div>
-              </div>
-              <div class="stat-icon">
-                <el-icon class="icon-large"><Close /></el-icon>
-              </div>
-            </el-card>
+          <div class="performance-section">
+            <h4 class="sub-section-title">API 统计</h4>
+            <div class="chart-container">
+              <div ref="apiStatsChartRef" class="chart" style="height: 350px"></div>
+            </div>
+
+            <h4 class="sub-section-title">大模型监控</h4>
+            <div class="stats-grid">
+              <el-card shadow="never" class="stat-card">
+                <div class="stat-content">
+                  <div class="stat-value">{{ formatNumber(llmStats.tokenConsumption) }}</div>
+                  <div class="stat-label">Token 消耗</div>
+                </div>
+                <div class="stat-icon">
+                  <el-icon class="icon-large"><ChatLineSquare /></el-icon>
+                </div>
+              </el-card>
+              <el-card shadow="never" class="stat-card">
+                <div class="stat-content">
+                  <div class="stat-value">{{ formatNumber(llmStats.failureCount) }}</div>
+                  <div class="stat-label">失败次数</div>
+                </div>
+                <div class="stat-icon">
+                  <el-icon class="icon-large"><Close /></el-icon>
+                </div>
+              </el-card>
+            </div>
+
+            <h4 class="sub-section-title">Redis 监控</h4>
+            <div class="stats-grid">
+              <el-card shadow="never" class="stat-card">
+                <div class="stat-content">
+                  <div class="stat-value">{{ redisStats.hitRate }}%</div>
+                  <div class="stat-label">命中率</div>
+                </div>
+                <div class="stat-icon">
+                  <el-icon class="icon-large"><Check /></el-icon>
+                </div>
+              </el-card>
+              <el-card shadow="never" class="stat-card">
+                <div class="stat-content">
+                  <div class="stat-value">{{ redisStats.memoryUsage }}</div>
+                  <div class="stat-label">内存使用</div>
+                </div>
+                <div class="stat-icon">
+                  <el-icon class="icon-large"><Monitor /></el-icon>
+                </div>
+              </el-card>
+            </div>
+          </div>
+        </el-tab-pane>
+
+        <!-- 日志审计 -->
+        <el-tab-pane name="logs">
+          <template #label>
+            <span class="tab-label">
+              <el-icon><DocumentCopy /></el-icon>
+              日志审计
+            </span>
+          </template>
+
+          <div class="logs-section">
+            <h4 class="sub-section-title">操作日志</h4>
+            <el-table :data="operationLogs" style="width: 100%" v-loading="logsLoading">
+              <el-table-column prop="time" label="时间" width="180" />
+              <el-table-column prop="user" label="操作用户" width="150" />
+              <el-table-column prop="action" label="操作内容" />
+              <el-table-column prop="result" label="结果" width="100">
+                <template #default="scope">
+                  <el-tag :type="scope.row.result === '成功' ? 'success' : 'danger'">
+                    {{ scope.row.result }}
+                  </el-tag>
+                </template>
+              </el-table-column>
+            </el-table>
           </div>
 
-          <h2 class="section-title mt-4">Redis监控</h2>
-          <div class="stats-grid">
-            <el-card shadow="never" class="stat-card">
-              <div class="stat-content">
-                <div class="stat-value">{{ redisStats.hitRate }}%</div>
-                <div class="stat-label">命中率</div>
-              </div>
-              <div class="stat-icon">
-                <el-icon class="icon-large"><Check /></el-icon>
-              </div>
-            </el-card>
-            <el-card shadow="never" class="stat-card">
-              <div class="stat-content">
-                <div class="stat-value">{{ redisStats.memoryUsage }}</div>
-                <div class="stat-label">内存使用</div>
-              </div>
-              <div class="stat-icon">
-                <el-icon class="icon-large"><HardDrive /></el-icon>
-              </div>
-            </el-card>
+          <div class="logs-section">
+            <h4 class="sub-section-title">登录日志</h4>
+            <el-table :data="loginLogs" style="width: 100%">
+              <el-table-column prop="time" label="时间" width="180" />
+              <el-table-column prop="user" label="用户" width="150" />
+              <el-table-column prop="ip" label="IP 地址" width="150" />
+              <el-table-column prop="result" label="结果" width="100">
+                <template #default="scope">
+                  <el-tag :type="scope.row.result === '成功' ? 'success' : 'danger'">
+                    {{ scope.row.result }}
+                  </el-tag>
+                </template>
+              </el-table-column>
+            </el-table>
           </div>
-        </div>
-      </el-tab-pane>
 
-      <!-- 日志审计 -->
-      <el-tab-pane label="日志审计" name="logs">
-        <el-card shadow="never" class="mt-2">
-          <template #header>
-            <span>操作日志</span>
-          </template>
-          <el-table :data="operationLogs" style="width: 100%">
-            <el-table-column prop="time" label="时间" width="180" />
-            <el-table-column prop="user" label="操作用户" width="150" />
-            <el-table-column prop="action" label="操作内容" />
-            <el-table-column prop="result" label="结果" width="100">
-              <template #default="scope">
-                <el-tag :type="scope.row.result === '成功' ? 'success' : 'danger'">
-                  {{ scope.row.result }}
-                </el-tag>
-              </template>
-            </el-table-column>
-          </el-table>
-        </el-card>
-
-        <el-card shadow="never" class="mt-4">
-          <template #header>
-            <span>登录日志</span>
-          </template>
-          <el-table :data="loginLogs" style="width: 100%">
-            <el-table-column prop="time" label="时间" width="180" />
-            <el-table-column prop="user" label="用户" width="150" />
-            <el-table-column prop="ip" label="IP地址" width="150" />
-            <el-table-column prop="result" label="结果" width="100">
-              <template #default="scope">
-                <el-tag :type="scope.row.result === '成功' ? 'success' : 'danger'">
-                  {{ scope.row.result }}
-                </el-tag>
-              </template>
-            </el-table-column>
-          </el-table>
-        </el-card>
-
-        <el-card shadow="never" class="mt-4">
-          <template #header>
-            <span>异常日志</span>
-          </template>
-          <el-table :data="errorLogs" style="width: 100%">
-            <el-table-column prop="time" label="时间" width="180" />
-            <el-table-column prop="api" label="接口" width="200" />
-            <el-table-column prop="error" label="错误信息" />
-            <el-table-column label="操作" width="120">
-              <template #default="scope">
-                <el-button size="small" @click="viewErrorDetail(scope.row.id)">
-                  查看堆栈
-                </el-button>
-              </template>
-            </el-table-column>
-          </el-table>
-        </el-card>
-      </el-tab-pane>
-    </el-tabs>
+          <div class="logs-section">
+            <h4 class="sub-section-title">异常日志</h4>
+            <el-table :data="errorLogs" style="width: 100%">
+              <el-table-column prop="time" label="时间" width="180" />
+              <el-table-column prop="api" label="接口" width="200" />
+              <el-table-column prop="error" label="错误信息" />
+              <el-table-column label="操作" width="120">
+                <template #default="scope">
+                  <el-button size="small" @click="viewErrorDetail(scope.row.id)">
+                    查看堆栈
+                  </el-button>
+                </template>
+              </el-table-column>
+            </el-table>
+          </div>
+        </el-tab-pane>
+      </el-tabs>
+    </el-card>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, nextTick } from 'vue';
+import { ref, onMounted, nextTick, watch } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import { ChatLineSquare, Money, Close, Check, HardDrive } from '@element-plus/icons-vue';
+import { ChatLineSquare, Money, Close, Check, Monitor, Document, DataAnalysis, DocumentCopy } from '@element-plus/icons-vue';
 import request from '@/utils/request';
 import * as echarts from 'echarts';
+import { formatDateTime } from '@/utils/format';
 
 const activeTab = ref('assignment');
 
-// 课程列表
 const courses = ref([]);
+const assignmentLoading = ref(false);
+const logsLoading = ref(false);
 
-// 作业监控
 const assignmentFilter = ref({
   dateRange: null,
   courseId: '',
@@ -244,194 +256,153 @@ const assignmentPage = ref({
   total: 0
 });
 
-// 性能监控
 const apiStatsChartRef = ref<HTMLElement | null>(null);
 let apiStatsChart: echarts.ECharts | null = null;
 
 const llmStats = ref({
-  tokenConsumption: 12500,
-  costEstimate: 15.6,
-  failureCount: 3
+  tokenConsumption: 0,
+  costEstimate: 0,
+  failureCount: 0
 });
 
 const redisStats = ref({
-  hitRate: 92.5,
-  memoryUsage: '450MB / 1GB'
+  hitRate: 0,
+  memoryUsage: ''
 });
 
-// 日志审计
-const operationLogs = ref([
-  { time: '2026-03-14 10:30:25', user: 'admin', action: '发布作业《数据结构作业1》', result: '成功' },
-  { time: '2026-03-14 09:15:42', user: 'teacher1', action: '批改作业《算法作业2》', result: '成功' },
-  { time: '2026-03-13 16:45:10', user: 'admin', action: '添加课程《计算机网络》', result: '成功' },
-  { time: '2026-03-13 14:20:33', user: 'student1', action: '提交作业《计算机导论作业》', result: '成功' },
-  { time: '2026-03-13 11:05:17', user: 'admin', action: '修改系统配置', result: '成功' }
-]);
+const operationLogs = ref([]);
+const loginLogs = ref([]);
+const errorLogs = ref([]);
 
-const loginLogs = ref([
-  { time: '2026-03-14 10:00:15', user: 'admin', ip: '192.168.1.100', result: '成功' },
-  { time: '2026-03-14 09:30:45', user: 'teacher1', ip: '192.168.1.101', result: '成功' },
-  { time: '2026-03-14 09:15:20', user: 'student1', ip: '192.168.1.102', result: '成功' },
-  { time: '2026-03-13 18:45:30', user: 'student2', ip: '192.168.1.103', result: '失败' },
-  { time: '2026-03-13 16:20:10', user: 'admin', ip: '192.168.1.100', result: '成功' }
-]);
-
-const errorLogs = ref([
-  { time: '2026-03-14 11:30:25', api: '/api/llm/grade', error: 'AI模型调用超时' },
-  { time: '2026-03-14 10:15:42', api: '/api/student/submit', error: '文件上传失败' },
-  { time: '2026-03-13 15:45:10', api: '/api/teacher/assignments', error: '数据库连接异常' }
-]);
-
-// 获取课程列表
 const getCourses = async () => {
   try {
     const response = await request.get('/admin/courses', {
-      params: {
-        page: 1,
-        size: 100
-      }
+      params: { page: 1, size: 100 }
     });
-    courses.value = response.data.records;
+    courses.value = response.data?.records || [];
   } catch (error) {
-    // 模拟数据
-    courses.value = [
-      { id: 1, name: '计算机导论' },
-      { id: 2, name: '数据结构' },
-      { id: 3, name: '算法设计与分析' }
-    ];
+    console.error('获取课程列表失败:', error);
   }
 };
 
-// 获取作业提交记录
 const getAssignmentSubmissions = async () => {
+  assignmentLoading.value = true;
   try {
     const response = await request.get('/admin/monitoring/assignments', {
       params: {
         page: assignmentPage.value.page,
         pageSize: assignmentPage.value.pageSize,
-        startDate: assignmentFilter.value.dateRange?.[0],
-        endDate: assignmentFilter.value.dateRange?.[1],
-        courseId: assignmentFilter.value.courseId,
-        status: assignmentFilter.value.status
+        courseId: assignmentFilter.value.courseId || undefined,
+        status: assignmentFilter.value.status || undefined
       }
     });
-    assignmentSubmissions.value = response.data.records;
-    assignmentPage.value.total = response.data.total;
+    assignmentSubmissions.value = response.data?.records || [];
+    assignmentPage.value.total = response.data?.total || 0;
   } catch (error) {
-    // 模拟数据
-    assignmentSubmissions.value = [
-      {
-        id: 1,
-        studentName: '张三',
-        courseName: '数据结构',
-        assignmentName: '数据结构作业1',
-        submitTime: '2026-03-14 10:30:25',
-        status: 'completed',
-        llmCallId: 'llm-123456'
-      },
-      {
-        id: 2,
-        studentName: '李四',
-        courseName: '算法设计与分析',
-        assignmentName: '算法作业1',
-        submitTime: '2026-03-14 09:15:42',
-        status: 'completed',
-        llmCallId: 'llm-123457'
-      },
-      {
-        id: 3,
-        studentName: '王五',
-        courseName: '计算机导论',
-        assignmentName: '计算机导论作业1',
-        submitTime: '2026-03-13 16:45:10',
-        status: 'pending',
-        llmCallId: ''
-      },
-      {
-        id: 4,
-        studentName: '赵六',
-        courseName: '数据结构',
-        assignmentName: '数据结构作业2',
-        submitTime: '2026-03-13 14:20:33',
-        status: 'error',
-        llmCallId: 'llm-123458'
+    console.error('获取作业提交记录失败:', error);
+  } finally {
+    assignmentLoading.value = false;
+  }
+};
+
+const getOperationLogs = async () => {
+  logsLoading.value = true;
+  try {
+    const response = await request.get('/admin/monitor/audit-logs', {
+      params: { size: 20 }
+    });
+    const logsData = response.data || { records: [] };
+    operationLogs.value = (logsData.records || []).map((log: any) => ({
+      time: log.createTime || log.operationTime || '-',
+      user: log.operator || log.username || '-',
+      action: log.operation || log.operationType || '-',
+      result: log.success ? '成功' : '失败'
+    }));
+  } catch (error) {
+    console.error('获取操作日志失败:', error);
+    operationLogs.value = [];
+  } finally {
+    logsLoading.value = false;
+  }
+};
+
+const getLlmStats = async () => {
+  try {
+    const response = await request.get('/admin/monitor/llm');
+    llmStats.value = response.data || { tokenConsumption: 0, costEstimate: 0, failureCount: 0 };
+  } catch (error) {
+    console.error('获取LLM统计失败:', error);
+  }
+};
+
+const getRedisStats = async () => {
+  try {
+    const response = await request.get('/admin/monitor/redis');
+    redisStats.value = response.data || { hitRate: 0, memoryUsage: '' };
+  } catch (error) {
+    console.error('获取Redis统计失败:', error);
+  }
+};
+
+const initApiStatsChart = async () => {
+  try {
+    if (apiStatsChartRef.value && apiStatsChartRef.value.clientWidth > 0) {
+      if (apiStatsChart) {
+        apiStatsChart.dispose();
       }
-    ];
-    assignmentPage.value.total = assignmentSubmissions.value.length;
+      apiStatsChart = echarts.init(apiStatsChartRef.value);
+      const option = {
+        tooltip: {
+          trigger: 'axis',
+          axisPointer: {
+            type: 'shadow'
+          }
+        },
+        grid: {
+          left: '3%',
+          right: '4%',
+          bottom: '3%',
+          containLabel: true
+        },
+        xAxis: {
+          type: 'category',
+          data: ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
+        },
+        yAxis: [
+          {
+            type: 'value',
+            name: '调用次数',
+            position: 'left'
+          }
+        ],
+        series: [
+          {
+            name: '调用次数',
+            type: 'bar',
+            data: [0, 0, 0, 0, 0, 0, 0],
+            itemStyle: {
+              color: '#409eff'
+            }
+          }
+        ]
+      };
+      apiStatsChart.setOption(option);
+    }
+  } catch (error) {
+    console.error('初始化API统计图表失败:', error);
   }
 };
 
-// 初始化API统计图表
-const initApiStatsChart = () => {
-  if (apiStatsChartRef.value) {
-    apiStatsChart = echarts.init(apiStatsChartRef.value);
-    const option = {
-      tooltip: {
-        trigger: 'axis',
-        axisPointer: {
-          type: 'shadow'
-        }
-      },
-      grid: {
-        left: '3%',
-        right: '4%',
-        bottom: '3%',
-        containLabel: true
-      },
-      xAxis: {
-        type: 'category',
-        data: ['/api/student/assignments', '/api/teacher/assignments', '/api/llm/grade', '/api/auth/login', '/api/admin/users']
-      },
-      yAxis: {
-        type: 'value',
-        name: '调用次数'
-      },
-      series: [
-        {
-          name: '调用次数',
-          type: 'bar',
-          data: [120, 80, 50, 60, 30],
-          itemStyle: {
-            color: '#409eff'
-          }
-        },
-        {
-          name: '平均响应时间(ms)',
-          type: 'line',
-          yAxisIndex: 1,
-          data: [120, 150, 2000, 80, 100],
-          itemStyle: {
-            color: '#e6a23c'
-          }
-        }
-      ],
-      yAxis: [
-        {
-          type: 'value',
-          name: '调用次数',
-          position: 'left'
-        },
-        {
-          type: 'value',
-          name: '响应时间(ms)',
-          position: 'right',
-          axisLabel: {
-            formatter: '{value} ms'
-          }
-        }
-      ]
-    };
-    apiStatsChart.setOption(option);
-  }
-};
-
-// 处理作业搜索
 const handleAssignmentSearch = () => {
   assignmentPage.value.page = 1;
   getAssignmentSubmissions();
 };
 
-// 重置作业筛选
+const handleFilterChange = () => {
+  assignmentPage.value.page = 1;
+  getAssignmentSubmissions();
+};
+
 const resetAssignmentFilter = () => {
   assignmentFilter.value = {
     dateRange: null,
@@ -442,7 +413,6 @@ const resetAssignmentFilter = () => {
   getAssignmentSubmissions();
 };
 
-// 作业分页处理
 const handleAssignmentSizeChange = (size: number) => {
   assignmentPage.value.pageSize = size;
   assignmentPage.value.page = 1;
@@ -454,12 +424,10 @@ const handleAssignmentCurrentChange = (current: number) => {
   getAssignmentSubmissions();
 };
 
-// 查看提交详情
 const viewSubmissionDetail = (id: number) => {
   ElMessage.info('查看提交详情功能开发中');
 };
 
-// 查看错误详情
 const viewErrorDetail = (id: number) => {
   ElMessageBox.alert(
     '错误堆栈信息：\n' +
@@ -474,51 +442,257 @@ const viewErrorDetail = (id: number) => {
   );
 };
 
-// 初始化
+const formatNumber = (num: number): string => {
+  if (num === undefined || num === null) return '0';
+  return num.toLocaleString('zh-CN');
+};
+
 onMounted(() => {
   getCourses();
   getAssignmentSubmissions();
-  nextTick(() => {
-    initApiStatsChart();
-  });
   
-  // 监听窗口大小变化，自适应图表
   window.addEventListener('resize', () => {
     apiStatsChart?.resize();
   });
+});
+
+watch(activeTab, (newVal) => {
+  if (newVal === 'performance') {
+    nextTick(() => {
+      setTimeout(() => {
+        initApiStatsChart();
+        getLlmStats();
+        getRedisStats();
+      }, 100);
+    });
+  } else if (newVal === 'logs') {
+    getOperationLogs();
+  }
 });
 </script>
 
 <style scoped>
 .admin-monitoring {
+  padding: 24px;
+  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  min-height: calc(100vh - 84px);
+}
+
+/* 通用卡片样式 */
+:deep(.el-card) {
+  border: none;
+  border-radius: 16px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+}
+
+:deep(.el-card__header) {
+  padding: 16px 20px;
+  border-bottom: none;
+  background: transparent;
+}
+
+:deep(.el-card__body) {
   padding: 20px;
 }
 
-.page-header {
-  margin-bottom: 20px;
-}
-
+/* 卡片头部 */
 .card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
 }
 
+.card-header__title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 20px;
+  font-weight: 600;
+  color: #303133;
+}
+
+.card-header__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #fff;
+}
+
+.card-header__icon .el-icon {
+  font-size: 24px;
+}
+
+/* 监控子板块 */
+.monitoring-subsection {
+  margin-bottom: 32px;
+  padding-bottom: 32px;
+  border-bottom: 1px solid #ebeef5;
+}
+
+.monitoring-subsection:last-child {
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+/* Tabs 样式 */
+.monitoring-tabs {
+  margin-top: 0;
+}
+
+:deep(.el-tabs__header) {
+  margin-bottom: 24px;
+}
+
+.tab-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+}
+
+.tab-label .el-icon {
+  font-size: 18px;
+}
+
+.sub-section-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #606266;
+  margin: 24px 0 16px;
+  padding-left: 12px;
+  border-left: 3px solid #409eff;
+}
+
+.sub-section-title:first-child {
+  margin-top: 0;
+}
+
+/* 图表容器 */
+.chart-container {
+  padding: 16px;
+  background-color: #f5f7fa;
+  border-radius: 12px;
+}
+
+/* 日志区块 */
+.logs-section {
+  margin-top: 24px;
+}
+
+/* 筛选表单 */
 .filter-form {
-  margin-bottom: 20px;
+  margin-bottom: 24px;
+  padding: 20px;
+  background-color: #ffffff;
+  border-radius: 16px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
 }
 
+.filter-form :deep(.el-form-item) {
+  margin-bottom: 0;
+  margin-right: 24px;
+}
+
+.filter-form :deep(.el-form-item:last-child) {
+  margin-right: 0;
+}
+
+.filter-form :deep(.el-select) {
+  width: 180px;
+}
+
+/* 表格样式 */
+.modern-table {
+  width: 100%;
+}
+
+.modern-table :deep(.el-table__header th) {
+  background: linear-gradient(135deg, #f5f7fa 0%, #e4e7ed 100%);
+  color: #606266;
+  font-weight: 600;
+  font-size: 14px;
+  padding: 12px 8px;
+}
+
+.modern-table :deep(.el-table__row) {
+  transition: all 0.3s ease;
+}
+
+.modern-table :deep(.el-table__row:hover) {
+  background-color: #f5f7fa;
+}
+
+.modern-table :deep(.el-table__cell) {
+  text-align: center;
+}
+
+/* 分页 */
 .pagination-container {
   margin-top: 20px;
   display: flex;
   justify-content: flex-end;
 }
 
-.section-title {
+/* 状态标签 */
+.status-tag {
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 12px;
+}
+
+/* 详情对话框 */
+:deep(.el-dialog) {
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+:deep(.el-dialog__header) {
+  padding: 20px;
+  border-bottom: 1px solid #ebeef5;
+}
+
+:deep(.el-dialog__title) {
   font-size: 18px;
-  font-weight: bold;
-  color: #303133;
-  margin: 20px 0 10px;
+  font-weight: 600;
+}
+
+:deep(.el-dialog__body) {
+  padding: 24px;
+}
+
+:deep(.el-dialog__footer) {
+  padding: 16px 24px;
+  border-top: 1px solid #ebeef5;
+}
+
+/* 响应式设计 */
+@media (max-width: 1200px) {
+  .filter-form :deep(.el-form-item) {
+    margin-bottom: 16px;
+  }
+}
+
+@media (max-width: 768px) {
+  .card-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .admin-monitoring {
+    padding: 16px;
+  }
+  
+  :deep(.el-tabs__item) {
+    padding: 0 16px;
+    font-size: 14px;
+  }
 }
 
 .performance-section {
@@ -527,37 +701,55 @@ onMounted(() => {
 
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 20px;
-  margin-top: 20px;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 24px;
+  margin: 20px 16px 0;
 }
 
 .stat-card {
   display: flex;
   align-items: center;
-  padding: 20px;
-  height: 120px;
+  justify-content: space-between;
+  padding: 28px 32px;
+  min-height: 120px;
+  box-sizing: border-box;
+}
+
+.stat-card :deep(.el-card__body) {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 0;
 }
 
 .stat-content {
-  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }
 
 .stat-value {
-  font-size: 24px;
+  font-size: 28px;
   font-weight: bold;
   color: #409eff;
   margin-bottom: 8px;
+  line-height: 1.2;
 }
 
 .stat-label {
   font-size: 14px;
   color: #606266;
+  line-height: 1.4;
 }
 
 .stat-icon {
-  margin-left: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 24px;
   color: #409eff;
+  flex-shrink: 0;
 }
 
 .icon-large {
@@ -568,6 +760,12 @@ onMounted(() => {
 .chart {
   width: 100%;
   height: 100%;
+}
+
+@media (max-width: 1200px) {
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }
 
 @media (max-width: 768px) {
@@ -583,6 +781,8 @@ onMounted(() => {
   .stats-grid {
     grid-template-columns: 1fr;
   }
+  
+
   
   .pagination-container {
     justify-content: center;

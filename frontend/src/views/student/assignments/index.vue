@@ -196,12 +196,20 @@ const filteredAssignments = computed(() => {
 
 const getAssignments = async () => {
   try {
-    const response = await request.get('/student/assignments/list', {
-      params: {
-        page: 1,
-        size: 100
-      }
-    });
+    const params: any = {
+      page: 1,
+      size: 100
+    };
+    if (filterStatus.value) params.status = filterStatus.value;
+    if (filterCourse.value) params.courseId = filterCourse.value;
+    if (searchKeyword.value) params.keyword = searchKeyword.value;
+    if (sortBy.value) {
+      const [field, order] = sortBy.value.split(':');
+      params.sortBy = field;
+      params.sortOrder = order;
+    }
+    
+    const response = await request.get('/student/assignments/list', { params });
     assignments.value = response.data.records || [];
   } catch (error) {
     console.error('获取作业列表失败:', error);

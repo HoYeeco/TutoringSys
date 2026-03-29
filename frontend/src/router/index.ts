@@ -17,13 +17,50 @@ const routes = [
     {
         path: '/dashboard',
         name: 'Dashboard',
-        component: () => import('@/views/dashboard/index.vue'),
+        redirect: (to) => {
+            const userStore = useUserStore();
+            const role = (userStore.userInfo?.role || userStore.role || '').toUpperCase();
+            switch (role) {
+                case 'STUDENT':
+                    return '/dashboard/student';
+                case 'TEACHER':
+                    return '/dashboard/teacher';
+                case 'ADMIN':
+                    return '/dashboard/admin';
+                default:
+                    return '/login';
+            }
+        },
         meta: { requiresAuth: true }
+    },
+    {
+        path: '/dashboard/student',
+        name: 'StudentDashboard',
+        component: () => import('@/views/dashboard/student.vue'),
+        meta: { requiresAuth: true, role: 'STUDENT' }
+    },
+    {
+        path: '/dashboard/teacher',
+        name: 'TeacherDashboard',
+        component: () => import('@/views/dashboard/teacher.vue'),
+        meta: { requiresAuth: true, role: 'TEACHER' }
+    },
+    {
+        path: '/dashboard/admin',
+        name: 'AdminDashboard',
+        component: () => import('@/views/dashboard/admin.vue'),
+        meta: { requiresAuth: true, role: 'ADMIN' }
     },
     {
         path: '/profile',
         name: 'Profile',
         component: () => import('@/views/profile/index.vue'),
+        meta: { requiresAuth: true }
+    },
+    {
+        path: '/messages',
+        name: 'Messages',
+        component: () => import('@/views/messages/index.vue'),
         meta: { requiresAuth: true }
     },
     {
@@ -53,13 +90,49 @@ const routes = [
     {
         path: '/student/reports/:id',
         name: 'StudentReports',
-        component: () => import('@/views/student/reports/index.vue'),
+        component: () => import('@/views/student/assignments/report.vue'),
         meta: { requiresAuth: true, role: 'STUDENT' }
     },
     {
         path: '/student/history',
         name: 'StudentHistory',
-        component: () => import('@/views/student/history/index.vue'),
+        component: () => import('@/views/student/assignments/history.vue'),
+        meta: { requiresAuth: true, role: 'STUDENT' }
+    },
+    {
+        path: '/student/courses',
+        name: 'StudentCourses',
+        component: () => import('@/views/student/courses/index.vue'),
+        meta: { requiresAuth: true, role: 'STUDENT' }
+    },
+    {
+        path: '/student/error-book',
+        name: 'StudentErrorBook',
+        component: () => import('@/views/student/error-book/index.vue'),
+        meta: { requiresAuth: true, role: 'STUDENT' }
+    },
+    {
+        path: '/student/courses/:id',
+        name: 'StudentCourseDetail',
+        component: () => import('@/views/student/courses/detail.vue'),
+        meta: { requiresAuth: true, role: 'STUDENT' }
+    },
+    {
+        path: '/student/grading',
+        name: 'StudentGrading',
+        component: () => import('@/views/student/grading/index.vue'),
+        meta: { requiresAuth: true, role: 'STUDENT' }
+    },
+    {
+        path: '/student/grading/:id',
+        name: 'StudentGradingDetail',
+        component: () => import('@/views/student/grading/detail.vue'),
+        meta: { requiresAuth: true, role: 'STUDENT' }
+    },
+    {
+        path: '/student/assignments/report/:id',
+        name: 'StudentAssignmentReport',
+        component: () => import('@/views/student/assignments/report.vue'),
         meta: { requiresAuth: true, role: 'STUDENT' }
     },
     {
@@ -72,6 +145,12 @@ const routes = [
         path: '/teacher/courses/:id',
         name: 'TeacherCourseDetail',
         component: () => import('@/views/teacher/courses/detail.vue'),
+        meta: { requiresAuth: true, role: 'TEACHER' }
+    },
+    {
+        path: '/teacher/assignments',
+        name: 'TeacherAssignments',
+        component: () => import('@/views/teacher/assignments/index.vue'),
         meta: { requiresAuth: true, role: 'TEACHER' }
     },
     {
@@ -93,6 +172,24 @@ const routes = [
         meta: { requiresAuth: true, role: 'TEACHER' }
     },
     {
+        path: '/teacher/grading',
+        name: 'TeacherGrading',
+        component: () => import('@/views/teacher/grading/index.vue'),
+        meta: { requiresAuth: true, role: 'TEACHER' }
+    },
+    {
+        path: '/teacher/grading/:id',
+        name: 'TeacherGradingDetail',
+        component: () => import('@/views/teacher/grading/detail.vue'),
+        meta: { requiresAuth: true, role: 'TEACHER' }
+    },
+    {
+        path: '/teacher/grading/batch',
+        name: 'TeacherGradingBatch',
+        component: () => import('@/views/teacher/grading/batch.vue'),
+        meta: { requiresAuth: true, role: 'TEACHER' }
+    },
+    {
         path: '/teacher/analysis',
         name: 'TeacherAnalysis',
         component: () => import('@/views/teacher/analysis/index.vue'),
@@ -111,15 +208,33 @@ const routes = [
         meta: { requiresAuth: true, role: 'ADMIN' }
     },
     {
-        path: '/admin/questions',
-        name: 'AdminQuestions',
-        component: () => import('@/views/admin/questions/index.vue'),
+        path: '/admin/assignments',
+        name: 'AdminAssignments',
+        component: () => import('@/views/admin/assignments/index.vue'),
         meta: { requiresAuth: true, role: 'ADMIN' }
     },
     {
-        path: '/admin/stats',
-        name: 'AdminStats',
-        component: () => import('@/views/admin/stats/index.vue'),
+        path: '/admin/assignments/create',
+        name: 'AdminCreateAssignment',
+        component: () => import('@/views/admin/assignments/edit.vue'),
+        meta: { requiresAuth: true, role: 'ADMIN' }
+    },
+    {
+        path: '/admin/assignments/:id/edit',
+        name: 'AdminEditAssignment',
+        component: () => import('@/views/admin/assignments/edit.vue'),
+        meta: { requiresAuth: true, role: 'ADMIN' }
+    },
+    {
+        path: '/admin/monitoring',
+        name: 'AdminMonitoring',
+        component: () => import('@/views/admin/monitoring/index.vue'),
+        meta: { requiresAuth: true, role: 'ADMIN' }
+    },
+    {
+        path: '/admin/config',
+        name: 'AdminConfig',
+        component: () => import('@/views/admin/config/index.vue'),
         meta: { requiresAuth: true, role: 'ADMIN' }
     },
     { path: '/403', component: () => import('@/views/403.vue') },
@@ -133,13 +248,23 @@ const router = createRouter({
 
 router.beforeEach((to, from, next) => {
     const userStore = useUserStore();
+    
     if (to.meta.requiresAuth && !userStore.token) {
         next('/login');
-    } else if (to.meta.role && userStore.role !== to.meta.role) {
-        next('/403');
-    } else {
-        next();
+        return;
     }
+    
+    if (to.meta.role) {
+        const userRole = (userStore.userInfo?.role || userStore.role || '').toUpperCase();
+        const requiredRole = (to.meta.role as string).toUpperCase();
+        
+        if (userRole !== requiredRole) {
+            next('/403');
+            return;
+        }
+    }
+    
+    next();
 });
 
 export default router;
