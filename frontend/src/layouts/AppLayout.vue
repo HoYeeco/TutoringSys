@@ -1,73 +1,112 @@
-     <template>
-       <el-container class="layout-container" :class="themeClass">
-         <el-aside :width="collapsed ? '64px' : '200px'" :class="{ 'mobile-hidden': isMobile }">
-           <el-menu :collapse="collapsed" :default-active="$route.path" router>
-             <el-menu-item v-for="item in menuItems" :key="item.path" :index="item.path">
-               <el-icon><component :is="item.icon" /></el-icon>
-               <span>{{ item.title }}</span>
-             </el-menu-item>
-           </el-menu>
-         </el-aside>
-         <el-container>
-           <el-header>
-             <div class="header-left">
-                <div class="logo" @click="toggleSidebar">
-             <img src="@/assets/images/Scoututor.png" alt="Scoututor" class="logo-img">
-           </div>
-                <el-icon @click="toggleSidebar" v-if="!isMobile"><Fold /></el-icon>
-                <el-icon @click="toggleMobileMenu" v-else><Menu /></el-icon>
-              </div>
-             <div class="header-right">
-              <div class="user-info" @click="goToProfile">
-                <div class="avatar">
-                  <img v-if="userStore.userInfo?.avatar" :src="userStore.userInfo.avatar" alt="头像" @error="handleAvatarError" />
-                  <span v-else class="avatar-placeholder">{{ (userStore.userInfo?.realName || userStore.userInfo?.username).charAt(0) }}</span>
-                </div>
-                {{ userStore.userInfo?.realName || userStore.userInfo?.username }}
-              </div>
-              <el-badge :value="unreadCount" :hidden="unreadCount === 0" @click="goToMessages" class="message-badge">
-                <el-icon class="message-icon"><Bell /></el-icon>
-              </el-badge>
-              <el-icon class="logout-icon" @click="confirmLogout"><SwitchButton /></el-icon>
-              <el-tooltip :content="isDark ? '切换到白天模式' : '切换到黑夜模式'" placement="bottom">
-                <el-switch 
-                  :model-value="isDark"
-                  @change="handleThemeChange"
-                  inline-prompt 
-                  :active-icon="Moon" 
-                  :inactive-icon="Sunny"
-                  class="theme-switch"
-                />
-              </el-tooltip>
-             </div>
-           </el-header>
-           <el-main>
-             <slot></slot>
-           </el-main>
-         </el-container>
-       </el-container>
-       <!-- 移动端菜单 -->
-       <el-drawer
-         v-model="mobileMenuVisible"
-         direction="ltr"
-         size="200px"
-         title="菜单"
-       >
-         <el-menu :default-active="$route.path" router @select="handleMenuSelect">
-           <el-menu-item v-for="item in menuItems" :key="item.path" :index="item.path">
-             <el-icon><component :is="item.icon" /></el-icon>
-             <span>{{ item.title }}</span>
-           </el-menu-item>
-         </el-menu>
-       </el-drawer>
-     </template>
+<template>
+  <el-container class="layout-container" :class="themeClass">
+    <el-aside
+      :width="collapsed ? '64px' : '200px'"
+      :class="{ 'mobile-hidden': isMobile }"
+    >
+      <el-menu :collapse="collapsed" :default-active="$route.path" router>
+        <el-menu-item
+          v-for="item in menuItems"
+          :key="item.path"
+          :index="item.path"
+        >
+          <el-icon><component :is="item.icon" /></el-icon>
+          <span>{{ item.title }}</span>
+        </el-menu-item>
+      </el-menu>
+    </el-aside>
+    <el-container>
+      <el-header>
+        <div class="header-left">
+          <div class="logo" @click="toggleSidebar">
+            <img
+              src="@/assets/images/Scoututor.png"
+              alt="Scoututor"
+              class="logo-img"
+            />
+          </div>
+          <el-icon @click="toggleSidebar" v-if="!isMobile"><Fold /></el-icon>
+          <el-icon @click="toggleMobileMenu" v-else><Menu /></el-icon>
+        </div>
+        <div class="header-right">
+          <div class="user-info" @click="goToProfile">
+            <div class="avatar">
+              <img
+                v-if="userStore.userInfo?.avatar"
+                :src="userStore.userInfo.avatar"
+                alt="头像"
+                @error="handleAvatarError"
+              />
+              <span v-else class="avatar-placeholder">{{
+                getAvatarText()
+              }}</span>
+            </div>
+            {{ userStore.userInfo?.realName || userStore.userInfo?.username || '用户' }}
+          </div>
+          <el-badge
+            :value="unreadCount"
+            :hidden="unreadCount === 0"
+            @click="goToMessages"
+            class="message-badge"
+          >
+            <el-icon class="message-icon"><Bell /></el-icon>
+          </el-badge>
+          <el-icon class="logout-icon" @click="confirmLogout"
+            ><SwitchButton
+          /></el-icon>
+          <el-tooltip
+            :content="isDark ? '切换到白天模式' : '切换到黑夜模式'"
+            placement="bottom"
+          >
+            <el-switch
+              :model-value="isDark"
+              @change="handleThemeChange"
+              inline-prompt
+              :active-icon="Moon"
+              :inactive-icon="Sunny"
+              class="theme-switch"
+            />
+          </el-tooltip>
+        </div>
+      </el-header>
+      <el-main>
+        <slot></slot>
+      </el-main>
+    </el-container>
+  </el-container>
+  <!-- 移动端菜单 -->
+  <el-drawer
+    v-model="mobileMenuVisible"
+    direction="ltr"
+    size="200px"
+    title="菜单"
+  >
+    <el-menu :default-active="$route.path" router @select="handleMenuSelect">
+      <el-menu-item
+        v-for="item in menuItems"
+        :key="item.path"
+        :index="item.path"
+      >
+        <el-icon><component :is="item.icon" /></el-icon>
+        <span>{{ item.title }}</span>
+      </el-menu-item>
+    </el-menu>
+  </el-drawer>
+</template>
 
-     <script setup lang="ts">
+<script setup lang="ts">
 import { computed, ref, onMounted, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useUserStore } from '@/stores/user';
 import { useAppStore } from '@/stores/app';
-import { Fold, Moon, Sunny, Menu, Bell, SwitchButton } from '@element-plus/icons-vue';
+import {
+  Fold,
+  Moon,
+  Sunny,
+  Menu,
+  Bell,
+  SwitchButton,
+} from '@element-plus/icons-vue';
 import { ElMessageBox } from 'element-plus';
 import request from '@/utils/request';
 
@@ -105,6 +144,12 @@ const handleAvatarError = () => {
   }
 };
 
+// 获取头像文字
+const getAvatarText = () => {
+  const name = userStore.userInfo?.realName || userStore.userInfo?.username;
+  return name ? name.charAt(0) : 'U';
+};
+
 const toggleMobileMenu = () => {
   mobileMenuVisible.value = !mobileMenuVisible.value;
 };
@@ -126,8 +171,8 @@ const getUnreadCount = async () => {
     try {
       const response = await request.get('/message/unread-count', {
         params: {
-          userId: userStore.userInfo?.id
-        }
+          userId: userStore.userInfo?.id,
+        },
       });
       unreadCount.value = response.data || 0;
     } catch (error) {
@@ -151,31 +196,19 @@ const confirmLogout = () => {
   ElMessageBox.confirm('确定要退出登录吗？', '提示', {
     confirmButtonText: '确定',
     cancelButtonText: '取消',
-    type: 'warning'
+    type: 'warning',
   }).then(() => {
     userStore.logout();
     router.push('/login');
   });
 };
 
-
-
-onMounted(async () => {
+onMounted(() => {
   checkMobile();
   window.addEventListener('resize', checkMobile);
-  
-  if (userStore.token) {
-    try {
-      const response = await request.get('/user/profile');
-      if (response.code === 200) {
-        userStore.setUserInfo(response.data);
-      }
-    } catch (error) {
-      console.error('获取用户信息失败:', error);
-    }
-  }
-  
+  // 获取未读消息数量
   getUnreadCount();
+  // 每30秒刷新一次未读消息数量
   const interval = setInterval(getUnreadCount, 30000);
   onUnmounted(() => {
     clearInterval(interval);
@@ -187,7 +220,7 @@ onUnmounted(() => {
 });
 </script>
 
-     <style scoped>
+<style scoped>
 .layout-container {
   height: 100vh;
   width: 100%;
@@ -403,7 +436,7 @@ html.dark .logo-img {
   .el-main {
     padding: 10px;
   }
-  
+
   .el-header {
     padding: 0 10px;
   }
