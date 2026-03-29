@@ -202,12 +202,12 @@ const getMonitoringData = async () => {
       request.get('/admin/monitor/redis').catch(() => ({ data: { hitRate: 0, usedMemoryHuman: '' } }))
     ]);
     llmStats.value = {
-      tokenConsumption: llmRes.data?.totalTokens || 0,
-      failureCount: llmRes.data?.failedCalls || 0
+      tokenConsumption: llmRes?.data?.totalTokens || 0,
+      failureCount: llmRes?.data?.failedCalls || 0
     };
     redisStats.value = {
-      hitRate: redisRes.data?.hitRate || 0,
-      memoryUsage: redisRes.data?.usedMemoryHuman || ''
+      hitRate: redisRes?.data?.hitRate || 0,
+      memoryUsage: redisRes?.data?.usedMemoryHuman || ''
     };
   } catch (error) {
     console.error('获取监控数据失败:', error);
@@ -217,7 +217,7 @@ const getMonitoringData = async () => {
 const getRecentLogs = async () => {
   try {
     const response = await request.get('/admin/monitor/audit-logs', { params: { size: 5 } });
-    const logsData = response.data || { records: [] };
+    const logsData = response?.data || { records: [] };
     recentLogs.value = (logsData.records || []).map((log: any) => ({
       time: log.operationTime || '-',
       user: log.operator || '-',
