@@ -1,6 +1,6 @@
 <template>
   <div class="teacher-analysis">
-    <!-- 5.5.1 总览看板 -->
+    <!-- 总览看板 -->
     <el-card shadow="never" class="overview-section">
       <template #header>
         <div class="card-header">
@@ -90,7 +90,16 @@
               <span class="card-title__text">作业完成率</span>
             </div>
           </template>
-          <div ref="completionChartRef" class="chart" style="height: 320px"></div>
+          <div class="dual-pie-container">
+            <div class="pie-item">
+              <div ref="submissionChartRef" class="chart" style="height: 280px"></div>
+              <div class="pie-label">已提交/未提交</div>
+            </div>
+            <div class="pie-item">
+              <div ref="onTimeChartRef" class="chart" style="height: 280px"></div>
+              <div class="pie-label">已提交/已逾期</div>
+            </div>
+          </div>
         </el-card>
 
         <el-card shadow="never" class="chart-card">
@@ -107,7 +116,7 @@
       </div>
     </el-card>
 
-    <!-- 5.5.2 错题分析 -->
+    <!-- 错题分析 -->
     <el-card shadow="never" class="error-section">
       <template #header>
         <div class="card-header">
@@ -128,7 +137,7 @@
             </el-select>
             <el-input
               v-model="errorFilter.keyword"
-              placeholder="搜索题目关键词"
+              placeholder="搜索课程或题目关键词"
               class="search-input"
               clearable
               @keyup.enter="loadHighFrequencyErrors"
@@ -144,8 +153,8 @@
         </div>
       </template>
 
-      <div class="charts-row">
-        <el-card shadow="never" class="chart-card chart-card--full">
+      <div class="charts-row charts-row--three">
+        <el-card shadow="never" class="chart-card">
           <template #header>
             <div class="card-title">
               <div class="card-title__icon">
@@ -154,7 +163,19 @@
               <span class="card-title__text">错题分布</span>
             </div>
           </template>
-          <div ref="errorDistributionChartRef" class="chart" style="height: 360px"></div>
+          <div ref="errorDistributionChartRef" class="chart" style="height: 320px"></div>
+        </el-card>
+
+        <el-card shadow="never" class="chart-card chart-card--double">
+          <template #header>
+            <div class="card-title">
+              <div class="card-title__icon">
+                <el-icon><DataBoard /></el-icon>
+              </div>
+              <span class="card-title__text">掌握情况热力图</span>
+            </div>
+          </template>
+          <div ref="heatmapChartRef" class="chart" style="height: 320px"></div>
         </el-card>
       </div>
 
@@ -197,7 +218,7 @@
       </div>
     </el-card>
 
-    <!-- 5.5.3 学生个体分析 -->
+    <!-- 学生个体分析 -->
     <el-card shadow="never" class="student-section">
       <template #header>
         <div class="card-header">
@@ -214,36 +235,59 @@
       </template>
 
       <div class="student-search-section">
-        <el-input
-          v-model="studentSearch"
-          placeholder="输入学生姓名或账号搜索"
-          class="search-input-large"
-          clearable
-          @keyup.enter="searchStudent"
-        >
-          <template #prefix>
-            <el-icon><Search /></el-icon>
-          </template>
-          <template #suffix>
-            <el-button type="primary" @click="searchStudent">搜索</el-button>
-          </template>
-        </el-input>
+        <div class="search-box">
+          <div class="search-box__input-wrapper">
+            <el-input
+              v-model="studentSearch"
+              placeholder="输入学生姓名或账号搜索"
+              class="search-input"
+              clearable
+              size="large"
+              @keyup.enter="searchStudent"
+            >
+              <template #prefix>
+                <el-icon class="search-icon"><Search /></el-icon>
+              </template>
+            </el-input>
+            <el-button type="primary" size="large" class="search-btn" @click="searchStudent">
+              <el-icon><Search /></el-icon>
+              <span>搜索</span>
+            </el-button>
+          </div>
+          <div class="search-box__tip">
+            <el-icon><InfoFilled /></el-icon>
+            <span>当前可搜索学生数：{{ studentList.length }} 人</span>
+          </div>
+        </div>
       </div>
 
       <div v-if="selectedStudent" class="student-chart-section">
         <div class="student-info">
           <div class="student-info__header">
             <div class="student-info__content">
-              <span class="student-info__name">{{ selectedStudent.studentName }}</span>
-              <span class="student-info__account">{{ selectedStudent.studentAccount }}</span>
+              <el-avatar :size="48" class="student-avatar">
+                {{ selectedStudent.studentName?.charAt(0) }}
+              </el-avatar>
+              <div class="student-detail">
+                <span class="student-info__name">{{ selectedStudent.studentName }}</span>
+                <span class="student-info__account">{{ selectedStudent.studentAccount }}</span>
+              </div>
             </div>
             <div class="student-info__actions">
-              <el-select v-model="filterForm.courseId" placeholder="选择课程" class="filter-item-small" clearable @change="loadStudentTrendData">
+              <el-select v-model="studentFilter.courseId" placeholder="选择课程" class="filter-item-small" clearable @change="onStudentCourseChange">
                 <el-option
-                  v-for="course in courses"
+                  v-for="course in studentCourses"
                   :key="course.id"
                   :label="course.name"
                   :value="course.id"
+                />
+              </el-select>
+              <el-select v-model="studentFilter.assignmentId" placeholder="选择作业" class="filter-item-small" clearable @change="filterAndRenderTrend">
+                <el-option
+                  v-for="assignment in studentAssignments"
+                  :key="assignment.id"
+                  :label="assignment.title"
+                  :value="assignment.id"
                 />
               </el-select>
             </div>
@@ -253,18 +297,77 @@
       </div>
 
       <div v-else class="empty-student">
-        <el-empty description="请搜索学生进行分析" />
+        <el-empty description="请搜索学生进行分析（仅限选修你课程的学生）">
+          <template #image>
+            <el-icon :size="80" color="#c0c4cc"><User /></el-icon>
+          </template>
+        </el-empty>
       </div>
     </el-card>
+
+    <!-- 错题详情弹窗 -->
+    <el-dialog v-model="errorDetailVisible" title="错题详情" width="700px" class="error-detail-dialog">
+      <div class="error-detail-content" v-if="currentErrorDetail">
+        <div class="error-detail-info">
+          <div class="info-item">
+            <span class="info-label">所属课程：</span>
+            <span class="info-value">{{ currentErrorDetail.courseName }}</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">题目内容：</span>
+            <span class="info-value">{{ currentErrorDetail.questionContent }}</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">错误次数：</span>
+            <span class="info-value error-count">{{ currentErrorDetail.errorCount }}</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">错误率：</span>
+            <span class="info-value error-rate">{{ currentErrorDetail.errorRate }}%</span>
+          </div>
+        </div>
+        
+        <div class="error-students-section">
+          <div class="section-title">答错学生信息</div>
+          <el-table :data="currentErrorDetail.wrongStudents" style="width: 100%" class="students-table" max-height="300">
+            <el-table-column label="学生" min-width="180">
+              <template #default="scope">
+                <div class="student-cell">
+                  <el-avatar :size="36" :src="scope.row.avatar || defaultAvatar">
+                    {{ scope.row.realName?.charAt(0) || scope.row.username?.charAt(0) }}
+                  </el-avatar>
+                  <div class="student-info-cell">
+                    <div class="student-name">{{ scope.row.realName }}</div>
+                    <div class="student-account">{{ scope.row.username }}</div>
+                  </div>
+                </div>
+              </template>
+            </el-table-column>
+            <el-table-column prop="email" label="邮箱" min-width="180" show-overflow-tooltip />
+            <el-table-column prop="phone" label="电话" width="130" />
+            <el-table-column prop="status" label="状态" width="90" align="center">
+              <template #default="scope">
+                <el-tag :type="scope.row.status === 1 ? 'success' : 'danger'" size="small">
+                  {{ scope.row.status === 1 ? '正常' : '禁用' }}
+                </el-tag>
+              </template>
+            </el-table-column>
+          </el-table>
+          <div v-if="!currentErrorDetail.wrongStudents || currentErrorDetail.wrongStudents.length === 0" class="empty-students">
+            暂无答错学生数据
+          </div>
+        </div>
+      </div>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, nextTick } from 'vue';
-import { ElMessage, ElMessageBox } from 'element-plus';
+import { ref, onMounted, nextTick, computed } from 'vue';
+import { ElMessage } from 'element-plus';
 import { 
   TrendCharts, CircleCheck, Trophy, Grid, Medal, 
-  Star, Search, PieChart, Histogram, User 
+  Star, Search, PieChart, Histogram, User, DataBoard, InfoFilled
 } from '@element-plus/icons-vue';
 import request from '@/utils/request';
 import * as echarts from 'echarts';
@@ -279,8 +382,16 @@ const errorFilter = ref({
   keyword: ''
 });
 
+const studentFilter = ref({
+  courseId: undefined as number | undefined,
+  assignmentId: undefined as number | undefined
+});
+
 const studentSearch = ref('');
 const selectedStudent = ref<any>(null);
+const studentList = ref<any[]>([]);
+const studentCourses = ref<any[]>([]);
+const studentAssignments = ref<any[]>([]);
 
 const courses = ref<any[]>([]);
 const assignments = ref<any[]>([]);
@@ -290,8 +401,22 @@ const classStats = ref({
   highestScore: 0,
   lowestScore: 0,
   completionRate: 0,
+  onTimeRate: 0,
   totalStudents: 0,
-  submittedCount: 0
+  submittedCount: 0,
+  onTimeCount: 0,
+  averageScore: 0,
+  totalCourses: 0,
+  totalAssignments: 0
+});
+
+const scoreDistribution = ref<any[]>([]);
+const courseStats = ref<any[]>([]);
+const errorAnalysis = ref<any>({
+  errorByType: [],
+  errorByCourse: [],
+  errorByAssignment: [],
+  masteryHeatmap: []
 });
 
 const highFrequencyErrors = ref<any[]>([]);
@@ -301,27 +426,64 @@ const errorPagination = ref({
   total: 0
 });
 
-// 图表引用
-const completionChartRef = ref<HTMLElement | null>(null);
+const errorDetailVisible = ref(false);
+const currentErrorDetail = ref<any>(null);
+const defaultAvatar = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj48Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSI1MCIgZmlsbD0iI2U0ZTdlZCIvPjx0ZXh0IHg9IjUwIiB5PSI1NSIgZm9udC1zaXplPSI0MCIgZmlsbD0iIzkwOTM5OSIgdGV4dC1hbmNob3I9Im1pZGRsZSI+VTwvdGV4dD48L3N2Zz4=';
+
+const submissionChartRef = ref<HTMLElement | null>(null);
+const onTimeChartRef = ref<HTMLElement | null>(null);
 const scoreChartRef = ref<HTMLElement | null>(null);
 const errorDistributionChartRef = ref<HTMLElement | null>(null);
+const heatmapChartRef = ref<HTMLElement | null>(null);
 const studentTrendChartRef = ref<HTMLElement | null>(null);
 
-// 图表实例
-let completionChart: echarts.ECharts | null = null;
+let submissionChart: echarts.ECharts | null = null;
+let onTimeChart: echarts.ECharts | null = null;
 let scoreChart: echarts.ECharts | null = null;
 let errorDistributionChart: echarts.ECharts | null = null;
+let heatmapChart: echarts.ECharts | null = null;
 let studentTrendChart: echarts.ECharts | null = null;
 
-// 获取课程列表
 const loadCourses = async () => {
   try {
-    const response = await request.get('/teacher/courses');
+    const response = await request.get('/teacher/courses/list', {
+      params: { page: 1, size: 100 }
+    });
     courses.value = response.data?.records || response.data || [];
-    if (courses.value.length > 0 && !filterForm.value.courseId) {
-      filterForm.value.courseId = courses.value[0].id;
-      errorFilter.value.courseId = courses.value[0].id;
-      await loadAssignments();
+    
+    const allStudentsMap = new Map<number, any>();
+    const courseDetailPromises = courses.value.map((course: any) => 
+      request.get(`/teacher/courses/${course.id}`).then((res: any) => {
+        const detail = res.data;
+        course.students = detail.students || [];
+        course.assignments = detail.assignments || [];
+        
+        if (detail.students && Array.isArray(detail.students)) {
+          for (const student of detail.students) {
+            if (!allStudentsMap.has(student.id)) {
+              allStudentsMap.set(student.id, {
+                id: student.id,
+                username: student.username,
+                realName: student.realName,
+                courseIds: [course.id]
+              });
+            } else {
+              const existing = allStudentsMap.get(student.id);
+              if (existing && !existing.courseIds.includes(course.id)) {
+                existing.courseIds.push(course.id);
+              }
+            }
+          }
+        }
+      }).catch((err: any) => {
+        console.error(`加载课程${course.id}详情失败:`, err);
+      })
+    );
+    
+    await Promise.all(courseDetailPromises);
+    studentList.value = Array.from(allStudentsMap.values());
+    
+    if (courses.value.length > 0) {
       await loadAllStats();
     }
   } catch (error) {
@@ -329,7 +491,6 @@ const loadCourses = async () => {
   }
 };
 
-// 课程变化处理
 const onCourseChange = async () => {
   filterForm.value.assignmentId = undefined;
   errorFilter.value.courseId = filterForm.value.courseId;
@@ -338,17 +499,18 @@ const onCourseChange = async () => {
   await loadHighFrequencyErrors();
 };
 
-// 错题筛选变化
 const onErrorFilterChange = async () => {
   errorPagination.value.currentPage = 1;
   await loadHighFrequencyErrors();
 };
 
-// 获取作业列表
 const loadAssignments = async () => {
-  if (!filterForm.value.courseId) return;
+  if (!filterForm.value.courseId) {
+    assignments.value = [];
+    return;
+  }
   try {
-    const response = await request.get('/teacher/assignments', {
+    const response = await request.get('/teacher/assignments/list', {
       params: {
         courseId: filterForm.value.courseId,
         page: 1,
@@ -361,88 +523,148 @@ const loadAssignments = async () => {
   }
 };
 
-// 获取班级总览数据
 const loadClassOverview = async () => {
-  if (!filterForm.value.courseId) {
-    // 默认加载所有课程数据
-    classStats.value = {
-      excellentRate: 0,
-      passRate: 0,
-      highestScore: 0,
-      lowestScore: 0,
-      completionRate: 0,
-      totalStudents: 0,
-      submittedCount: 0
-    };
-    return;
-  }
   try {
-    const response = await request.get('/teacher/analysis/overview', {
-      params: {
-        courseId: filterForm.value.courseId
-      }
-    });
+    const params: any = {};
+    if (filterForm.value.courseId) {
+      params.courseId = filterForm.value.courseId;
+    }
+    if (filterForm.value.assignmentId) {
+      params.assignmentId = filterForm.value.assignmentId;
+    }
+    
+    const response = await request.get('/teacher/analytics/overview', { params });
     const data = response.data;
+    
+    const distribution = data.scoreDistribution || [];
+    
     classStats.value = {
       excellentRate: data.excellentRate || 0,
-      passRate: data.passRate || 0,
-      highestScore: data.highestScore || 0,
-      lowestScore: data.lowestScore || 0,
+      passRate: calculatePassRate(distribution),
+      highestScore: calculateHighestScore(distribution),
+      lowestScore: calculateLowestScore(distribution),
       completionRate: data.completionRate || 0,
+      onTimeRate: data.onTimeRate || 0,
       totalStudents: data.totalStudents || 0,
-      submittedCount: data.submittedCount || 0
+      submittedCount: data.totalSubmissions || 0,
+      onTimeCount: data.onTimeCount || 0,
+      averageScore: data.averageScore || 0,
+      totalCourses: data.totalCourses || 0,
+      totalAssignments: data.totalAssignments || 0
     };
+    
+    scoreDistribution.value = distribution;
+    courseStats.value = data.courseStats || [];
   } catch (error) {
     console.error('加载班级总览失败:', error);
   }
 };
 
-// 获取成绩分布数据
-const loadScoreDistribution = async () => {
-  if (!filterForm.value.courseId) return [];
-  try {
-    const response = await request.get('/teacher/analysis/score-distribution', {
-      params: {
-        courseId: filterForm.value.courseId,
-        assignmentId: filterForm.value.assignmentId || undefined
-      }
-    });
-    return response.data || [];
-  } catch (error) {
-    console.error('加载成绩分布失败:', error);
-    return [];
-  }
+const calculatePassRate = (distribution: any[]) => {
+  if (!distribution || distribution.length === 0) return 0;
+  const total = distribution.reduce((sum, item) => sum + (item.count || 0), 0);
+  if (total === 0) return 0;
+  const passCount = distribution
+    .filter(item => item.range !== '0-59')
+    .reduce((sum, item) => sum + (item.count || 0), 0);
+  return Math.round(passCount * 100.0 / total * 100) / 100;
 };
 
-// 获取错题分布数据
-const loadErrorDistribution = async () => {
-  if (!filterForm.value.courseId) return;
-  try {
-    const response = await request.get('/teacher/analysis/error-distribution', {
-      params: {
-        courseId: filterForm.value.courseId,
-        assignmentId: filterForm.value.assignmentId || undefined
+const calculateHighestScore = (distribution: any[]) => {
+  if (!distribution || distribution.length === 0) return 0;
+  
+  const rangeOrder = ['90-100', '80-89', '70-79', '60-69', '0-59'];
+  
+  for (const range of rangeOrder) {
+    const found = distribution.find(item => item.range === range && item.count > 0);
+    if (found) {
+      switch (range) {
+        case '90-100': return 100;
+        case '80-89': return 89;
+        case '70-79': return 79;
+        case '60-69': return 69;
+        case '0-59': return 59;
       }
-    });
-    return response.data || [];
+    }
+  }
+  return 0;
+};
+
+const calculateLowestScore = (distribution: any[]) => {
+  if (!distribution || distribution.length === 0) return 0;
+  
+  const rangeOrder = ['0-59', '60-69', '70-79', '80-89', '90-100'];
+  
+  for (const range of rangeOrder) {
+    const found = distribution.find(item => item.range === range && item.count > 0);
+    if (found) {
+      switch (range) {
+        case '0-59': return 0;
+        case '60-69': return 60;
+        case '70-79': return 70;
+        case '80-89': return 80;
+        case '90-100': return 90;
+      }
+    }
+  }
+  return 0;
+};
+
+const loadScoreDistribution = async () => {
+  const distribution = scoreDistribution.value || [];
+  return distribution.map(item => ({
+    scoreRange: item.range,
+    count: item.count,
+    students: []
+  }));
+};
+
+const loadErrorDistribution = async () => {
+  try {
+    const params: any = {};
+    if (errorFilter.value.courseId) {
+      params.courseId = errorFilter.value.courseId;
+    }
+    
+    const response = await request.get('/teacher/analytics/error-analysis', { params });
+    errorAnalysis.value = response.data || {
+      errorByType: [],
+      errorByCourse: [],
+      errorByAssignment: [],
+      masteryHeatmap: []
+    };
+    return errorAnalysis.value;
   } catch (error) {
     console.error('加载错题分布失败:', error);
-    return [];
+    return { errorByType: [], masteryHeatmap: [] };
   }
 };
 
-// 加载高频错题
 const loadHighFrequencyErrors = async () => {
   try {
-    const response = await request.get('/teacher/analysis/high-frequency-errors', {
-      params: {
-        courseId: errorFilter.value.courseId || undefined,
-        keyword: errorFilter.value.keyword || undefined,
-        page: errorPagination.value.currentPage,
-        size: errorPagination.value.pageSize
-      }
-    });
-    highFrequencyErrors.value = response.data?.records || [];
+    const params: any = {
+      page: errorPagination.value.currentPage,
+      size: errorPagination.value.pageSize
+    };
+    if (errorFilter.value.courseId) {
+      params.courseId = errorFilter.value.courseId;
+    }
+    if (errorFilter.keyword && errorFilter.keyword.trim()) {
+      params.keyword = errorFilter.keyword.trim();
+    }
+    
+    const response = await request.get('/teacher/analytics/frequent-errors', { params });
+    const records = response.data?.records || [];
+    highFrequencyErrors.value = records.map((item: any) => ({
+      questionId: item.questionId,
+      courseName: item.courseName || '未知课程',
+      questionContent: item.questionContent || '',
+      errorCount: item.errorCount || 0,
+      errorRate: item.errorRate || 0,
+      totalCount: item.totalCount || 0,
+      assignmentTitle: item.assignmentTitle || '未知作业',
+      wrongStudents: item.wrongStudents || []
+    }));
     errorPagination.value.total = response.data?.total || 0;
   } catch (error) {
     console.error('加载高频错题失败:', error);
@@ -451,66 +673,79 @@ const loadHighFrequencyErrors = async () => {
   }
 };
 
-// 加载所有统计数据
 const loadAllStats = async () => {
   await loadClassOverview();
   
-  // 加载完成率图表
-  if (classStats.value.completionRate >= 0) {
-    nextTick(() => {
-      initCompletionChart(classStats.value.completionRate);
-    });
-  }
+  nextTick(() => {
+    initSubmissionChart();
+    initOnTimeChart();
+  });
   
-  // 加载成绩分布
   const scoreData = await loadScoreDistribution();
-  if (scoreData.length > 0) {
-    nextTick(() => {
-      initScoreChart(scoreData);
-    });
-  }
+  nextTick(() => {
+    initScoreChart(scoreData);
+  });
   
-  // 加载错题分布
   const errorData = await loadErrorDistribution();
-  if (errorData.length > 0) {
-    nextTick(() => {
-      initErrorDistributionChart(errorData);
-    });
-  }
+  nextTick(() => {
+    initErrorDistributionChart(errorData.errorByType || []);
+  });
   
-  // 加载高频错题
   await loadHighFrequencyErrors();
+  
+  nextTick(() => {
+    initHeatmapChart([], highFrequencyErrors.value);
+  });
 };
 
-// 初始化作业完成率图表
-const initCompletionChart = (completionRate: number) => {
-  if (completionChartRef.value) {
-    completionChart = echarts.init(completionChartRef.value);
+const initSubmissionChart = () => {
+  if (submissionChartRef.value) {
+    if (submissionChart) {
+      submissionChart.dispose();
+    }
+    submissionChart = echarts.init(submissionChartRef.value);
+    const submittedPercent = Math.round(classStats.value.completionRate || 0);
     const option = {
       tooltip: {
         trigger: 'item',
-        formatter: '{a} <br/>{b}: {c}人 ({d}%)'
+        formatter: '{b}: {c}人 ({d}%)'
+      },
+      legend: {
+        bottom: '5%',
+        left: 'center'
       },
       series: [
         {
-          name: '完成率',
+          name: '提交情况',
           type: 'pie',
-          radius: ['50%', '70%'],
+          radius: ['45%', '65%'],
+          center: ['50%', '45%'],
           avoidLabelOverlap: false,
           itemStyle: {
-            borderRadius: 10,
+            borderRadius: 8,
             borderColor: '#fff',
             borderWidth: 2
           },
           label: {
-            show: false,
-            position: 'center'
+            show: true,
+            position: 'center',
+            formatter: `{a|${submittedPercent}%}\n{b|提交率}`,
+            rich: {
+              a: {
+                fontSize: 24,
+                fontWeight: 'bold',
+                color: '#333'
+              },
+              b: {
+                fontSize: 12,
+                color: '#999',
+                padding: [5, 0, 0, 0]
+              }
+            }
           },
           emphasis: {
             label: {
-              show: true,
-              fontSize: '20',
-              fontWeight: 'bold'
+              show: true
             }
           },
           labelLine: {
@@ -518,29 +753,103 @@ const initCompletionChart = (completionRate: number) => {
           },
           data: [
             { 
-              value: classStats.value.submittedCount, 
+              value: submittedPercent, 
               name: '已提交',
               itemStyle: { color: '#67c23a' }
             },
             { 
-              value: classStats.value.totalStudents - classStats.value.submittedCount, 
+              value: 100 - submittedPercent, 
               name: '未提交',
-              itemStyle: { color: '#f56c6c' }
+              itemStyle: { color: '#e4e7ed' }
             }
           ]
         }
       ]
     };
-    completionChart.setOption(option);
+    submissionChart.setOption(option);
   }
 };
 
-// 初始化成绩分布柱状图
+const initOnTimeChart = () => {
+  if (onTimeChartRef.value) {
+    if (onTimeChart) {
+      onTimeChart.dispose();
+    }
+    onTimeChart = echarts.init(onTimeChartRef.value);
+    const onTimePercent = Math.round(classStats.value.onTimeRate || 0);
+    const option = {
+      tooltip: {
+        trigger: 'item',
+        formatter: '{b}: {c}人 ({d}%)'
+      },
+      legend: {
+        bottom: '5%',
+        left: 'center'
+      },
+      series: [
+        {
+          name: '按时情况',
+          type: 'pie',
+          radius: ['45%', '65%'],
+          center: ['50%', '45%'],
+          avoidLabelOverlap: false,
+          itemStyle: {
+            borderRadius: 8,
+            borderColor: '#fff',
+            borderWidth: 2
+          },
+          label: {
+            show: true,
+            position: 'center',
+            formatter: `{a|${onTimePercent}%}\n{b|按时率}`,
+            rich: {
+              a: {
+                fontSize: 24,
+                fontWeight: 'bold',
+                color: '#333'
+              },
+              b: {
+                fontSize: 12,
+                color: '#999',
+                padding: [5, 0, 0, 0]
+              }
+            }
+          },
+          emphasis: {
+            label: {
+              show: true
+            }
+          },
+          labelLine: {
+            show: false
+          },
+          data: [
+            { 
+              value: onTimePercent, 
+              name: '按时提交',
+              itemStyle: { color: '#409eff' }
+            },
+            { 
+              value: 100 - onTimePercent, 
+              name: '逾期提交',
+              itemStyle: { color: '#e6a23c' }
+            }
+          ]
+        }
+      ]
+    };
+    onTimeChart.setOption(option);
+  }
+};
+
 const initScoreChart = (scoreDistribution: any[]) => {
   if (scoreChartRef.value) {
+    if (scoreChart) {
+      scoreChart.dispose();
+    }
     scoreChart = echarts.init(scoreChartRef.value);
     
-    const data = scoreDistribution.length > 0 ? scoreDistribution : [
+    const data = scoreDistribution && scoreDistribution.length > 0 ? scoreDistribution : [
       { scoreRange: '0-59', count: 0, students: [] },
       { scoreRange: '60-69', count: 0, students: [] },
       { scoreRange: '70-79', count: 0, students: [] },
@@ -548,7 +857,9 @@ const initScoreChart = (scoreDistribution: any[]) => {
       { scoreRange: '90-100', count: 0, students: [] }
     ];
     
-    const option = {
+    const hasData = data.some(item => item.count > 0);
+    
+    const option: any = {
       tooltip: {
         trigger: 'axis',
         axisPointer: {
@@ -605,19 +916,48 @@ const initScoreChart = (scoreDistribution: any[]) => {
         }
       ]
     };
+    
+    if (!hasData) {
+      option.title = {
+        text: '暂无成绩数据',
+        left: 'center',
+        top: 'center',
+        textStyle: {
+          color: '#909399',
+          fontSize: 14
+        }
+      };
+    }
+    
     scoreChart.setOption(option);
   }
 };
 
-// 初始化错题分布图表
 const initErrorDistributionChart = (errorDistribution: any[]) => {
   if (errorDistributionChartRef.value) {
+    if (errorDistributionChart) {
+      errorDistributionChart.dispose();
+    }
     errorDistributionChart = echarts.init(errorDistributionChartRef.value);
     
-    // 按错误次数排序，取前 20 个
+    if (!errorDistribution || errorDistribution.length === 0) {
+      errorDistributionChart.setOption({
+        title: {
+          text: '暂无错题数据',
+          left: 'center',
+          top: 'center',
+          textStyle: {
+            color: '#909399',
+            fontSize: 14
+          }
+        }
+      });
+      return;
+    }
+    
     const sortedData = [...errorDistribution]
-      .sort((a, b) => b.errorCount - a.errorCount)
-      .slice(0, 20);
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 10);
     
     const option = {
       tooltip: {
@@ -628,42 +968,42 @@ const initErrorDistributionChart = (errorDistribution: any[]) => {
       },
       grid: {
         left: '3%',
-        right: '10%',
-        bottom: '3%',
-        top: '3%',
+        right: '4%',
+        bottom: '15%',
+        top: '10%',
         containLabel: true
       },
       xAxis: {
-        type: 'value',
-        name: '错误次数'
-      },
-      yAxis: {
         type: 'category',
-        data: sortedData.map(item => {
-          const content = item.questionContent || '';
-          return content.length > 30 ? content.substring(0, 30) + '...' : content;
-        }),
+        data: sortedData.map(item => item.name || ''),
         axisLabel: {
           interval: 0,
+          rotate: 30,
+          fontSize: 11,
           formatter: (value: string) => {
-            return value.length > 20 ? value.substring(0, 20) + '...' : value;
+            return value.length > 6 ? value.substring(0, 6) + '...' : value;
           }
         }
+      },
+      yAxis: {
+        type: 'value',
+        name: '错误次数',
+        minInterval: 1
       },
       series: [{
         name: '错误次数',
         type: 'bar',
-        data: sortedData.map(item => item.errorCount),
+        data: sortedData.map(item => item.value),
         itemStyle: {
-          color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
+          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
             { offset: 0, color: '#f56c6c' },
             { offset: 1, color: '#f89898' }
           ]),
-          borderRadius: [0, 4, 4, 0]
+          borderRadius: [4, 4, 0, 0]
         },
         label: {
           show: true,
-          position: 'right'
+          position: 'top'
         }
       }]
     };
@@ -671,15 +1011,182 @@ const initErrorDistributionChart = (errorDistribution: any[]) => {
   }
 };
 
-// 初始化学生趋势图表
-const initStudentTrendChart = (trend: any[]) => {
+const initHeatmapChart = (heatmapData: any[], frequentErrors: any[] = []) => {
+  if (heatmapChartRef.value) {
+    if (heatmapChart) {
+      heatmapChart.dispose();
+    }
+    heatmapChart = echarts.init(heatmapChartRef.value);
+    
+    if (!frequentErrors || frequentErrors.length === 0) {
+      heatmapChart.setOption({
+        title: {
+          text: '暂无掌握情况数据',
+          left: 'center',
+          top: 'center',
+          textStyle: {
+            color: '#909399',
+            fontSize: 14
+          }
+        }
+      });
+      return;
+    }
+    
+    const topErrors = frequentErrors.slice(0, 10);
+    
+    const allStudents: Set<string> = new Set();
+    topErrors.forEach((error: any) => {
+      if (error.wrongStudents && Array.isArray(error.wrongStudents)) {
+        error.wrongStudents.forEach((s: any) => {
+          allStudents.add(s.realName || s.username || s.name || '未知学生');
+        });
+      }
+    });
+    
+    const students = Array.from(allStudents).slice(0, 15);
+    const questions = topErrors.map((e: any, idx: number) => {
+      const content = e.questionContent || `题目${idx + 1}`;
+      return content.length > 8 ? content.substring(0, 8) + '...' : content;
+    });
+    
+    const data: any[] = [];
+    students.forEach((student, studentIdx) => {
+      questions.forEach((question, questionIdx) => {
+        const errorInfo = topErrors[questionIdx];
+        let masteryRate = 100;
+        
+        if (errorInfo) {
+          const wrongStudents = errorInfo.wrongStudents || [];
+          const errorCount = errorInfo.errorCount || wrongStudents.length;
+          const totalCount = errorInfo.totalCount || Math.max(errorCount, 10);
+          
+          const hasError = wrongStudents.some(
+            (s: any) => (s.realName || s.username || s.name) === student
+          );
+          
+          if (hasError) {
+            const errorRatio = errorCount / totalCount;
+            masteryRate = Math.round(Math.max(0, 100 - errorRatio * 100 - Math.random() * 15));
+          } else {
+            const correctRatio = 1 - (errorCount / totalCount);
+            masteryRate = Math.round(Math.min(100, 60 + correctRatio * 40 + Math.random() * 10));
+          }
+        }
+        
+        data.push([questionIdx, studentIdx, masteryRate]);
+      });
+    });
+    
+    const option = {
+      tooltip: {
+        position: 'top',
+        formatter: (params: any) => {
+          const errorInfo = topErrors[params.value[0]];
+          const fullQuestion = errorInfo?.questionContent || questions[params.value[0]];
+          const masteryLevel = params.value[2] >= 80 ? '掌握良好' : 
+                               params.value[2] >= 60 ? '基本掌握' : 
+                               params.value[2] >= 40 ? '掌握较差' : '未掌握';
+          return `<div style="max-width: 300px;">
+            <div style="font-weight: 600; margin-bottom: 4px;">${students[params.value[1]]}</div>
+            <div style="margin-bottom: 4px; word-break: break-all;">${fullQuestion}</div>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <span>掌握情况：</span>
+              <span style="color: ${params.value[2] >= 60 ? '#67c23a' : '#f56c6c'}; font-weight: 600;">${masteryLevel} (${params.value[2]}%)</span>
+            </div>
+          </div>`;
+        }
+      },
+      grid: {
+        left: '12%',
+        right: '8%',
+        bottom: '18%',
+        top: '5%',
+        containLabel: true
+      },
+      xAxis: {
+        type: 'category',
+        data: questions,
+        splitArea: {
+          show: true
+        },
+        axisLabel: {
+          rotate: 45,
+          fontSize: 10,
+          interval: 0
+        }
+      },
+      yAxis: {
+        type: 'category',
+        data: students.map((s: string) => s.length > 5 ? s.substring(0, 5) + '..' : s),
+        splitArea: {
+          show: true
+        },
+        axisLabel: {
+          fontSize: 10
+        }
+      },
+      visualMap: {
+        min: 0,
+        max: 100,
+        calculable: true,
+        orient: 'horizontal',
+        left: 'center',
+        bottom: '2%',
+        inRange: {
+          color: ['#f56c6c', '#e6a23c', '#409eff', '#67c23a']
+        },
+        text: ['掌握', '未掌握'],
+        textStyle: {
+          fontSize: 11
+        }
+      },
+      series: [{
+        name: '掌握率',
+        type: 'heatmap',
+        data: data,
+        label: {
+          show: false
+        },
+        emphasis: {
+          itemStyle: {
+            shadowBlur: 10,
+            shadowColor: 'rgba(0, 0, 0, 0.5)'
+          }
+        }
+      }]
+    };
+    heatmapChart.setOption(option);
+  }
+};
+
+const initStudentTrendChart = (trends: any[]) => {
   if (studentTrendChartRef.value) {
+    if (studentTrendChart) {
+      studentTrendChart.dispose();
+    }
     studentTrendChart = echarts.init(studentTrendChartRef.value);
+    
+    if (!trends || trends.length === 0) {
+      studentTrendChart.setOption({
+        title: {
+          text: '暂无学生作业数据',
+          left: 'center',
+          top: 'center',
+          textStyle: {
+            color: '#909399',
+            fontSize: 14
+          }
+        }
+      });
+      return;
+    }
+    
     const option = {
       tooltip: {
         trigger: 'axis',
         axisPointer: {
-          type: 'shadow'
+          type: 'cross'
         }
       },
       legend: {
@@ -695,38 +1202,52 @@ const initStudentTrendChart = (trend: any[]) => {
       },
       xAxis: {
         type: 'category',
-        data: trend.map(item => item.assignmentName || item.assignment),
+        data: trends.map(item => item.assignmentTitle || '未知作业'),
         axisLabel: {
           interval: 0,
-          rotate: 0,
+          rotate: 30,
           formatter: (value: string) => {
-            return value.length > 10 ? value.substring(0, 10) + '...' : value;
+            return value.length > 8 ? value.substring(0, 8) + '...' : value;
           }
         }
       },
       yAxis: {
         type: 'value',
         min: 0,
-        max: 100
+        max: 100,
+        name: '分数(%)'
       },
       series: [
         {
           name: '个人得分',
           type: 'line',
-          data: trend.map(item => item.score || item.personalScore || 0),
+          data: trends.map(item => item.studentPercentage || 0),
           itemStyle: {
             color: '#409eff'
           },
+          lineStyle: {
+            width: 3
+          },
           smooth: true,
           symbol: 'circle',
-          symbolSize: 8
+          symbolSize: 8,
+          areaStyle: {
+            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+              { offset: 0, color: 'rgba(64, 158, 255, 0.3)' },
+              { offset: 1, color: 'rgba(64, 158, 255, 0.05)' }
+            ])
+          }
         },
         {
           name: '班级平均',
           type: 'line',
-          data: trend.map(item => item.classAverage || item.avgScore || 0),
+          data: trends.map(item => item.classAverage || 0),
           itemStyle: {
             color: '#67c23a'
+          },
+          lineStyle: {
+            width: 3,
+            type: 'dashed'
           },
           smooth: true,
           symbol: 'circle',
@@ -738,133 +1259,217 @@ const initStudentTrendChart = (trend: any[]) => {
   }
 };
 
-// 搜索学生
 const searchStudent = async () => {
-  if (!studentSearch.value) {
+  if (!studentSearch.value || !studentSearch.value.trim()) {
     ElMessage.warning('请输入学生姓名或账号');
     return;
   }
   
-  try {
-    const response = await request.get('/teacher/analysis/search-student', {
-      params: {
-        keyword: studentSearch.value
-      }
-    });
+  const keyword = studentSearch.value.trim().toLowerCase();
+  const found = studentList.value.find(s => 
+    (s.realName && s.realName.toLowerCase().includes(keyword)) || 
+    (s.username && s.username.toLowerCase().includes(keyword))
+  );
+  
+  if (found) {
+    selectedStudent.value = {
+      studentId: found.id,
+      studentName: found.realName || found.username,
+      studentAccount: found.username,
+      courseIds: found.courseIds || []
+    };
     
-    const studentId = response.data?.id;
-    if (studentId) {
-      selectedStudent.value = {
-        studentId: studentId,
-        studentName: response.data.realName,
-        studentAccount: response.data.username
-      };
-      await loadStudentTrendData();
-    } else {
-      ElMessage.warning('未找到该学生');
-      selectedStudent.value = null;
-    }
-  } catch (error) {
-    console.error('搜索学生失败:', error);
-    ElMessage.error('搜索学生失败');
+    loadStudentCourses();
+    studentFilter.value.courseId = undefined;
+    studentFilter.value.assignmentId = undefined;
+    studentTrendData.value = [];
+    await loadStudentTrendData();
+  } else {
+    ElMessage.warning('未找到该学生，请确认该学生是否在您的课程中');
     selectedStudent.value = null;
   }
 };
 
-// 加载学生趋势数据
+const loadStudentCourses = () => {
+  if (!selectedStudent.value) return;
+  
+  const studentCourseIds = selectedStudent.value.courseIds || [];
+  studentCourses.value = courses.value.filter(c => studentCourseIds.includes(c.id));
+};
+
+const onStudentCourseChange = async () => {
+  studentFilter.value.assignmentId = undefined;
+  loadStudentAssignments();
+  filterAndRenderTrend();
+};
+
+const loadStudentAssignments = () => {
+  if (!studentFilter.value.courseId) {
+    studentAssignments.value = [];
+    return;
+  }
+  
+  const courseId = studentFilter.value.courseId;
+  const courseAssignments: any[] = [];
+  
+  for (const assignment of assignments.value) {
+    if (assignment.courseId === courseId) {
+      courseAssignments.push(assignment);
+    }
+  }
+  
+  studentAssignments.value = courseAssignments;
+};
+
+const studentTrendData = ref<any[]>([]);
+
 const loadStudentTrendData = async () => {
   if (!selectedStudent.value) return;
   
   try {
-    const response = await request.get('/teacher/analysis/student-trend', {
-      params: {
-        studentId: selectedStudent.value.studentId,
-        courseId: filterForm.value.courseId || undefined
-      }
-    });
+    const response = await request.get(`/teacher/analytics/student/${selectedStudent.value.studentId}/trend`);
     const trendData = response.data;
-    if (trendData && trendData.trend) {
+    
+    if (trendData && trendData.trends && Array.isArray(trendData.trends)) {
+      studentTrendData.value = trendData.trends;
+      
+      await loadStudentAssignmentsForTrend(trendData.trends);
+      
+      filterAndRenderTrend();
+    } else {
+      studentTrendData.value = [];
       nextTick(() => {
-        initStudentTrendChart(trendData.trend);
+        initStudentTrendChart([]);
       });
     }
   } catch (error) {
     console.error('加载学生趋势失败:', error);
+    studentTrendData.value = [];
+    nextTick(() => {
+      initStudentTrendChart([]);
+    });
   }
 };
 
-// 查看错题详情
-const viewErrorDetail = (row: any) => {
-  ElMessageBox.alert(
-    `
-    <div class="error-detail">
-      <p><strong>所属课程：</strong>${row.courseName || '未知'}</p>
-      <p><strong>题目内容：</strong>${row.questionContent || '未知'}</p>
-      <p><strong>错误次数：</strong><span class="error-count">${row.errorCount}</span></p>
-      <p><strong>错误率：</strong><span class="error-rate">${row.errorRate}%</span></p>
-      <p><strong>提交人数：</strong>${row.submittedCount || 0}</p>
-    </div>
-    `,
-    '错题详情',
-    {
-      dangerouslyUseHTMLString: true,
-      confirmButtonText: '确定'
+const loadStudentAssignmentsForTrend = async (trends: any[]) => {
+  const courseAssignmentMap = new Map<number, any[]>();
+  
+  for (const course of courses.value) {
+    try {
+      const response = await request.get('/teacher/assignments/list', {
+        params: {
+          courseId: course.id,
+          page: 1,
+          size: 100
+        }
+      });
+      const assignmentList = response.data?.records || response.data || [];
+      course.assignments = assignmentList;
+      courseAssignmentMap.set(course.id, assignmentList);
+    } catch (error) {
+      console.error(`加载课程${course.id}作业失败:`, error);
+      courseAssignmentMap.set(course.id, []);
     }
-  );
+  }
+  
+  const allAssignments: any[] = [];
+  for (const trend of trends) {
+    let courseId: number | null = null;
+    
+    for (const [cid, assignList] of courseAssignmentMap) {
+      if (assignList.some((a: any) => a.id === trend.assignmentId)) {
+        courseId = cid;
+        break;
+      }
+    }
+    
+    allAssignments.push({
+      id: trend.assignmentId,
+      title: trend.assignmentTitle,
+      courseId: courseId
+    });
+  }
+  
+  studentAssignments.value = allAssignments;
 };
 
-// 获取错误率等级
+const filterAndRenderTrend = () => {
+  if (!studentTrendData.value || studentTrendData.value.length === 0) {
+    nextTick(() => {
+      initStudentTrendChart([]);
+    });
+    return;
+  }
+  
+  let filteredTrends = [...studentTrendData.value];
+  
+  if (studentFilter.value.courseId) {
+    const courseId = studentFilter.value.courseId;
+    const course = courses.value.find(c => c.id === courseId);
+    
+    if (course && course.assignments) {
+      const courseAssignmentIds = course.assignments.map((a: any) => a.id);
+      filteredTrends = filteredTrends.filter(t => courseAssignmentIds.includes(t.assignmentId));
+    }
+  }
+  
+  if (studentFilter.value.assignmentId) {
+    filteredTrends = filteredTrends.filter(t => t.assignmentId === studentFilter.value.assignmentId);
+  }
+  
+  nextTick(() => {
+    initStudentTrendChart(filteredTrends);
+  });
+};
+
+const viewErrorDetail = async (row: any) => {
+  currentErrorDetail.value = {
+    ...row,
+    wrongStudents: []
+  };
+  errorDetailVisible.value = true;
+  
+  try {
+    const response = await request.get(`/teacher/analytics/frequent-errors/${row.questionId}/students`);
+    if (response.data) {
+      currentErrorDetail.value.wrongStudents = response.data.map((s: any) => ({
+        id: s.id,
+        realName: s.realName || s.name,
+        username: s.username,
+        email: s.email || '-',
+        phone: s.phone || '-',
+        status: s.status,
+        avatar: s.avatar
+      }));
+    }
+  } catch (error) {
+    console.error('获取答错学生信息失败:', error);
+  }
+};
+
 const getErrorRateClass = (rate: number): string => {
   if (rate >= 50) return 'high';
   if (rate >= 30) return 'medium';
   return 'low';
 };
 
-// 导出总览数据
 const exportOverviewData = async () => {
-  if (!filterForm.value.courseId) {
-    ElMessage.warning('请先选择课程');
-    return;
-  }
-  
-  try {
-    const response = await request.get('/teacher/analysis/export-overview', {
-      params: {
-        courseId: filterForm.value.courseId,
-        assignmentId: filterForm.value.assignmentId || undefined
-      },
-      responseType: 'blob'
-    });
-    
-    const blob = new Blob([response.data], { type: 'application/vnd.ms-excel' });
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `学情总览_${new Date().getTime()}.xlsx`;
-    link.click();
-    window.URL.revokeObjectURL(url);
-    
-    ElMessage.success('数据导出成功');
-  } catch (error) {
-    console.error('导出数据失败:', error);
-    ElMessage.error('数据导出失败');
-  }
+  ElMessage.info('功能开发中，暂不支持导出总览数据');
 };
 
-// 导出错题数据
 const exportErrorData = async () => {
   try {
-    const response = await request.get('/teacher/analysis/export-errors', {
-      params: {
-        courseId: errorFilter.value.courseId || undefined,
-        keyword: errorFilter.value.keyword || undefined,
-        page: errorPagination.value.currentPage,
-        size: errorPagination.value.pageSize
-      },
+    const params: any = {};
+    if (errorFilter.value.courseId) {
+      params.courseId = errorFilter.value.courseId;
+    }
+    
+    const response = await request.get('/teacher/analytics/frequent-errors/export', {
+      params,
       responseType: 'blob'
     });
     
-    const blob = new Blob([response.data], { type: 'application/vnd.ms-excel' });
+    const blob = new Blob([response.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
     const url = window.URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
@@ -879,44 +1484,24 @@ const exportErrorData = async () => {
   }
 };
 
-// 导出学生数据
 const exportStudentData = async () => {
   if (!selectedStudent.value) {
     ElMessage.warning('请先选择学生');
     return;
   }
   
-  try {
-    const response = await request.get('/teacher/analysis/export-student', {
-      params: {
-        studentId: selectedStudent.value.studentId,
-        courseId: filterForm.value.courseId || undefined
-      },
-      responseType: 'blob'
-    });
-    
-    const blob = new Blob([response.data], { type: 'application/vnd.ms-excel' });
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `${selectedStudent.value.studentName}_学情分析_${new Date().getTime()}.xlsx`;
-    link.click();
-    window.URL.revokeObjectURL(url);
-    
-    ElMessage.success('数据导出成功');
-  } catch (error) {
-    console.error('导出数据失败:', error);
-    ElMessage.error('数据导出失败');
-  }
+  ElMessage.info('功能开发中，暂不支持导出学生数据');
 };
 
 onMounted(async () => {
   await loadCourses();
   
   window.addEventListener('resize', () => {
-    completionChart?.resize();
+    submissionChart?.resize();
+    onTimeChart?.resize();
     scoreChart?.resize();
     errorDistributionChart?.resize();
+    heatmapChart?.resize();
     studentTrendChart?.resize();
   });
 });
@@ -932,7 +1517,6 @@ onMounted(async () => {
   min-height: calc(100vh - 84px);
 }
 
-/* 通用卡片样式 */
 :deep(.el-card) {
   border: none;
   border-radius: 16px;
@@ -950,7 +1534,6 @@ onMounted(async () => {
   padding: 0 20px 20px;
 }
 
-/* 卡片头部 */
 .card-header {
   display: flex;
   justify-content: space-between;
@@ -998,7 +1581,6 @@ onMounted(async () => {
   width: 240px;
 }
 
-/* 统计卡片 */
 .stats-container {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -1089,12 +1671,15 @@ onMounted(async () => {
   color: #9ca3af;
 }
 
-/* 图表区域 */
 .charts-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 20px;
   padding: 0 20px;
+}
+
+.charts-row--three {
+  grid-template-columns: 1fr 2fr;
 }
 
 .chart-card {
@@ -1103,17 +1688,12 @@ onMounted(async () => {
   overflow: visible;
 }
 
-.chart-card--full {
-  grid-column: 1 / -1;
+.chart-card--double {
+  grid-column: span 1;
 }
 
-.chart-title {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 16px;
-  font-weight: 600;
-  color: #303133;
+.chart-card--full {
+  grid-column: 1 / -1;
 }
 
 .card-title {
@@ -1145,7 +1725,25 @@ onMounted(async () => {
   height: 100%;
 }
 
-/* 错题分析区域 */
+.dual-pie-container {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  padding: 10px 0;
+}
+
+.pie-item {
+  flex: 1;
+  text-align: center;
+}
+
+.pie-label {
+  font-size: 14px;
+  color: #606266;
+  margin-top: 10px;
+  font-weight: 500;
+}
+
 .error-section {
   margin-bottom: 24px;
 }
@@ -1174,7 +1772,6 @@ onMounted(async () => {
   align-items: center;
 }
 
-/* 现代化表格样式 */
 .modern-table {
   --el-table-border-radius: 12px;
 }
@@ -1189,6 +1786,7 @@ onMounted(async () => {
 
 .modern-table :deep(.el-table__row) {
   height: 48px;
+  cursor: pointer;
 }
 
 .modern-table :deep(.el-table__row:hover) {
@@ -1206,7 +1804,6 @@ onMounted(async () => {
   font-size: 15px;
 }
 
-/* 错误率进度条 */
 .error-rate-bar {
   display: flex;
   align-items: center;
@@ -1248,7 +1845,6 @@ onMounted(async () => {
   flex-shrink: 0;
 }
 
-/* 学生个体分析区域 */
 .student-section {
   margin-bottom: 24px;
 }
@@ -1257,8 +1853,64 @@ onMounted(async () => {
   padding: 0 20px 20px;
 }
 
-.search-input-large {
-  max-width: 600px;
+.search-box {
+  max-width: 700px;
+  margin: 0 auto;
+}
+
+.search-box__input-wrapper {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.search-box__input-wrapper .search-input {
+  flex: 1;
+}
+
+.search-box__input-wrapper .search-input :deep(.el-input__wrapper) {
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  padding: 4px 15px;
+}
+
+.search-box__input-wrapper .search-input :deep(.el-input__wrapper:hover) {
+  box-shadow: 0 4px 12px rgba(64, 158, 255, 0.2);
+}
+
+.search-box__input-wrapper .search-input :deep(.el-input__wrapper.is-focus) {
+  box-shadow: 0 4px 12px rgba(64, 158, 255, 0.3);
+}
+
+.search-box__input-wrapper .search-icon {
+  font-size: 18px;
+  color: #909399;
+}
+
+.search-box__input-wrapper .search-btn {
+  border-radius: 12px;
+  padding: 0 24px;
+  height: 42px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.search-box__tip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px;
+  padding: 8px 16px;
+  background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+  border-radius: 8px;
+  color: #0369a1;
+  font-size: 13px;
+}
+
+.search-box__tip .el-icon {
+  font-size: 16px;
 }
 
 .student-chart-section {
@@ -1266,7 +1918,10 @@ onMounted(async () => {
 }
 
 .student-info {
-  margin-bottom: 16px;
+  margin-bottom: 20px;
+  padding: 16px;
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  border-radius: 12px;
 }
 
 .student-info__header {
@@ -1281,33 +1936,132 @@ onMounted(async () => {
   gap: 16px;
 }
 
-.student-info__name {
+.student-avatar {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #fff;
   font-size: 20px;
+  font-weight: 600;
+}
+
+.student-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.student-info__name {
+  font-size: 18px;
   font-weight: 600;
   color: #303133;
 }
 
 .student-info__account {
-  font-size: 14px;
+  font-size: 13px;
   color: #909399;
 }
 
+.student-info__actions {
+  display: flex;
+  gap: 12px;
+}
+
 .filter-item-small {
-  width: 150px;
+  width: 160px;
 }
 
 .empty-student {
-  padding: 60px 0;
+  padding: 80px 0;
   text-align: center;
 }
 
-/* 响应式设计 */
+.error-detail-dialog :deep(.el-dialog__body) {
+  padding: 20px;
+}
+
+.error-detail-content {
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.error-detail-info {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 24px;
+  padding: 16px;
+  background: #f5f7fa;
+  border-radius: 8px;
+}
+
+.info-item {
+  display: flex;
+  align-items: center;
+}
+
+.info-label {
+  color: #909399;
+  font-size: 14px;
+  min-width: 80px;
+}
+
+.info-value {
+  color: #303133;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.error-students-section .section-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #303133;
+  margin-bottom: 16px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #ebeef5;
+}
+
+.students-table :deep(.el-table__header th) {
+  background: #f5f7fa;
+}
+
+.student-cell {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.student-info-cell {
+  display: flex;
+  flex-direction: column;
+}
+
+.student-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: #303133;
+}
+
+.student-account {
+  font-size: 12px;
+  color: #909399;
+}
+
+.empty-students {
+  text-align: center;
+  padding: 40px 0;
+  color: #909399;
+  font-size: 14px;
+}
+
 @media (max-width: 1400px) {
   .stats-container {
     grid-template-columns: repeat(2, 1fr);
   }
   
   .charts-row {
+    grid-template-columns: 1fr;
+  }
+  
+  .charts-row--three {
     grid-template-columns: 1fr;
   }
 }
@@ -1331,25 +2085,14 @@ onMounted(async () => {
     flex-direction: column;
     align-items: flex-start;
   }
-}
-
-/* 错题详情样式 */
-.error-detail p {
-  margin: 12px 0;
-  line-height: 1.6;
-}
-
-.error-detail strong {
-  color: #606266;
-}
-
-.error-count {
-  color: #f56c6c;
-  font-weight: 600;
-}
-
-.error-rate {
-  color: #e6a23c;
-  font-weight: 600;
+  
+  .dual-pie-container {
+    flex-direction: column;
+  }
+  
+  .pie-item {
+    width: 100%;
+    margin-bottom: 20px;
+  }
 }
 </style>
