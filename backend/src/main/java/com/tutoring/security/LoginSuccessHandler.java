@@ -43,6 +43,7 @@ public class LoginSuccessHandler implements AuthenticationSuccessHandler {
             .realName(user.getRealName())
             .role(user.getRole())
             .userId(user.getId())
+            .avatar(user.getAvatar())
             .build();
 
         response.setContentType("application/json;charset=UTF-8");
