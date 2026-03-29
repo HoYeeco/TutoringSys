@@ -174,9 +174,11 @@ public class TeacherCourseServiceImpl implements TeacherCourseService {
                 courseSelectionMapper.insert(selection);
             }
 
+            User teacher = userMapper.selectById(teacherId);
+            String teacherName = teacher != null ? teacher.getRealName() : "未知";
             notifyStudents(request.getStudentIds(), 
                 "课程添加通知", 
-                "您已被添加到课程：" + course.getName(), 
+                "你已加入" + teacherName + "老师的" + course.getName() + "课程", 
                 teacherId);
         }
 
@@ -227,9 +229,11 @@ public class TeacherCourseServiceImpl implements TeacherCourseService {
                 courseSelectionMapper.insert(selection);
             }
 
+            User teacher = userMapper.selectById(teacherId);
+            String teacherName = teacher != null ? teacher.getRealName() : "未知";
             notifyStudents(toAdd, 
                 "课程添加通知", 
-                "您已被添加到课程：" + course.getName(), 
+                "你已加入" + teacherName + "老师的" + course.getName() + "课程", 
                 teacherId);
         }
 
@@ -240,9 +244,11 @@ public class TeacherCourseServiceImpl implements TeacherCourseService {
                     .in(CourseSelection::getStudentId, toRemove)
             );
 
+            User teacher = userMapper.selectById(teacherId);
+            String teacherName = teacher != null ? teacher.getRealName() : "未知";
             notifyStudents(toRemove, 
                 "课程移除通知", 
-                "您已从课程：" + course.getName() + " 中移除", 
+                "你已被移出" + teacherName + "老师的" + course.getName() + "课程", 
                 teacherId);
         }
     }

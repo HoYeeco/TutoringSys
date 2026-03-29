@@ -69,44 +69,146 @@
     <el-dialog
       v-model="dialogVisible"
       :title="dialogType === 'create' ? '新增课程' : '编辑课程'"
-      width="600px"
+      width="700px"
       append-to-body
       destroy-on-close
+      :close-on-click-modal="false"
     >
       <el-form :model="form" :rules="rules" ref="formRef" label-width="100px">
         <el-form-item label="课程名称" prop="name">
-          <el-input v-model="form.name" placeholder="请输入课程名称" />
+          <el-input v-model="form.name" placeholder="请输入课程名称" maxlength="100" show-word-limit />
         </el-form-item>
         <el-form-item label="课程描述" prop="description">
-          <el-input v-model="form.description" type="textarea" :rows="3" placeholder="请输入课程描述" />
+          <el-input 
+            v-model="form.description" 
+            type="textarea" 
+            :rows="3" 
+            placeholder="请输入课程描述" 
+            maxlength="500"
+            show-word-limit
+          />
         </el-form-item>
-        <el-form-item label="选课学生">
-          <el-select
-            v-model="form.studentIds"
-            multiple
-            filterable
-            placeholder="选择学生"
-            style="width: 100%"
-          >
-            <el-option
-              v-for="student in students"
-              :key="student.id"
-              :label="`${student.username} - ${student.realName}`"
-              :value="student.id"
-            >
-              <div class="student-option">
-                <el-avatar :size="24" :src="student.avatar || ''">{{ student.realName?.charAt(0) }}</el-avatar>
-                <span>{{ student.realName }} ({{ student.username }})</span>
+        <el-form-item label="已选课学生">
+          <div class="student-section">
+            <div class="student-header">
+              <span class="student-count">已选择 {{ selectedStudents.length }} 名学生</span>
+              <div class="student-actions">
+                <el-button 
+                  type="danger" 
+                  size="small" 
+                  :disabled="studentsToRemove.length === 0"
+                  @click="handleBatchRemoveStudents"
+                >
+                  <el-icon><Delete /></el-icon>
+                  批量移除 ({{ studentsToRemove.length }})
+                </el-button>
+                <el-button type="primary" size="small" @click="openAddStudentDialog">
+                  <el-icon><Plus /></el-icon>
+                  添加学生
+                </el-button>
               </div>
-            </el-option>
-          </el-select>
-          <div class="form-hint">若不选则学生人数为0</div>
+            </div>
+            
+            <div class="student-search" v-if="selectedStudents.length > 0">
+              <el-input
+                v-model="studentSearchKeyword"
+                placeholder="搜索学生姓名或账号"
+                clearable
+                size="small"
+              >
+                <template #prefix>
+                  <el-icon><Search /></el-icon>
+                </template>
+              </el-input>
+            </div>
+            
+            <div class="student-list" v-if="filteredSelectedStudents.length > 0">
+              <el-checkbox-group v-model="studentsToRemove">
+                <div 
+                  v-for="student in filteredSelectedStudents" 
+                  :key="student.id" 
+                  class="student-item"
+                >
+                  <el-checkbox :value="student.id">
+                    <div class="student-info">
+                      <el-avatar :size="32" class="student-avatar">
+                        {{ student.realName?.charAt(0) || '?' }}
+                      </el-avatar>
+                      <div class="student-detail">
+                        <span class="student-name">{{ student.realName }}</span>
+                        <span class="student-username">({{ student.username }})</span>
+                      </div>
+                    </div>
+                  </el-checkbox>
+                </div>
+              </el-checkbox-group>
+            </div>
+            <el-empty v-else description="暂无选课学生" :image-size="80" />
+          </div>
         </el-form-item>
       </el-form>
       <template #footer>
         <span class="dialog-footer">
           <el-button @click="dialogVisible = false">取消</el-button>
-          <el-button type="primary" @click="handleSubmit">确定</el-button>
+          <el-button type="primary" @click="handleSubmit" :loading="submitting">
+            {{ dialogType === 'create' ? '创建' : '保存' }}
+          </el-button>
+        </span>
+      </template>
+    </el-dialog>
+
+    <el-dialog
+      v-model="addStudentDialogVisible"
+      title="添加学生"
+      width="600px"
+      append-to-body
+      destroy-on-close
+    >
+      <div class="add-student-section">
+        <el-input
+          v-model="addStudentSearchKeyword"
+          placeholder="搜索学生姓名或账号"
+          clearable
+          class="mb-4"
+        >
+          <template #prefix>
+            <el-icon><Search /></el-icon>
+          </template>
+        </el-input>
+        
+        <div class="available-student-list" v-if="filteredAvailableStudents.length > 0">
+          <el-checkbox-group v-model="studentsToAdd">
+            <div 
+              v-for="student in filteredAvailableStudents" 
+              :key="student.id" 
+              class="student-item"
+            >
+              <el-checkbox :value="student.id">
+                <div class="student-info">
+                  <el-avatar :size="32" class="student-avatar">
+                    {{ student.realName?.charAt(0) || '?' }}
+                  </el-avatar>
+                  <div class="student-detail">
+                    <span class="student-name">{{ student.realName }}</span>
+                    <span class="student-username">({{ student.username }})</span>
+                  </div>
+                </div>
+              </el-checkbox>
+            </div>
+          </el-checkbox-group>
+        </div>
+        <el-empty v-else description="没有可添加的学生" :image-size="80" />
+      </div>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="addStudentDialogVisible = false">取消</el-button>
+          <el-button 
+            type="primary" 
+            @click="confirmAddStudents" 
+            :disabled="studentsToAdd.length === 0"
+          >
+            添加 ({{ studentsToAdd.length }})
+          </el-button>
         </span>
       </template>
     </el-dialog>
@@ -114,11 +216,18 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue';
+import { ref, reactive, onMounted, computed, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import { Plus, School, Search } from '@element-plus/icons-vue';
+import { Plus, School, Search, Delete } from '@element-plus/icons-vue';
 import request from '@/utils/request';
+
+interface Student {
+  id: number;
+  username: string;
+  realName: string;
+  avatar?: string;
+}
 
 const router = useRouter();
 
@@ -131,32 +240,65 @@ const courses = reactive({
   total: 0
 });
 
-const students = ref([]);
-
+const allStudents = ref<Student[]>([]);
 const dialogVisible = ref(false);
-const dialogType = ref('create');
+const dialogType = ref<'create' | 'edit'>('create');
 const formRef = ref();
+const submitting = ref(false);
 
 const form = reactive({
-  id: undefined,
+  id: undefined as number | undefined,
   name: '',
   description: '',
-  studentIds: []
+  studentIds: [] as number[]
 });
 
 const rules = {
-  name: [{ required: true, message: '请输入课程名称', trigger: 'blur' }]
+  name: [{ required: true, message: '请输入课程名称', trigger: 'blur' }],
+  description: [{ required: true, message: '请输入课程描述', trigger: 'blur' }]
 };
 
-const getStudents = async () => {
+const selectedStudents = ref<Student[]>([]);
+const studentsToRemove = ref<number[]>([]);
+const studentSearchKeyword = ref('');
+
+const addStudentDialogVisible = ref(false);
+const studentsToAdd = ref<number[]>([]);
+const addStudentSearchKeyword = ref('');
+
+const filteredSelectedStudents = computed(() => {
+  if (!studentSearchKeyword.value) {
+    return selectedStudents.value;
+  }
+  const keyword = studentSearchKeyword.value.toLowerCase();
+  return selectedStudents.value.filter(student => 
+    student.realName.toLowerCase().includes(keyword) ||
+    student.username.toLowerCase().includes(keyword)
+  );
+});
+
+const filteredAvailableStudents = computed(() => {
+  const selectedIds = selectedStudents.value.map(s => s.id);
+  let available = allStudents.value.filter(s => !selectedIds.includes(s.id));
+  
+  if (addStudentSearchKeyword.value) {
+    const keyword = addStudentSearchKeyword.value.toLowerCase();
+    available = available.filter(student => 
+      student.realName.toLowerCase().includes(keyword) ||
+      student.username.toLowerCase().includes(keyword)
+    );
+  }
+  
+  return available;
+});
+
+const getAllStudents = async () => {
   try {
-    const response = await request.get('/admin/users', {
-      params: { role: 'STUDENT', page: 1, size: 1000 }
-    });
-    students.value = response.data?.records || [];
+    const response = await request.get('/teacher/courses/students');
+    allStudents.value = response.data || [];
   } catch (error) {
     console.error('获取学生列表失败:', error);
-    students.value = [];
+    allStudents.value = [];
   }
 };
 
@@ -197,13 +339,17 @@ const handleCurrentChange = (current: number) => {
   getCourses();
 };
 
-const handleCreate = () => {
+const handleCreate = async () => {
   dialogType.value = 'create';
   form.id = undefined;
   form.name = '';
   form.description = '';
   form.studentIds = [];
-  getStudents();
+  selectedStudents.value = [];
+  studentsToRemove.value = [];
+  studentSearchKeyword.value = '';
+  
+  await getAllStudents();
   dialogVisible.value = true;
 };
 
@@ -213,19 +359,73 @@ const handleEdit = async (row: any) => {
   form.name = row.name;
   form.description = row.description;
   form.studentIds = [];
+  selectedStudents.value = [];
+  studentsToRemove.value = [];
+  studentSearchKeyword.value = '';
+  
+  await getAllStudents();
   
   try {
     const response = await request.get(`/teacher/courses/${row.id}`);
     const detail = response.data;
     if (detail && detail.students) {
+      selectedStudents.value = detail.students.map((s: any) => ({
+        id: s.id,
+        username: s.username,
+        realName: s.realName
+      }));
       form.studentIds = detail.students.map((s: any) => s.id);
     }
   } catch (error) {
     console.error('获取课程详情失败:', error);
   }
   
-  getStudents();
   dialogVisible.value = true;
+};
+
+const openAddStudentDialog = () => {
+  studentsToAdd.value = [];
+  addStudentSearchKeyword.value = '';
+  addStudentDialogVisible.value = true;
+};
+
+const confirmAddStudents = () => {
+  if (studentsToAdd.value.length === 0) {
+    ElMessage.warning('请选择要添加的学生');
+    return;
+  }
+  
+  const newStudents = allStudents.value.filter(s => studentsToAdd.value.includes(s.id));
+  selectedStudents.value = [...selectedStudents.value, ...newStudents];
+  form.studentIds = selectedStudents.value.map(s => s.id);
+  
+  addStudentDialogVisible.value = false;
+  studentsToAdd.value = [];
+  addStudentSearchKeyword.value = '';
+};
+
+const handleBatchRemoveStudents = () => {
+  if (studentsToRemove.value.length === 0) {
+    ElMessage.warning('请选择要移除的学生');
+    return;
+  }
+  
+  ElMessageBox.confirm(
+    `确定要移除选中的 ${studentsToRemove.value.length} 名学生吗？移除后学生将收到通知。`,
+    '确认移除',
+    {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning'
+    }
+  ).then(() => {
+    selectedStudents.value = selectedStudents.value.filter(
+      s => !studentsToRemove.value.includes(s.id)
+    );
+    form.studentIds = selectedStudents.value.map(s => s.id);
+    studentsToRemove.value = [];
+    ElMessage.success('已移除选中学生');
+  }).catch(() => {});
 };
 
 const handleSubmit = async () => {
@@ -233,20 +433,21 @@ const handleSubmit = async () => {
   
   try {
     await formRef.value.validate();
+    submitting.value = true;
+    
+    const submitData = {
+      name: form.name,
+      description: form.description,
+      studentIds: form.studentIds
+    };
     
     if (dialogType.value === 'create') {
-      await request.post('/teacher/courses', {
-        name: form.name,
-        description: form.description,
-        studentIds: form.studentIds
-      });
+      await request.post('/teacher/courses', submitData);
       ElMessage.success('课程创建成功');
     } else {
       await request.put('/teacher/courses', {
         id: form.id,
-        name: form.name,
-        description: form.description,
-        studentIds: form.studentIds
+        ...submitData
       });
       ElMessage.success('课程更新成功');
     }
@@ -255,6 +456,8 @@ const handleSubmit = async () => {
     getCourses();
   } catch (error) {
     console.error('提交失败:', error);
+  } finally {
+    submitting.value = false;
   }
 };
 
@@ -280,6 +483,13 @@ const handlePublishAssignment = (row: any) => {
     query: { courseId: row.id }
   });
 };
+
+watch(dialogVisible, (val) => {
+  if (!val) {
+    studentsToRemove.value = [];
+    studentSearchKeyword.value = '';
+  }
+});
 
 onMounted(() => {
   getCourses();
@@ -415,16 +625,102 @@ onMounted(() => {
   gap: 12px;
 }
 
-.student-option {
+.student-section {
+  width: 100%;
+  border: 1px solid #e4e7ed;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.student-header {
   display: flex;
+  justify-content: space-between;
   align-items: center;
+  padding: 12px 16px;
+  background: #f5f7fa;
+  border-bottom: 1px solid #e4e7ed;
+}
+
+.student-count {
+  font-size: 14px;
+  font-weight: 500;
+  color: #606266;
+}
+
+.student-actions {
+  display: flex;
   gap: 8px;
 }
 
-.form-hint {
-  font-size: 12px;
+.student-search {
+  padding: 12px 16px;
+  border-bottom: 1px solid #ebeef5;
+}
+
+.student-list {
+  max-height: 300px;
+  overflow-y: auto;
+  padding: 8px 16px;
+}
+
+.student-item {
+  padding: 10px 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.student-item:last-child {
+  border-bottom: none;
+}
+
+.student-item :deep(.el-checkbox__label) {
+  display: flex;
+  align-items: center;
+}
+
+.student-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.student-avatar {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #fff;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.student-detail {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.student-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: #303133;
+}
+
+.student-username {
+  font-size: 13px;
   color: #909399;
-  margin-top: 8px;
+}
+
+.add-student-section {
+  min-height: 200px;
+}
+
+.available-student-list {
+  max-height: 400px;
+  overflow-y: auto;
+  border: 1px solid #e4e7ed;
+  border-radius: 8px;
+  padding: 8px 16px;
+}
+
+.mb-4 {
+  margin-bottom: 16px;
 }
 
 @media (max-width: 768px) {
@@ -444,6 +740,20 @@ onMounted(() => {
   
   .teacher-courses {
     padding: 16px;
+  }
+  
+  .student-header {
+    flex-direction: column;
+    gap: 12px;
+    align-items: flex-start;
+  }
+  
+  .student-actions {
+    width: 100%;
+  }
+  
+  .student-actions .el-button {
+    flex: 1;
   }
 }
 </style>

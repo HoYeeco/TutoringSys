@@ -17,7 +17,9 @@
         </div>
         <div class="info-row">
           <span class="info-label">创建时间：</span>
-          <span class="info-value">{{ formatDateTime(course.createTime) }}</span>
+          <span class="info-value">{{
+            formatDateTime(course.createTime)
+          }}</span>
         </div>
         <div class="info-row">
           <span class="info-label">学生人数：</span>
@@ -41,7 +43,7 @@
           <span class="card-title__text">学生列表</span>
         </div>
       </template>
-      
+
       <div class="table-header-actions">
         <el-input
           v-model="searchKeyword"
@@ -62,7 +64,7 @@
           <el-icon><Delete /></el-icon> 批量移除
         </el-button>
       </div>
-      
+
       <el-table
         :data="students"
         style="width: 100%"
@@ -72,9 +74,19 @@
         <el-table-column type="selection" width="55" />
         <el-table-column prop="username" label="账号" width="150" />
         <el-table-column prop="realName" label="学生姓名" width="120" />
-        <el-table-column prop="email" label="邮箱" min-width="200" show-overflow-tooltip />
+        <el-table-column
+          prop="email"
+          label="邮箱"
+          min-width="200"
+          show-overflow-tooltip
+        />
         <el-table-column prop="phone" label="电话" width="150" />
-        <el-table-column prop="completionRate" label="作业完成率" width="150" align="center">
+        <el-table-column
+          prop="completionRate"
+          label="作业完成率"
+          width="150"
+          align="center"
+        >
           <template #default="scope">
             <div class="completion-info">
               <el-progress
@@ -93,13 +105,17 @@
         </el-table-column>
         <el-table-column label="操作" width="100" align="center">
           <template #default="scope">
-            <el-button size="small" type="danger" @click="removeStudent(scope.row.id)">
+            <el-button
+              size="small"
+              type="danger"
+              @click="removeStudent(scope.row.id)"
+            >
               移除
             </el-button>
           </template>
         </el-table-column>
       </el-table>
-      
+
       <div class="pagination-container">
         <el-pagination
           v-model:current-page="currentPage"
@@ -114,11 +130,7 @@
     </el-card>
 
     <!-- 添加学生弹窗 -->
-    <el-dialog
-      v-model="addStudentDialogVisible"
-      title="添加学生"
-      width="600px"
-    >
+    <el-dialog v-model="addStudentDialogVisible" title="添加学生" width="600px">
       <el-input
         v-model="addStudentSearch"
         placeholder="搜索学生姓名或账号"
@@ -197,7 +209,7 @@ const course = ref<Course>({
   id: 0,
   name: '',
   description: '',
-  createTime: ''
+  createTime: '',
 });
 
 const students = ref<Student[]>([]);
@@ -223,7 +235,7 @@ const getCourseDetail = async () => {
       id: 0,
       name: '',
       description: '',
-      createTime: ''
+      createTime: '',
     };
   } catch (error) {
     ElMessage.error('获取课程详情失败');
@@ -233,12 +245,15 @@ const getCourseDetail = async () => {
 // 获取课程学生列表
 const getCourseStudents = async () => {
   try {
-    const response = await request.get(`/teacher/courses/${courseId.value}/students`, {
-      params: {
-        page: currentPage.value,
-        size: pageSize.value
-      }
-    });
+    const response = await request.get(
+      `/teacher/courses/${courseId.value}/students`,
+      {
+        params: {
+          page: currentPage.value,
+          size: pageSize.value,
+        },
+      },
+    );
     students.value = response.data?.records || [];
     total.value = response.data?.total || 0;
   } catch (error) {
@@ -252,7 +267,7 @@ const getCourseStudents = async () => {
 const getAvailableStudents = async () => {
   try {
     const response = await request.get('/admin/users', {
-      params: { role: 'STUDENT', page: 1, size: 100 }
+      params: { role: 'STUDENT', page: 1, size: 100 },
     });
     availableStudents.value = response.data?.records || [];
     filteredAvailableStudents.value = [...availableStudents.value];
@@ -268,12 +283,14 @@ const filterAvailableStudents = (query: string) => {
   if (query) {
     loading.value = true;
     setTimeout(() => {
-      filteredAvailableStudents.value = availableStudents.value.filter(student => {
-        return (
-          student.realName.toLowerCase().includes(query.toLowerCase()) ||
-          student.username.toLowerCase().includes(query.toLowerCase())
-        );
-      });
+      filteredAvailableStudents.value = availableStudents.value.filter(
+        (student) => {
+          return (
+            student.realName.toLowerCase().includes(query.toLowerCase()) ||
+            student.username.toLowerCase().includes(query.toLowerCase())
+          );
+        },
+      );
       loading.value = false;
     }, 200);
   } else {
@@ -285,7 +302,7 @@ const filterAvailableStudents = (query: string) => {
 const addStudents = async (studentIds: number[]) => {
   try {
     await request.post(`/teacher/courses/${courseId.value}/students`, {
-      studentIds
+      studentIds,
     });
     ElMessage.success('添加学生成功');
     addStudentDialogVisible.value = false;
@@ -303,9 +320,11 @@ const removeStudent = async (studentId: number) => {
     ElMessageBox.confirm('确定要移除该学生吗？', '提示', {
       confirmButtonText: '确定',
       cancelButtonText: '取消',
-      type: 'warning'
+      type: 'warning',
     }).then(async () => {
-      await request.delete(`/teacher/courses/${courseId.value}/students/${studentId}`);
+      await request.delete(
+        `/teacher/courses/${courseId.value}/students/${studentId}`,
+      );
       ElMessage.success('移除学生成功');
       getCourseStudents();
     });
@@ -321,15 +340,22 @@ const handleBatchRemove = () => {
     return;
   }
 
-  ElMessageBox.confirm(`确定要移除选中的 ${selectedStudentIds.value.length} 名学生吗？`, '提示', {
-    confirmButtonText: '确定',
-    cancelButtonText: '取消',
-    type: 'warning'
-  }).then(async () => {
+  ElMessageBox.confirm(
+    `确定要移除选中的 ${selectedStudentIds.value.length} 名学生吗？`,
+    '提示',
+    {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning',
+    },
+  ).then(async () => {
     try {
-      await request.post(`/teacher/courses/${courseId.value}/students/batch-remove`, {
-        studentIds: selectedStudentIds.value
-      });
+      await request.post(
+        `/teacher/courses/${courseId.value}/students/batch-remove`,
+        {
+          studentIds: selectedStudentIds.value,
+        },
+      );
       ElMessage.success('批量移除学生成功');
       selectedStudentIds.value = [];
       getCourseStudents();
@@ -341,14 +367,14 @@ const handleBatchRemove = () => {
 
 // 处理选择变化
 const handleSelectionChange = (val: any[]) => {
-  selectedStudentIds.value = val.map(item => item.id);
+  selectedStudentIds.value = val.map((item) => item.id);
 };
 
 // 处理搜索
 const handleSearch = () => {
   if (searchKeyword.value) {
     const keyword = searchKeyword.value.toLowerCase();
-    students.value = students.value.filter(student => {
+    students.value = students.value.filter((student) => {
       return (
         student.realName.toLowerCase().includes(keyword) ||
         student.username.toLowerCase().includes(keyword)
@@ -571,7 +597,7 @@ onMounted(() => {
     flex-direction: column;
     align-items: stretch;
   }
-  
+
   .search-input {
     width: 100%;
   }
@@ -581,15 +607,15 @@ onMounted(() => {
   .teacher-course-detail {
     padding: 16px;
   }
-  
+
   .card-title {
     font-size: 14px;
   }
-  
+
   .info-row {
     flex-direction: column;
   }
-  
+
   .info-label {
     margin-bottom: 4px;
   }
