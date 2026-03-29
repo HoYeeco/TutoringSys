@@ -120,12 +120,6 @@
           </div>
           <span class="quick-item__label">批改复核</span>
         </div>
-        <div class="quick-item" @click="goToDrafts">
-          <div class="quick-item__icon">
-            <el-icon><Files /></el-icon>
-          </div>
-          <span class="quick-item__label">草稿箱</span>
-        </div>
       </div>
     </el-card>
   </div>
@@ -137,7 +131,7 @@ import { useUserStore } from '@/stores/user';
 import { useRouter } from 'vue-router';
 import request from '@/utils/request';
 import * as echarts from 'echarts';
-import { School, Ticket, Warning, Edit, Notebook, Document, User, Clock, Histogram, Grid, DataAnalysis, Files } from '@element-plus/icons-vue';
+import { School, Ticket, Warning, Edit, Notebook, Document, User, Clock, Histogram, Grid } from '@element-plus/icons-vue';
 
 const userStore = useUserStore();
 const router = useRouter();
@@ -166,7 +160,6 @@ const goToCreateAssignment = () => router.push('/teacher/assignments/create');
 const goToAssignments = () => router.push('/teacher/assignments');
 const goToCourses = () => router.push('/teacher/courses');
 const goToSubmissions = () => router.push('/teacher/grading');
-const goToDrafts = () => router.push('/teacher/assignments/create');
 
 const getTeacherStats = async () => {
   try {
@@ -174,10 +167,10 @@ const getTeacherStats = async () => {
     if (response.data) {
       teacherStats.value = {
         courseCount: response.data.courseCount || 0,
-        studentCount: response.data.totalStudents || 0,
-        ongoingAssignments: response.data.ongoingAssignments || 0,
-        pendingReviews: response.data.pendingReviews || 0,
-        overdueAssignments: response.data.overdueAssignments || 0
+        studentCount: response.data.studentCount || 0,
+        ongoingAssignments: response.data.ongoingAssignmentCount || 0,
+        pendingReviews: response.data.pendingReviewCount || 0,
+        overdueAssignments: response.data.overdueAssignmentCount || 0
       };
     }
   } catch (error) {
@@ -410,7 +403,7 @@ onUnmounted(() => {
 
 .quick-grid {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 20px;
 }
 
