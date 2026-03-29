@@ -120,7 +120,7 @@ const getMessages = async () => {
     let records = response.data.records || [];
     
     if (activeTab.value === 'unread') {
-      records = records.filter((msg: any) => msg.isRead === 0);
+      records = records.filter((msg) => msg.isRead === 0);
     }
     
     messages.value = records;
