@@ -20,7 +20,9 @@
               <template #dropdown>
                 <el-dropdown-menu>
                   <el-dropdown-item command="pdf">导出为 PDF</el-dropdown-item>
-                  <el-dropdown-item command="excel">导出为 Excel</el-dropdown-item>
+                  <el-dropdown-item command="excel"
+                    >导出为 Excel</el-dropdown-item
+                  >
                 </el-dropdown-menu>
               </template>
             </el-dropdown>
@@ -34,22 +36,22 @@
                 <el-icon><Search /></el-icon>
               </template>
             </el-input>
-            <el-select 
-              v-model="filterCourseId" 
-              placeholder="按课程筛选" 
+            <el-select
+              v-model="filterCourseId"
+              placeholder="按课程筛选"
               clearable
               class="filter-select"
             >
               <el-option label="全部课程" value="" />
-              <el-option 
-                v-for="course in courses" 
-                :key="course.courseId" 
-                :label="`${course.courseName} (${course.errorCount})`" 
-                :value="course.courseId" 
+              <el-option
+                v-for="course in courses"
+                :key="course.courseId"
+                :label="`${course.courseName} (${course.errorCount})`"
+                :value="course.courseId"
               />
             </el-select>
-            <el-select 
-              v-model="sortBy" 
+            <el-select
+              v-model="sortBy"
               placeholder="排序方式"
               class="sort-select"
             >
@@ -81,44 +83,71 @@
             <template #title>
               <div class="error-title-row">
                 <div class="title-left">
-                  <el-tag :type="getQuestionTypeTag(error.questionType)" size="small" class="type-tag">
-                    {{ getQuestionTypeText(error.questionType) }}
+                  <el-tag
+                    :type="getQuestionTypeTag(error.type)"
+                    size="small"
+                    class="type-tag"
+                  >
+                    {{ getQuestionTypeText(error.type) }}
                   </el-tag>
-                  <span class="question-preview">{{ truncateText(error.questionContent, 60) }}</span>
+                  <span class="question-preview">{{
+                    truncateText(error.content, 60)
+                  }}</span>
                 </div>
                 <div class="title-right">
                   <span class="course-badge">{{ error.courseName }}</span>
-                  <span class="time-text">{{ formatDate(error.createTime) }}</span>
+                  <span class="time-text">{{
+                    formatDate(error.createTime)
+                  }}</span>
                 </div>
               </div>
             </template>
-            
+
             <div class="error-detail">
               <div class="detail-section">
                 <div class="section-title">题目内容</div>
-                <div class="question-content" v-html="error.questionContent"></div>
+                <div
+                  class="question-content"
+                  v-html="error.content"
+                ></div>
               </div>
-              
+
               <div class="detail-section" v-if="error.options">
                 <div class="section-title">选项</div>
                 <div class="options-list">
-                  <div 
-                    v-for="(option, key) in parseOptions(error.options)" 
+                  <div
+                    v-for="(option, key) in parseOptions(error.options)"
                     :key="key"
                     class="option-item"
                     :class="{
-                      'is-correct': isCorrectOption(error.correctAnswer, String(key)),
-                      'is-wrong': isStudentAnswer(error.studentAnswer, String(key)) && !isCorrectOption(error.correctAnswer, String(key))
+                      'is-correct': isCorrectOption(
+                        error.correctAnswer,
+                        String(key),
+                      ),
+                      'is-wrong':
+                        isStudentAnswer(error.studentAnswer, String(key)) &&
+                        !isCorrectOption(error.correctAnswer, String(key)),
                     }"
                   >
                     <span class="option-key">{{ key }}.</span>
                     <span class="option-text">{{ option }}</span>
-                    <el-icon v-if="isCorrectOption(error.correctAnswer, String(key))" class="correct-icon"><CircleCheck /></el-icon>
-                    <el-icon v-if="isStudentAnswer(error.studentAnswer, String(key)) && !isCorrectOption(error.correctAnswer, String(key))" class="wrong-icon"><CircleClose /></el-icon>
+                    <el-icon
+                      v-if="isCorrectOption(error.correctAnswer, String(key))"
+                      class="correct-icon"
+                      ><CircleCheck
+                    /></el-icon>
+                    <el-icon
+                      v-if="
+                        isStudentAnswer(error.studentAnswer, String(key)) &&
+                        !isCorrectOption(error.correctAnswer, String(key))
+                      "
+                      class="wrong-icon"
+                      ><CircleClose
+                    /></el-icon>
                   </div>
                 </div>
               </div>
-              
+
               <el-row :gutter="20" class="answer-section">
                 <el-col :span="12">
                   <div class="answer-box wrong-answer">
@@ -126,7 +155,11 @@
                       <el-icon><CircleClose /></el-icon>
                       你的答案
                     </div>
-                    <div class="answer-content">{{ formatAnswer(error.studentAnswer, error.questionType) }}</div>
+                    <div class="answer-content">
+                      {{
+                        formatAnswer(error.studentAnswer, error.type)
+                      }}
+                    </div>
                   </div>
                 </el-col>
                 <el-col :span="12">
@@ -135,19 +168,26 @@
                       <el-icon><CircleCheck /></el-icon>
                       正确答案
                     </div>
-                    <div class="answer-content">{{ formatAnswer(error.correctAnswer, error.questionType) }}</div>
+                    <div class="answer-content">
+                      {{
+                        formatAnswer(error.correctAnswer, error.type)
+                      }}
+                    </div>
                   </div>
                 </el-col>
               </el-row>
-              
-              <div class="detail-section analysis-section" v-if="error.analysis">
+
+              <div
+                class="detail-section analysis-section"
+                v-if="error.analysis"
+              >
                 <div class="section-title">
                   <el-icon><Document /></el-icon>
                   题目解析
                 </div>
                 <div class="analysis-content">{{ error.analysis }}</div>
               </div>
-              
+
               <div class="detail-footer">
                 <div class="meta-info">
                   <span class="meta-item">
@@ -159,7 +199,11 @@
                     所属课程：{{ error.courseName }}
                   </span>
                 </div>
-                <el-button type="danger" size="small" @click="confirmRemove(error)">
+                <el-button
+                  type="danger"
+                  size="small"
+                  @click="confirmRemove(error)"
+                >
                   <el-icon><Delete /></el-icon>
                   移除错题
                 </el-button>
@@ -176,6 +220,7 @@
           :page-sizes="[10, 20, 50]"
           :total="totalCount"
           layout="total, sizes, prev, pager, next, jumper"
+          justify="center"
           @size-change="handleSizeChange"
           @current-change="handlePageChange"
         />
@@ -187,9 +232,18 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import { 
-  Search, Refresh, Download, ArrowDown, CircleCheck, CircleClose, 
-  Document, Folder, School, Delete, Notebook
+import {
+  Search,
+  Refresh,
+  Download,
+  ArrowDown,
+  CircleCheck,
+  CircleClose,
+  Document,
+  Folder,
+  School,
+  Delete,
+  Notebook,
 } from '@element-plus/icons-vue';
 import request from '@/utils/request';
 
@@ -206,7 +260,7 @@ const courses = ref<any[]>([]);
 
 const getCourses = async () => {
   try {
-    const response = await request.get('/student/error-book/by-course');
+    const response = await request.get('/student/error-book/stats');
     courses.value = response.data || [];
   } catch (error) {
     console.error('获取课程列表失败:', error);
@@ -219,17 +273,16 @@ const getErrorList = async () => {
     const params: any = {
       page: currentPage.value,
       size: pageSize.value,
-      sortBy: sortBy.value
     };
-    
+
     if (searchKeyword.value) {
       params.keyword = searchKeyword.value;
     }
     if (filterCourseId.value) {
       params.courseId = filterCourseId.value;
     }
-    
-    const response = await request.get('/student/error-book', { params });
+
+    const response = await request.get('/student/error-book/list', { params });
     const data = response.data || {};
     errorList.value = data.records || [];
     totalCount.value = data.total || 0;
@@ -270,16 +323,19 @@ const handleExport = async (format: string) => {
     if (filterCourseId.value) {
       params.courseId = filterCourseId.value;
     }
-    
-    const response = await request.get('/student/error-book/export', { 
+
+    const response = await request.get('/student/error-book/export', {
       params,
-      responseType: 'blob'
+      responseType: 'blob',
     });
-    
+
     const blob = new Blob([response.data as BlobPart], {
-      type: format === 'pdf' ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      type:
+        format === 'pdf'
+          ? 'application/pdf'
+          : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     });
-    
+
     const url = window.URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
@@ -288,7 +344,7 @@ const handleExport = async (format: string) => {
     link.click();
     document.body.removeChild(link);
     window.URL.revokeObjectURL(url);
-    
+
     ElMessage.success(`错题本已导出为${format.toUpperCase()}格式`);
   } catch (error) {
     console.error('导出失败:', error);
@@ -297,17 +353,15 @@ const handleExport = async (format: string) => {
 };
 
 const confirmRemove = (error: any) => {
-  ElMessageBox.confirm(
-    '确定要移除这道错题吗？移除后将无法恢复。',
-    '移除确认',
-    {
-      confirmButtonText: '确定移除',
-      cancelButtonText: '取消',
-      type: 'warning'
-    }
-  ).then(() => {
-    removeError(error.id);
-  }).catch(() => {});
+  ElMessageBox.confirm('确定要移除这道错题吗？移除后将无法恢复。', '移除确认', {
+    confirmButtonText: '确定移除',
+    cancelButtonText: '取消',
+    type: 'warning',
+  })
+    .then(() => {
+      removeError(error.id);
+    })
+    .catch(() => {});
 };
 
 const removeError = async (errorId: number) => {
@@ -327,7 +381,7 @@ const getQuestionTypeText = (type: string) => {
     single: '单选题',
     multiple: '多选题',
     judgment: '判断题',
-    essay: '简答题'
+    essay: '简答题',
   };
   return typeMap[type] || type;
 };
@@ -337,7 +391,7 @@ const getQuestionTypeTag = (type: string) => {
     single: 'primary',
     multiple: 'success',
     judgment: 'warning',
-    essay: 'info'
+    essay: 'info',
   };
   return tagMap[type] || 'info';
 };
@@ -355,7 +409,7 @@ const formatDate = (dateStr: string) => {
   return date.toLocaleDateString('zh-CN', {
     year: 'numeric',
     month: '2-digit',
-    day: '2-digit'
+    day: '2-digit',
   });
 };
 
@@ -712,13 +766,13 @@ onMounted(() => {
     flex-direction: column;
     align-items: stretch;
   }
-  
+
   .search-input,
   .filter-select,
   .sort-select {
     width: 100%;
   }
-  
+
   .empty-container {
     min-height: 300px;
     padding: 40px 16px;
@@ -730,33 +784,33 @@ onMounted(() => {
     flex-direction: column;
     align-items: flex-start;
   }
-  
+
   .stats-grid {
     flex-direction: column;
     gap: 16px;
   }
-  
+
   .error-title-row {
     flex-direction: column;
     align-items: flex-start;
     gap: 8px;
   }
-  
+
   .title-right {
     width: 100%;
     justify-content: space-between;
   }
-  
+
   .detail-footer {
     flex-direction: column;
     gap: 12px;
   }
-  
+
   .meta-info {
     flex-direction: column;
     gap: 8px;
   }
-  
+
   .answer-section .el-col {
     margin-bottom: 12px;
   }
