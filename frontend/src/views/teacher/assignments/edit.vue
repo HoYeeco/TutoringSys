@@ -483,6 +483,51 @@ const publishAssignment = async () => {
       }
     });
 
+    // 验证题目内容和答案
+    for (let i = 0; i < questions.value.length; i++) {
+      const question = questions.value[i];
+      const questionNum = i + 1;
+      
+      // 验证题目内容
+      const contentText = question.content?.replace(/<[^>]+>/g, '').trim() || '';
+      if (!contentText) {
+        ElMessage.warning(`第${questionNum}题题目内容为空，请填写完整`);
+        return;
+      }
+      
+      // 验证选择题选项
+      if (question.type === 'single' || question.type === 'multiple') {
+        const emptyOptions = question.options?.filter(
+          (opt: any) => !opt.value || opt.value.trim() === ''
+        );
+        if (emptyOptions?.length > 0) {
+          ElMessage.warning(`第${questionNum}题存在空白选项，请填写完整`);
+          return;
+        }
+        if (!question.correctAnswer || question.correctAnswer.length === 0) {
+          ElMessage.warning(`第${questionNum}题未设置正确答案`);
+          return;
+        }
+      }
+      
+      // 验证判断题答案
+      if (question.type === 'judgment') {
+        if (!question.correctAnswer) {
+          ElMessage.warning(`第${questionNum}题未设置正确答案`);
+          return;
+        }
+      }
+      
+      // 验证主观题参考答案
+      if (question.type === 'essay') {
+        const answerText = question.referenceAnswer?.replace(/<[^>]+>/g, '').trim() || '';
+        if (!answerText) {
+          ElMessage.warning(`第${questionNum}题参考答案为空，请填写完整`);
+          return;
+        }
+      }
+    }
+
     ElMessageBox.confirm(
       '确定要发布该作业吗？发布后将通知所有选课学生。',
       '提示',

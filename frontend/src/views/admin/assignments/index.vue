@@ -382,7 +382,7 @@ const getAssignments = async () => {
     const response = await request.get('/admin/assignments', {
       params: {
         page: currentPage.value,
-        pageSize: pageSize.value,
+        size: pageSize.value,
         courseId: filterForm.value.courseId || undefined,
         status: filterForm.value.status || undefined,
         keyword: searchKeyword.value || undefined,

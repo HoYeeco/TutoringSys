@@ -583,16 +583,6 @@ const publishNow = async () => {
       return;
     }
     
-    const unanswered = questions.value.filter(q => !q.content || q.score <= 0);
-    if (unanswered.length > 0) {
-      const result = await ElMessageBox.confirm(
-        `有${unanswered.length}道题目未填写完整，确认继续发布吗？`,
-        '提示',
-        { confirmButtonText: '确认发布', cancelButtonText: '返回修改', type: 'warning' }
-      ).catch(() => 'cancel');
-      if (result === 'cancel') return;
-    }
-    
     questions.value.forEach(q => {
       if (editors.value[q.tempId]) {
         q.content = editors.value[q.tempId].root.innerHTML;
@@ -602,10 +592,76 @@ const publishNow = async () => {
       }
     });
     
+    for (let i = 0; i < questions.value.length; i++) {
+      const question = questions.value[i];
+      const questionNum = i + 1;
+      
+      const contentText = question.content?.replace(/<[^>]+>/g, '').trim() || '';
+      if (!contentText) {
+        ElMessage.warning(`第${questionNum}题题目内容为空，请填写完整`);
+        return;
+      }
+      
+      if (question.type === 'single' || question.type === 'multiple') {
+        const emptyOptions = question.options?.filter(
+          (opt: any) => !opt.value || opt.value.trim() === ''
+        );
+        if (emptyOptions?.length > 0) {
+          ElMessage.warning(`第${questionNum}题存在空白选项，请填写完整`);
+          return;
+        }
+        if (question.type === 'single' && !question.correctAnswer) {
+          ElMessage.warning(`第${questionNum}题未设置正确答案`);
+          return;
+        }
+        if (question.type === 'multiple' && (!question.correctAnswers || question.correctAnswers.length === 0)) {
+          ElMessage.warning(`第${questionNum}题未设置正确答案`);
+          return;
+        }
+      }
+      
+      if (question.type === 'judgment') {
+        if (!question.correctAnswer) {
+          ElMessage.warning(`第${questionNum}题未设置正确答案`);
+          return;
+        }
+      }
+      
+      if (question.type === 'essay') {
+        const answerText = question.referenceAnswer?.replace(/<[^>]+>/g, '').trim() || '';
+        if (!answerText) {
+          ElMessage.warning(`第${questionNum}题参考答案为空，请填写完整`);
+          return;
+        }
+      }
+    }
+    
+    const formattedQuestions = questions.value.map((q, index) => {
+      let answer = q.correctAnswer || '';
+      if (q.type === 'multiple' && q.correctAnswers && q.correctAnswers.length > 0) {
+        answer = q.correctAnswers.join(',');
+      }
+      
+      return {
+        type: q.type,
+        content: q.content,
+        options: q.options ? q.options.map(opt => opt.value) : [],
+        answer: answer,
+        referenceAnswer: q.referenceAnswer || '',
+        score: q.score,
+        minWords: q.minWords || 0,
+        maxWords: q.maxWords || 0,
+        sortOrder: index + 1
+      };
+    });
+    
     const data = {
-      ...assignment.value,
-      questions: questions.value,
-      totalScore: totalScore.value
+      title: assignment.value.title,
+      description: assignment.value.description,
+      courseId: assignment.value.courseId,
+      deadline: assignment.value.deadline,
+      totalScore: totalScore.value,
+      questions: formattedQuestions
     };
     
     await request.post('/admin/assignments', data);

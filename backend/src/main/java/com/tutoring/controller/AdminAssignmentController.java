@@ -3,10 +3,12 @@ package com.tutoring.controller;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.tutoring.common.Result;
 import com.tutoring.dto.AdminAssignmentVO;
+import com.tutoring.dto.CreateAssignmentRequest;
 import com.tutoring.service.AdminAssignmentService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -31,6 +33,14 @@ public class AdminAssignmentController {
         Page<AdminAssignmentVO> assignmentPage = adminAssignmentService.listAssignments(
             page, size, courseId, status, keyword);
         return Result.success(assignmentPage);
+    }
+
+    @Operation(summary = "创建作业", description = "管理员创建作业")
+    @PostMapping
+    @PreAuthorize("hasRole('ADMIN')")
+    public Result<Long> createAssignment(@Valid @RequestBody CreateAssignmentRequest request) {
+        Long assignmentId = adminAssignmentService.createAssignment(request);
+        return Result.success(assignmentId);
     }
 
     @Operation(summary = "获取作业详情", description = "根据ID获取作业详情")

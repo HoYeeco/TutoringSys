@@ -3,11 +3,14 @@ package com.tutoring.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.tutoring.dto.AdminAssignmentVO;
+import com.tutoring.dto.CreateAssignmentRequest;
+import com.tutoring.dto.QuestionDTO;
 import com.tutoring.entity.*;
 import com.tutoring.mapper.*;
 import com.tutoring.service.AdminAssignmentService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.util.List;
@@ -190,5 +193,44 @@ public class AdminAssignmentServiceImpl implements AdminAssignmentService {
         );
 
         assignmentMapper.deleteById(id);
+    }
+
+    @Override
+    @Transactional
+    public Long createAssignment(CreateAssignmentRequest request) {
+        Course course = courseMapper.selectById(request.getCourseId());
+        if (course == null) {
+            throw new RuntimeException("课程不存在");
+        }
+
+        Assignment assignment = new Assignment();
+        assignment.setTitle(request.getTitle());
+        assignment.setDescription(request.getDescription());
+        assignment.setCourseId(request.getCourseId());
+        assignment.setTeacherId(course.getTeacherId());
+        assignment.setDeadline(request.getDeadline());
+        assignment.setTotalScore(request.getTotalScore() != null ? request.getTotalScore() : 100);
+        assignment.setStatus("published");
+        assignmentMapper.insert(assignment);
+
+        if (request.getQuestions() != null && !request.getQuestions().isEmpty()) {
+            int sortOrder = 1;
+            for (QuestionDTO qdto : request.getQuestions()) {
+                Question question = new Question();
+                question.setAssignmentId(assignment.getId());
+                question.setType(qdto.getType());
+                question.setContent(qdto.getContent());
+                question.setOptions(qdto.getOptions());
+                question.setAnswer(qdto.getAnswer());
+                question.setReferenceAnswer(qdto.getReferenceAnswer());
+                question.setScore(qdto.getScore());
+                question.setMinWords(qdto.getMinWords());
+                question.setMaxWords(qdto.getMaxWords());
+                question.setSortOrder(sortOrder++);
+                questionMapper.insert(question);
+            }
+        }
+
+        return assignment.getId();
     }
 }
