@@ -2,10 +2,10 @@
   <el-container
     class="layout-container"
     :class="themeClass"
-    :style="{ '--sidebar-width': collapsed ? '64px' : '200px' }"
+    :style="{ '--sidebar-width': collapsed ? '64px' : '150px' }"
   >
     <el-aside
-      :width="collapsed ? '64px' : '200px'"
+      :width="collapsed ? '64px' : '150px'"
       :class="{ 'mobile-hidden': isMobile }"
     >
       <el-menu :collapse="collapsed" :default-active="$route.path" router>

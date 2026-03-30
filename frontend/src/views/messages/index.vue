@@ -36,19 +36,9 @@
 
       <div class="message-tabs">
         <el-tabs v-model="activeTab" @tab-click="handleTabClick">
-          <el-tab-pane label="全部" name="all">
-            <span v-if="unreadCount > 0" class="unread-badge">{{
-              unreadCount
-            }}</span>
-          </el-tab-pane>
-          <el-tab-pane label="未读" name="unread">
-            <span v-if="unreadCount > 0" class="unread-badge">{{
-              unreadCount
-            }}</span>
-          </el-tab-pane>
-          <el-tab-pane label="系统公告" name="announcement"></el-tab-pane>
-          <el-tab-pane label="作业通知" name="assignment"></el-tab-pane>
-          <el-tab-pane label="批改通知" name="grading"></el-tab-pane>
+          <el-tab-pane label="全部" name="all"></el-tab-pane>
+          <el-tab-pane label="未读" name="unread"></el-tab-pane>
+          <el-tab-pane label="已读" name="read"></el-tab-pane>
         </el-tabs>
       </div>
 
@@ -62,38 +52,44 @@
           :class="{ 'message-card': true, unread: message.isRead === 0 }"
         >
           <div class="message-item" @click="handleMessageClick(message)">
-            <div class="message-header-item">
-              <div class="message-title">
-                {{ message.title }}
-                <span v-if="message.isRead === 0" class="unread-dot"></span>
+            <div class="message-body">
+              <div class="message-header-row">
+                <div class="message-title">
+                  {{ message.title }}
+                  <span v-if="message.isRead === 0" class="unread-tag">未读</span>
+                </div>
+                <div class="message-time">
+                  <el-icon><Clock /></el-icon>
+                  {{ formatTime(message.createTime) }}
+                </div>
               </div>
-              <div class="message-time">
-                {{ formatTime(message.createTime) }}
+              <div class="message-content">{{ message.content }}</div>
+              <div class="message-footer">
+                <el-button
+                  v-if="message.isRead === 0"
+                  type="primary"
+                  link
+                  size="small"
+                  @click.stop="markAsRead(message)"
+                >
+                  标记已读
+                </el-button>
+                <span v-else class="read-status">
+                  <el-icon><Check /></el-icon>
+                  已读
+                </span>
               </div>
-            </div>
-            <div class="message-content">{{ message.content }}</div>
-            <div class="message-footer">
-              <span class="message-type">{{
-                getMessageTypeText(message.type)
-              }}</span>
-              <el-button
-                type="text"
-                size="small"
-                @click.stop="markAsRead(message.id)"
-              >
-                {{ message.isRead === 0 ? '标记已读' : '已读' }}
-              </el-button>
             </div>
           </div>
         </el-card>
         <el-pagination
           v-if="total > 0"
-          class="pagination"
           :current-page="currentPage"
+          class="pagination"
           :page-size="pageSize"
           :total="total"
           layout="prev, pager, next"
-          @current-change="handlePageChange"
+          @current-change="onPageChange"
         />
       </div>
     </el-card>
@@ -101,11 +97,11 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, onMounted, watch } from 'vue';
 import { useUserStore } from '@/stores/user';
 import { useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
-import { Bell, Search } from '@element-plus/icons-vue';
+import { Bell, Search, Clock, Check } from '@element-plus/icons-vue';
 import request from '@/utils/request';
 
 const userStore = useUserStore();
@@ -122,25 +118,24 @@ const searchKeyword = ref('');
 
 // 获取消息列表
 const getMessages = async () => {
+  if (!userStore.userInfo?.id) return;
+  
   try {
-    let type = null;
-    if (
-      activeTab.value === 'announcement' ||
-      activeTab.value === 'assignment' ||
-      activeTab.value === 'grading'
-    ) {
-      type = activeTab.value;
+    const params = {
+      userId: userStore.userInfo?.id,
+      page: currentPage.value,
+      size: pageSize.value,
+      keyword: searchKeyword.value || undefined,
+    };
+
+    // 处理标签页筛选
+    if (activeTab.value === 'unread') {
+      params.readStatus = 0;
+    } else if (activeTab.value === 'read') {
+      params.readStatus = 1;
     }
 
-    const response = await request.get('/message/list', {
-      params: {
-        userId: userStore.userInfo?.id,
-        page: currentPage.value,
-        size: pageSize.value,
-        type,
-        keyword: searchKeyword.value || undefined,
-      },
-    });
+    const response = await request.get('/message/list', { params });
 
     messages.value = response.data.records || [];
     total.value = response.data.total || 0;
@@ -165,17 +160,17 @@ const getUnreadCount = async () => {
 };
 
 // 标记消息为已读
-const markAsRead = async (messageId) => {
+const markAsRead = async (message) => {
   try {
-    await request.put(`/message/read/${messageId}`, null, {
+    await request.put(`/message/read/${message.messageId}`, null, {
       params: {
         userId: userStore.userInfo?.id,
       },
     });
     // 更新本地消息状态
-    const message = messages.value.find((msg) => msg.id === messageId);
-    if (message) {
-      message.isRead = 1;
+    const localMessage = messages.value.find((msg) => msg.id === message.id);
+    if (localMessage) {
+      localMessage.isRead = 1;
     }
     getUnreadCount();
     ElMessage.success('标记成功');
@@ -209,7 +204,7 @@ const markAllAsRead = async () => {
 const handleMessageClick = (message) => {
   // 标记为已读
   if (message.isRead === 0) {
-    markAsRead(message.id);
+    markAsRead(message);
   }
 
   // 根据消息类型跳转到对应页面
@@ -224,28 +219,61 @@ const handleMessageClick = (message) => {
   }
 };
 
-// 处理标签切换
-const handleTabClick = () => {
-  currentPage.value = 1;
-  getMessages();
-};
-
-// 处理分页变化
-const handlePageChange = (page) => {
-  currentPage.value = page;
-  getMessages();
-};
-
 // 处理搜索
 const handleSearch = () => {
   currentPage.value = 1;
   getMessages();
 };
 
-// 格式化时间
+// 处理标签切换 - 只重置页码，筛选由 watch 处理
+const handleTabClick = () => {
+  currentPage.value = 1;
+};
+
+// 处理分页变化
+const onPageChange = (page) => {
+  currentPage.value = page;
+  getMessages();
+};
+
+// 监听标签切换，触发筛选
+watch(activeTab, () => {
+  getMessages();
+});
+
+// 页面加载时获取消息和未读数量
+onMounted(() => {
+  if (userStore.userInfo?.id) {
+    getMessages();
+    getUnreadCount();
+  }
+});
+
 const formatTime = (time) => {
   if (!time) return '';
   const date = new Date(time);
+  const now = new Date();
+  const diff = now - date;
+  
+  // 小于1小时显示"X分钟前"
+  if (diff < 60 * 60 * 1000) {
+    const minutes = Math.floor(diff / (60 * 1000));
+    return minutes < 1 ? '刚刚' : `${minutes}分钟前`;
+  }
+  
+  // 小于24小时显示"X小时前"
+  if (diff < 24 * 60 * 60 * 1000) {
+    const hours = Math.floor(diff / (60 * 60 * 1000));
+    return `${hours}小时前`;
+  }
+  
+  // 小于7天显示"X天前"
+  if (diff < 7 * 24 * 60 * 60 * 1000) {
+    const days = Math.floor(diff / (24 * 60 * 60 * 1000));
+    return `${days}天前`;
+  }
+  
+  // 否则显示具体日期
   return date.toLocaleString('zh-CN', {
     year: 'numeric',
     month: '2-digit',
@@ -254,28 +282,6 @@ const formatTime = (time) => {
     minute: '2-digit',
   });
 };
-
-// 获取消息类型文本
-const getMessageTypeText = (type) => {
-  switch (type) {
-    case 'announcement':
-      return '系统公告';
-    case 'assignment':
-      return '作业通知';
-    case 'grading':
-      return '批改通知';
-    default:
-      return '未知类型';
-  }
-};
-
-// 页面加载时获取消息
-onMounted(() => {
-  if (userStore.userInfo?.id) {
-    getMessages();
-    getUnreadCount();
-  }
-});
 </script>
 
 <style scoped>
@@ -355,16 +361,6 @@ onMounted(() => {
   margin-bottom: 20px;
 }
 
-.unread-badge {
-  display: inline-block;
-  background-color: #f56c6c;
-  color: white;
-  font-size: 12px;
-  padding: 0 6px;
-  border-radius: 10px;
-  margin-left: 5px;
-}
-
 /* 消息列表 */
 .message-list {
   margin-top: 20px;
@@ -373,6 +369,7 @@ onMounted(() => {
 .message-card {
   margin-bottom: 16px;
   transition: all 0.3s ease;
+  border-left: 4px solid transparent;
 }
 
 .message-card:hover {
@@ -381,64 +378,78 @@ onMounted(() => {
 }
 
 .message-card.unread {
-  border-left: 4px solid #409eff;
+  border-left-color: #409eff;
+  background: linear-gradient(135deg, #f0f7ff 0%, #ffffff 100%);
 }
 
 .message-item {
   cursor: pointer;
+  padding: 10px 4px 4px 4px;
 }
 
-.message-header-item {
+.message-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.message-header-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
+  gap: 12px;
 }
 
 .message-title {
   font-size: 16px;
   font-weight: 600;
-  color: #303133;
+  color: #1a1a2e;
   display: flex;
   align-items: center;
+  gap: 8px;
 }
 
-.unread-dot {
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  background-color: #f56c6c;
-  border-radius: 50%;
-  margin-left: 8px;
+.unread-tag {
+  font-size: 11px;
+  color: #fff;
+  background: linear-gradient(135deg, #f56c6c 0%, #e74c3c 100%);
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-weight: 500;
 }
 
 .message-time {
-  font-size: 12px;
+  font-size: 13px;
   color: #909399;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
 }
 
 .message-content {
   font-size: 14px;
   color: #606266;
-  margin-bottom: 10px;
   line-height: 1.6;
+  margin-bottom: 12px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .message-footer {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-end;
   align-items: center;
-  margin-top: 10px;
-  padding-top: 10px;
-  border-top: 1px solid #ebeef5;
 }
 
-.message-type {
-  font-size: 12px;
-  color: #909399;
-  background-color: #f5f7fa;
-  padding: 4px 10px;
-  border-radius: 10px;
+.read-status {
+  font-size: 13px;
+  color: #67c23a;
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .pagination {
@@ -480,6 +491,12 @@ onMounted(() => {
 
   .message-content {
     font-size: 13px;
+  }
+  
+  .message-header-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
   }
 }
 </style>

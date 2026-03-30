@@ -11,7 +11,7 @@ public interface MessageService extends IService<Message> {
 
     void sendMessage(Message message, List<Long> receiverIds);
 
-    Page<MessageVO> getUserMessages(Long userId, Integer page, Integer size, String type, String keyword);
+    Page<MessageVO> getUserMessages(Long userId, Integer page, Integer size, String type, String keyword, Integer readStatus);
 
     Long getUnreadCount(Long userId);
 

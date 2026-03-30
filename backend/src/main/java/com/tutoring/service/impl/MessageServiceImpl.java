@@ -46,12 +46,20 @@ public class MessageServiceImpl extends ServiceImpl<MessageMapper, Message> impl
     }
 
     @Override
-    public Page<MessageVO> getUserMessages(Long userId, Integer page, Integer size, String type, String keyword) {
+    public Page<MessageVO> getUserMessages(Long userId, Integer page, Integer size, String type, String keyword, Integer readStatus) {
+        LambdaQueryWrapper<UserMessage> queryWrapper = new LambdaQueryWrapper<UserMessage>()
+            .eq(UserMessage::getUserId, userId);
+        
+        // 添加已读状态筛选
+        if (readStatus != null) {
+            queryWrapper.eq(UserMessage::getIsRead, readStatus);
+        }
+        
+        queryWrapper.orderByDesc(UserMessage::getCreateTime);
+        
         Page<UserMessage> umPage = userMessageMapper.selectPage(
             new Page<>(page, size),
-            new LambdaQueryWrapper<UserMessage>()
-                .eq(UserMessage::getUserId, userId)
-                .orderByDesc(UserMessage::getCreateTime)
+            queryWrapper
         );
 
         List<MessageVO> voList = umPage.getRecords().stream()

@@ -30,10 +30,11 @@ public class MessageController {
             @RequestParam(defaultValue = "1") Integer page,
             @RequestParam(defaultValue = "10") Integer size,
             @RequestParam(required = false) String type,
-            @RequestParam(required = false) String keyword) {
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) Integer readStatus) {
         
         Long userId = getCurrentUserId();
-        Page<MessageVO> messagePage = messageService.getUserMessages(userId, page, size, type, keyword);
+        Page<MessageVO> messagePage = messageService.getUserMessages(userId, page, size, type, keyword, readStatus);
         return Result.success(messagePage);
     }
 
