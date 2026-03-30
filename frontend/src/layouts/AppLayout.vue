@@ -1,5 +1,9 @@
 <template>
-  <el-container class="layout-container" :class="themeClass">
+  <el-container
+    class="layout-container"
+    :class="themeClass"
+    :style="{ '--sidebar-width': collapsed ? '64px' : '200px' }"
+  >
     <el-aside
       :width="collapsed ? '64px' : '200px'"
       :class="{ 'mobile-hidden': isMobile }"
@@ -225,12 +229,18 @@ onUnmounted(() => {
   height: 100vh;
   width: 100%;
   overflow: hidden;
+  --sidebar-width: 200px;
 }
 
 .el-aside {
-  background-color: var(--color-menu-bg, #ffffff);
+  background-color: rgba(255, 255, 255, 0.77);
   overflow: hidden;
   flex-shrink: 0;
+  position: fixed;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  z-index: 100;
 }
 
 .el-menu {
@@ -263,6 +273,12 @@ onUnmounted(() => {
   padding: 0 20px;
   box-sizing: border-box;
   flex-shrink: 0;
+  position: fixed;
+  top: 0;
+  right: 0;
+  left: var(--sidebar-width, 200px);
+  z-index: 99;
+  transition: left 0.3s ease;
 }
 
 .el-main {
@@ -272,6 +288,10 @@ onUnmounted(() => {
   overflow-x: hidden;
   flex: 1;
   position: relative;
+  margin-top: 60px;
+  margin-left: var(--sidebar-width, 200px);
+  height: calc(100vh - 60px);
+  transition: margin-left 0.3s ease;
 }
 
 /* 背景图片层 */
@@ -305,6 +325,9 @@ onUnmounted(() => {
 .admin-theme .el-main::before {
   background-image: url('@/assets/images/bg_admin.png');
 }
+
+/* 灰色遮罩层 */
+
 
 .el-main::-webkit-scrollbar {
   width: 6px;
