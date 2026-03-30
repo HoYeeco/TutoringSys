@@ -7,7 +7,7 @@
             <div class="card-header__icon">
               <el-icon><Setting /></el-icon>
             </div>
-            <span>系统配置管理</span>
+            <span>配置管理</span>
           </div>
           <div class="card-header__actions">
             <el-button type="primary" @click="showCreateDialog">
@@ -447,7 +447,7 @@ onMounted(() => {
 .pagination-container {
   margin-top: 20px;
   display: flex;
-  justify-content: flex-end;
+  justify-content: center;
 }
 
 :deep(.el-dialog) {

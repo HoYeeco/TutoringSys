@@ -22,7 +22,7 @@
                 <el-icon><Search /></el-icon>
               </template>
             </el-input>
-            <el-select v-model="filterForm.teacherId" placeholder="选择教师" class="filter-item" clearable>
+            <el-select v-model="filterForm.teacherId" placeholder="选择教师" class="filter-item" clearable @change="handleSearch">
               <el-option
                 v-for="teacher in teachers"
                 :key="teacher.id"
@@ -511,7 +511,7 @@ onMounted(() => {
 .pagination-container {
   margin-top: 20px;
   display: flex;
-  justify-content: flex-end;
+  justify-content: center;
 }
 
 /* 对话框 */
