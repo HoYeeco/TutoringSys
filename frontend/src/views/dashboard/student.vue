@@ -3,7 +3,11 @@
     <el-card shadow="never" class="welcome-card">
       <div class="welcome-content">
         <div class="welcome-text">
-          <h1 class="welcome-title">{{ getGreeting() }}，{{ userStore.userInfo?.realName || userStore.userInfo?.username }}</h1>
+          <h1 class="welcome-title">
+            {{ getGreeting() }}，{{
+              userStore.userInfo?.realName || userStore.userInfo?.username
+            }}
+          </h1>
           <p class="welcome-subtitle">所有投资中，学习回报最优。</p>
         </div>
       </div>
@@ -18,7 +22,7 @@
           <span class="card-title__text">数据概览</span>
         </div>
       </template>
-      
+
       <div class="stats-grid">
         <el-card shadow="never" class="stat-card">
           <div class="stat-card__icon stat-card__icon--course">
@@ -26,7 +30,9 @@
           </div>
           <div class="stat-card__content">
             <div class="stat-card__label">已选课程数</div>
-            <div class="stat-card__value">{{ studentStats.courseCount || 0 }}</div>
+            <div class="stat-card__value">
+              {{ studentStats.courseCount || 0 }}
+            </div>
           </div>
         </el-card>
 
@@ -36,7 +42,9 @@
           </div>
           <div class="stat-card__content">
             <div class="stat-card__label">待提交作业</div>
-            <div class="stat-card__value">{{ studentStats.pendingAssignments || 0 }}</div>
+            <div class="stat-card__value">
+              {{ studentStats.pendingAssignments || 0 }}
+            </div>
           </div>
         </el-card>
 
@@ -46,7 +54,9 @@
           </div>
           <div class="stat-card__content">
             <div class="stat-card__label">已批改作业</div>
-            <div class="stat-card__value">{{ studentStats.gradedAssignments || 0 }}</div>
+            <div class="stat-card__value">
+              {{ studentStats.gradedAssignments || 0 }}
+            </div>
           </div>
         </el-card>
 
@@ -56,7 +66,9 @@
           </div>
           <div class="stat-card__content">
             <div class="stat-card__label">平均得分</div>
-            <div class="stat-card__value">{{ studentStats.averageScore || 0 }}</div>
+            <div class="stat-card__value">
+              {{ studentStats.averageScore || 0 }}
+            </div>
           </div>
         </el-card>
       </div>
@@ -83,7 +95,7 @@
           <span class="card-title__text">快捷入口</span>
         </div>
       </template>
-      
+
       <div class="quick-grid">
         <div class="quick-item" @click="goToCourses">
           <div class="quick-item__icon">
@@ -114,7 +126,17 @@ import { useUserStore } from '@/stores/user';
 import { useRouter } from 'vue-router';
 import request from '@/utils/request';
 import * as echarts from 'echarts';
-import { School, Ticket, Warning, DocumentChecked, Star, Clock, Histogram, Grid } from '@element-plus/icons-vue';
+import {
+  School,
+  Ticket,
+  Warning,
+  DocumentChecked,
+  Star,
+  Clock,
+  Histogram,
+  Grid,
+  TrendCharts,
+} from '@element-plus/icons-vue';
 
 const userStore = useUserStore();
 const router = useRouter();
@@ -123,7 +145,7 @@ const studentStats = ref({
   courseCount: 0,
   pendingAssignments: 0,
   gradedAssignments: 0,
-  averageScore: 0
+  averageScore: 0,
 });
 
 const studentChartRef = ref(null);
@@ -144,13 +166,13 @@ const goToErrorBook = () => router.push('/student/error-book');
 
 const getStudentStats = async () => {
   try {
-    const response = await request.get('/student/stats/overview');
+    const response = await request.get('/student/dashboard/overview');
     if (response.data) {
       studentStats.value = {
-        courseCount: response.data.courseCount || 0,
+        courseCount: response.data.selectedCourses || 0,
         pendingAssignments: response.data.pendingAssignments || 0,
-        gradedAssignments: response.data.gradedAssignments || 0,
-        averageScore: response.data.averageScore || 0
+        gradedAssignments: response.data.gradedSubmissions || 0,
+        averageScore: response.data.averageScore || 0,
       };
     }
   } catch (error) {
@@ -165,19 +187,27 @@ const initStudentChart = () => {
   const option = {
     tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
     grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
-    xAxis: { type: 'category', data: ['已选课程', '待提交作业', '已批改作业', '平均得分'] },
+    xAxis: {
+      type: 'category',
+      data: ['已选课程', '待提交作业', '已批改作业', '平均得分'],
+    },
     yAxis: { type: 'value' },
-    series: [{
-      data: [
-        studentStats.value.courseCount,
-        studentStats.value.pendingAssignments,
-        studentStats.value.gradedAssignments,
-        studentStats.value.averageScore
-      ],
-      type: 'bar',
-      itemStyle: { color: (params: any) => ['#409eff', '#e6a23c', '#67c23a', '#f56c6c'][params.dataIndex] },
-      label: { show: true, position: 'top' }
-    }]
+    series: [
+      {
+        data: [
+          studentStats.value.courseCount,
+          studentStats.value.pendingAssignments,
+          studentStats.value.gradedAssignments,
+          studentStats.value.averageScore,
+        ],
+        type: 'bar',
+        itemStyle: {
+          color: (params: any) =>
+            ['#409eff', '#e6a23c', '#67c23a', '#f56c6c'][params.dataIndex],
+        },
+        label: { show: true, position: 'top' },
+      },
+    ],
   };
   studentChart.setOption(option);
 };
@@ -236,7 +266,7 @@ onUnmounted(() => {
 }
 
 .welcome-card {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, rgb(15, 38, 70) 0%, rgb(58, 97, 156) 50%, rgb(11, 17, 27) 100%);
   color: #fff;
 }
 
@@ -274,7 +304,7 @@ onUnmounted(() => {
   width: 32px;
   height: 32px;
   border-radius: 8px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, rgb(15, 38, 70) 0%, rgb(58, 97, 156) 50%, rgb(11, 17, 27) 100%);
   color: #fff;
 }
 
@@ -405,7 +435,7 @@ onUnmounted(() => {
   width: 56px;
   height: 56px;
   border-radius: 12px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, rgb(15, 38, 70) 0%, rgb(58, 97, 156) 50%, rgb(11, 17, 27) 100%);
   color: #fff;
   margin-bottom: 12px;
   position: relative;
@@ -425,15 +455,15 @@ onUnmounted(() => {
   .stats-grid {
     grid-template-columns: 1fr;
   }
-  
+
   .quick-grid {
     grid-template-columns: 1fr;
   }
-  
+
   .welcome-title {
     font-size: 36px;
   }
-  
+
   .welcome-subtitle {
     font-size: 18px;
   }
