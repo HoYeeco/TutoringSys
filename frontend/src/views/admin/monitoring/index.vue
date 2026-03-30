@@ -349,6 +349,12 @@ const getAssignmentSubmissions = async () => {
       params.reviewStatus = assignmentFilter.value.status === 'pending' ? 0 : 
                            assignmentFilter.value.status === 'completed' ? 1 : undefined;
     }
+    if (assignmentFilter.value.dateRange && assignmentFilter.value.dateRange.length === 2) {
+      const startDate = new Date(assignmentFilter.value.dateRange[0]);
+      const endDate = new Date(assignmentFilter.value.dateRange[1]);
+      params.startTime = `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, '0')}-${String(startDate.getDate()).padStart(2, '0')} 00:00:00`;
+      params.endTime = `${endDate.getFullYear()}-${String(endDate.getMonth() + 1).padStart(2, '0')}-${String(endDate.getDate()).padStart(2, '0')} 23:59:59`;
+    }
     
     const response = await request.get('/admin/submissions', { params });
     assignmentSubmissions.value = (response.data?.records || []).map((item: any) => ({
@@ -785,7 +791,7 @@ watch(activeTab, (newVal) => {
 .pagination-container {
   margin-top: 20px;
   display: flex;
-  justify-content: flex-end;
+  justify-content: center;
 }
 
 /* 状态标签 */
