@@ -38,7 +38,7 @@ const menuItems = [
   },
   {
     path: '/student/grading',
-    title: '成绩批改',
+    title: '成绩分析',
     icon: DataAnalysis,
   },
   {
