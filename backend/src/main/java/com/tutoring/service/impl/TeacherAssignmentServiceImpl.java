@@ -31,6 +31,8 @@ public class TeacherAssignmentServiceImpl implements TeacherAssignmentService {
     private final SubmissionMapper submissionMapper;
     private final CourseSelectionMapper courseSelectionMapper;
     private final UserMessageMapper userMessageMapper;
+    private final UserMapper userMapper;
+    private final StudentAnswerMapper studentAnswerMapper;
     private final MessageService messageService;
 
     @Override
@@ -430,6 +432,292 @@ public class TeacherAssignmentServiceImpl implements TeacherAssignmentService {
             um.setIsRead(0);
             userMessageMapper.insert(um);
         }
+    }
+
+    @Override
+    public Page<SubmissionRecordVO> getAssignmentSubmissions(Long teacherId, Long assignmentId, Integer page, Integer size) {
+        // 验证作业是否存在且属于该教师
+        Assignment assignment = assignmentMapper.selectById(assignmentId);
+        if (assignment == null || !assignment.getTeacherId().equals(teacherId)) {
+            throw new BusinessException("作业不存在或无权访问");
+        }
+
+        // 查询提交列表
+        Page<Submission> submissionPage = submissionMapper.selectPage(
+            new Page<>(page, size),
+            new LambdaQueryWrapper<Submission>()
+                .eq(Submission::getAssignmentId, assignmentId)
+                .orderByDesc(Submission::getSubmitTime)
+        );
+
+        if (submissionPage.getRecords().isEmpty()) {
+            return new Page<>(page, size, 0);
+        }
+
+        // 获取学生信息
+        List<Long> studentIds = submissionPage.getRecords().stream()
+            .map(Submission::getStudentId)
+            .distinct()
+            .collect(Collectors.toList());
+
+        Map<Long, User> userMap = userMapper.selectBatchIds(studentIds).stream()
+            .collect(Collectors.toMap(User::getId, Function.identity()));
+
+        // 获取课程信息
+        Course course = courseMapper.selectById(assignment.getCourseId());
+
+        // 转换为VO
+        List<SubmissionRecordVO> voList = submissionPage.getRecords().stream()
+            .map(submission -> {
+                User user = userMap.get(submission.getStudentId());
+                return SubmissionRecordVO.builder()
+                    .id(submission.getId())
+                    .submissionId(submission.getSubmissionId())
+                    .studentId(submission.getStudentId())
+                    .studentName(user != null ? user.getRealName() : "未知学生")
+                    .studentUsername(user != null ? user.getUsername() : "")
+                    .assignmentId(assignmentId)
+                    .assignmentTitle(assignment.getTitle())
+                    .courseId(assignment.getCourseId())
+                    .courseName(course != null ? course.getName() : "未知课程")
+                    .teacherId(teacherId)
+                    .status(submission.getStatus())
+                    .totalScore(submission.getFinalTotalScore())
+                    .aiTotalScore(submission.getAiTotalScore())
+                    .finalTotalScore(submission.getFinalTotalScore())
+                    .reviewStatus(submission.getReviewStatus())
+                    .submitTime(submission.getSubmitTime())
+                    .reviewTime(submission.getReviewTime())
+                    .build();
+            })
+            .collect(Collectors.toList());
+
+        Page<SubmissionRecordVO> resultPage = new Page<>(page, size, submissionPage.getTotal());
+        resultPage.setRecords(voList);
+        return resultPage;
+    }
+
+    @Override
+    public SubmissionDetailVO getSubmissionDetail(Long teacherId, Long submissionId) {
+        Submission submission = submissionMapper.selectById(submissionId);
+        if (submission == null) {
+            return null;
+        }
+
+        // 验证作业是否属于该教师
+        Assignment assignment = assignmentMapper.selectById(submission.getAssignmentId());
+        if (assignment == null || !assignment.getTeacherId().equals(teacherId)) {
+            return null;
+        }
+
+        Course course = courseMapper.selectById(assignment.getCourseId());
+        User student = userMapper.selectById(submission.getStudentId());
+
+        List<StudentAnswer> answers = studentAnswerMapper.selectList(
+            new LambdaQueryWrapper<StudentAnswer>()
+                .eq(StudentAnswer::getSubmissionId, submissionId)
+                .eq(StudentAnswer::getIsDraft, 0)
+        );
+
+        List<Long> questionIds = answers.stream()
+            .map(StudentAnswer::getQuestionId)
+            .distinct()
+            .collect(Collectors.toList());
+
+        Map<Long, Question> questionMap = questionIds.isEmpty() ? Map.of() :
+            questionMapper.selectList(
+                new LambdaQueryWrapper<Question>()
+                    .in(Question::getId, questionIds)
+            ).stream().collect(Collectors.toMap(Question::getId, Function.identity()));
+
+        List<SubmissionDetailVO.AnswerDetail> answerDetails = answers.stream()
+            .map(answer -> {
+                Question question = questionMap.get(answer.getQuestionId());
+                return SubmissionDetailVO.AnswerDetail.builder()
+                    .id(answer.getId())
+                    .questionId(answer.getQuestionId())
+                    .questionType(question != null ? question.getType() : "")
+                    .questionContent(question != null ? question.getContent() : "")
+                    .questionScore(question != null ? question.getScore() : 0)
+                    .answer(answer.getAnswer())
+                    .answerContent(answer.getAnswerContent())
+                    .score(answer.getScore())
+                    .aiScore(answer.getAiScore())
+                    .finalScore(answer.getFinalScore())
+                    .aiFeedback(answer.getAiFeedback())
+                    .teacherFeedback(answer.getTeacherFeedback())
+                    .graderType(answer.getGraderType())
+                    .reviewStatus(answer.getReviewStatus())
+                    .reviewTime(answer.getReviewTime())
+                    .build();
+            })
+            .collect(Collectors.toList());
+
+        return SubmissionDetailVO.builder()
+            .id(submission.getId())
+            .submissionId(submission.getSubmissionId())
+            .studentId(submission.getStudentId())
+            .studentName(student != null ? student.getRealName() : "未知学生")
+            .studentUsername(student != null ? student.getUsername() : "")
+            .assignmentId(submission.getAssignmentId())
+            .assignmentTitle(assignment != null ? assignment.getTitle() : "未知作业")
+            .courseId(course != null ? course.getId() : null)
+            .courseName(course != null ? course.getName() : "未知课程")
+            .totalScore(submission.getTotalScore())
+            .aiTotalScore(submission.getAiTotalScore())
+            .finalTotalScore(submission.getFinalTotalScore())
+            .reviewStatus(submission.getReviewStatus())
+            .submitTime(submission.getSubmitTime())
+            .reviewTime(submission.getReviewTime())
+            .answers(answerDetails)
+            .build();
+    }
+
+    @Override
+    @Transactional
+    public void reviewSubmission(Long teacherId, Long submissionId, ReviewSubmissionRequest request) {
+        Submission submission = submissionMapper.selectById(submissionId);
+        if (submission == null) {
+            throw new BusinessException("提交记录不存在");
+        }
+
+        // 验证作业是否属于该教师
+        Assignment assignment = assignmentMapper.selectById(submission.getAssignmentId());
+        if (assignment == null || !assignment.getTeacherId().equals(teacherId)) {
+            throw new BusinessException("无权访问该提交记录");
+        }
+
+        // 更新每个题目的分数和评语
+        if (request.getQuestions() != null) {
+            for (ReviewSubmissionRequest.QuestionReview questionReview : request.getQuestions()) {
+                StudentAnswer answer = studentAnswerMapper.selectOne(
+                    new LambdaQueryWrapper<StudentAnswer>()
+                        .eq(StudentAnswer::getSubmissionId, submissionId)
+                        .eq(StudentAnswer::getQuestionId, questionReview.getQuestionId())
+                );
+
+                if (answer != null) {
+                    answer.setScore(questionReview.getScore());
+                    answer.setTeacherFeedback(questionReview.getFeedback());
+                    answer.setFinalScore(questionReview.getScore());
+                    answer.setReviewStatus(1); // 已批改
+                    answer.setReviewTime(java.time.LocalDateTime.now());
+                    studentAnswerMapper.updateById(answer);
+                }
+            }
+        }
+
+        // 更新提交记录的总分和批改状态
+        submission.setFinalTotalScore(request.getScore());
+        submission.setReviewStatus(1); // 已批改
+        submission.setReviewerId(teacherId);
+        submission.setReviewTime(java.time.LocalDateTime.now());
+        submissionMapper.updateById(submission);
+    }
+
+    @Override
+    public AssignmentSubmissionStatusVO getAssignmentSubmissionStatus(Long teacherId, Long assignmentId) {
+        // 验证作业是否存在且属于该教师
+        Assignment assignment = assignmentMapper.selectById(assignmentId);
+        if (assignment == null || !assignment.getTeacherId().equals(teacherId)) {
+            throw new BusinessException("作业不存在或无权访问");
+        }
+
+        // 获取课程下的所有学生
+        List<CourseSelection> selections = courseSelectionMapper.selectList(
+            new LambdaQueryWrapper<CourseSelection>()
+                .eq(CourseSelection::getCourseId, assignment.getCourseId())
+        );
+
+        List<Long> studentIds = selections.stream()
+            .map(CourseSelection::getStudentId)
+            .distinct()
+            .collect(Collectors.toList());
+
+        if (studentIds.isEmpty()) {
+            return AssignmentSubmissionStatusVO.builder()
+                .assignmentId(assignmentId)
+                .assignmentTitle(assignment.getTitle())
+                .totalStudents(0)
+                .submittedCount(0)
+                .notSubmittedCount(0)
+                .submittedStudents(List.of())
+                .notSubmittedStudents(List.of())
+                .allStudents(List.of())
+                .build();
+        }
+
+        // 获取学生信息
+        Map<Long, User> userMap = userMapper.selectBatchIds(studentIds).stream()
+            .collect(Collectors.toMap(User::getId, Function.identity()));
+
+        // 获取已提交的学生
+        List<Submission> submissions = submissionMapper.selectList(
+            new LambdaQueryWrapper<Submission>()
+                .eq(Submission::getAssignmentId, assignmentId)
+                .in(Submission::getStudentId, studentIds)
+        );
+
+        Set<Long> submittedStudentIds = submissions.stream()
+            .map(Submission::getStudentId)
+            .collect(Collectors.toSet());
+
+        // 构建已提交学生列表
+        List<AssignmentSubmissionStatusVO.StudentInfo> submittedStudents = submissions.stream()
+            .map(sub -> {
+                User user = userMap.get(sub.getStudentId());
+                return AssignmentSubmissionStatusVO.StudentInfo.builder()
+                    .studentId(sub.getStudentId())
+                    .studentName(user != null ? user.getRealName() : "未知学生")
+                    .username(user != null ? user.getUsername() : "")
+                    .avatar(user != null ? user.getAvatar() : "")
+                    .email(user != null ? user.getEmail() : "")
+                    .phone(user != null ? user.getPhone() : "")
+                    .build();
+            })
+            .collect(Collectors.toList());
+
+        // 构建未提交学生列表
+        List<AssignmentSubmissionStatusVO.StudentInfo> notSubmittedStudents = studentIds.stream()
+            .filter(id -> !submittedStudentIds.contains(id))
+            .map(id -> {
+                User user = userMap.get(id);
+                return AssignmentSubmissionStatusVO.StudentInfo.builder()
+                    .studentId(id)
+                    .studentName(user != null ? user.getRealName() : "未知学生")
+                    .username(user != null ? user.getUsername() : "")
+                    .avatar(user != null ? user.getAvatar() : "")
+                    .email(user != null ? user.getEmail() : "")
+                    .phone(user != null ? user.getPhone() : "")
+                    .build();
+            })
+            .collect(Collectors.toList());
+
+        // 构建所有学生列表
+        List<AssignmentSubmissionStatusVO.StudentInfo> allStudents = studentIds.stream()
+            .map(id -> {
+                User user = userMap.get(id);
+                return AssignmentSubmissionStatusVO.StudentInfo.builder()
+                    .studentId(id)
+                    .studentName(user != null ? user.getRealName() : "未知学生")
+                    .username(user != null ? user.getUsername() : "")
+                    .avatar(user != null ? user.getAvatar() : "")
+                    .email(user != null ? user.getEmail() : "")
+                    .phone(user != null ? user.getPhone() : "")
+                    .build();
+            })
+            .collect(Collectors.toList());
+
+        return AssignmentSubmissionStatusVO.builder()
+            .assignmentId(assignmentId)
+            .assignmentTitle(assignment.getTitle())
+            .totalStudents(studentIds.size())
+            .submittedCount(submittedStudents.size())
+            .notSubmittedCount(notSubmittedStudents.size())
+            .submittedStudents(submittedStudents)
+            .notSubmittedStudents(notSubmittedStudents)
+            .allStudents(allStudents)
+            .build();
     }
 
 }

@@ -84,17 +84,22 @@
             </el-tooltip>
           </template>
         </el-table-column>
-        <el-table-column prop="totalScore" label="总分值" width="80" />
-        <el-table-column prop="description" label="描述" min-width="180">
+        <el-table-column prop="totalScore" label="总分值" width="100" />
+        <el-table-column prop="description" label="作业描述" min-width="150">
           <template #default="scope">
+            <span
+              v-if="!scope.row.description"
+              class="no-description"
+            >
+              暂无描述
+            </span>
             <el-tooltip
+              v-else
               :content="scope.row.description"
               placement="top"
               :disabled="!isOverflow(scope.row.description, 20)"
             >
-              <span class="ellipsis-text">{{
-                scope.row.description || '-'
-              }}</span>
+              <span class="ellipsis-text">{{ scope.row.description }}</span>
             </el-tooltip>
           </template>
         </el-table-column>
@@ -103,10 +108,10 @@
             <span>{{ formatDeadline(scope.row.deadline) }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="completion" label="完成情况" width="120">
+        <el-table-column prop="completion" label="完成情况" width="120" align="center">
           <template #default="scope">
             <div class="completion-info">
-              <span>
+              <span class="completion-text">
                 {{
                   `${scope.row.submissionCount || 0}/${scope.row.totalStudents || 0}`
                 }}
@@ -130,8 +135,16 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="160" @click.stop>
+        <el-table-column label="操作" width="250" @click.stop>
           <template #default="scope">
+            <el-button
+              size="small"
+              type="primary"
+              @click.stop="goToSubmissionsPage(scope.row)"
+            >
+              <el-icon><Document /></el-icon>
+              提交详情
+            </el-button>
             <el-button
               size="small"
               @click.stop="editAssignment(scope.row.id)"
@@ -155,6 +168,7 @@
           :page-sizes="[10, 20, 50]"
           layout="total, sizes, prev, pager, next, jumper"
           :total="total"
+          justify="center"
           @size-change="handleSizeChange"
           @current-change="handleCurrentChange"
         />
@@ -163,13 +177,15 @@
 
     <el-dialog
       v-model="detailVisible"
-      :title="currentAssignment?.title || '作业详情'"
-      width="800px"
+      title="作业提交情况"
+      width="600px"
       class="detail-dialog"
+      append-to-body
+      :show-close="true"
     >
       <div v-if="currentAssignment" class="detail-content">
-        <el-descriptions :column="2" border>
-          <el-descriptions-item label="作业名称" :span="2">
+        <el-descriptions :column="1" border>
+          <el-descriptions-item label="作业名称">
             {{ currentAssignment.title }}
           </el-descriptions-item>
           <el-descriptions-item label="所属课程">
@@ -189,27 +205,27 @@
               }}
             </el-tag>
           </el-descriptions-item>
-          <el-descriptions-item label="截止时间" :span="2">
+          <el-descriptions-item label="截止时间">
             {{ formatDeadline(currentAssignment.deadline) }}
           </el-descriptions-item>
-          <el-descriptions-item label="作业描述" :span="2">
+          <el-descriptions-item label="作业描述">
             {{ currentAssignment.description || '暂无描述' }}
           </el-descriptions-item>
         </el-descriptions>
 
         <div class="completion-detail">
           <div class="completion-header">
-            <h4>完成情况详情</h4>
+            <h4>完成情况</h4>
             <el-button
               type="warning"
               @click="remindAllStudents"
               :loading="remindLoading"
             >
               <el-icon><Bell /></el-icon>
-              一键提醒未提交学生
+              一键提醒
             </el-button>
           </div>
-          <el-row :gutter="20">
+          <el-row :gutter="12">
             <el-col :span="8">
               <el-statistic
                 title="应交人数"
@@ -221,7 +237,7 @@
             <el-col :span="8">
               <el-statistic
                 title="已交人数"
-                :value="currentAssignment.submittedCount || 0"
+                :value="currentAssignment.submissionCount || 0"
               >
                 <template #suffix>人</template>
               </el-statistic>
@@ -231,7 +247,7 @@
                 title="未交人数"
                 :value="
                   (currentAssignment.totalStudents || 0) -
-                  (currentAssignment.submittedCount || 0)
+                  (currentAssignment.submissionCount || 0)
                 "
               >
                 <template #suffix>人</template>
@@ -241,131 +257,13 @@
           <div class="completion-rate">
             <span>完成率</span>
             <el-progress
-              :percentage="currentAssignment.completionRate || 0"
-              :stroke-width="20"
+              :percentage="getCompletionRate(currentAssignment)"
+              :stroke-width="12"
               :text-inside="true"
             />
           </div>
         </div>
-
-        <div class="student-lists">
-          <el-tabs v-model="activeTab">
-            <el-tab-pane label="已提交学生" name="submitted">
-              <div class="student-list">
-                <el-table
-                  :data="submittedStudents"
-                  style="width: 100%"
-                  max-height="300"
-                >
-                  <el-table-column label="头像" width="70">
-                    <template #default="scope">
-                      <el-avatar :size="40" :src="scope.row.avatar || ''">
-                        {{ scope.row.studentName?.charAt(0) || '?' }}
-                      </el-avatar>
-                    </template>
-                  </el-table-column>
-                  <el-table-column
-                    prop="studentName"
-                    label="姓名"
-                    width="100"
-                  />
-                  <el-table-column prop="username" label="账号" width="120" />
-                  <el-table-column prop="email" label="邮箱" min-width="150" />
-                  <el-table-column prop="phone" label="电话" width="130" />
-                </el-table>
-              </div>
-            </el-tab-pane>
-            <el-tab-pane label="未提交学生" name="notSubmitted">
-              <div class="student-list">
-                <el-table
-                  :data="notSubmittedStudents"
-                  style="width: 100%"
-                  max-height="300"
-                >
-                  <el-table-column label="头像" width="70">
-                    <template #default="scope">
-                      <el-avatar :size="40" :src="scope.row.avatar || ''">
-                        {{ scope.row.studentName?.charAt(0) || '?' }}
-                      </el-avatar>
-                    </template>
-                  </el-table-column>
-                  <el-table-column
-                    prop="studentName"
-                    label="姓名"
-                    width="100"
-                  />
-                  <el-table-column prop="username" label="账号" width="120" />
-                  <el-table-column prop="email" label="邮箱" min-width="150" />
-                  <el-table-column prop="phone" label="电话" width="130" />
-                  <el-table-column label="操作" width="100">
-                    <template #default="scope">
-                      <el-button
-                        size="small"
-                        type="warning"
-                        @click="remindStudent(scope.row.studentId)"
-                      >
-                        提醒
-                      </el-button>
-                    </template>
-                  </el-table-column>
-                </el-table>
-              </div>
-            </el-tab-pane>
-            <el-tab-pane label="全部学生" name="all">
-              <div class="student-list">
-                <el-table
-                  :data="allStudents"
-                  style="width: 100%"
-                  max-height="300"
-                >
-                  <el-table-column label="头像" width="70">
-                    <template #default="scope">
-                      <el-avatar :size="40" :src="scope.row.avatar || ''">
-                        {{ scope.row.studentName?.charAt(0) || '?' }}
-                      </el-avatar>
-                    </template>
-                  </el-table-column>
-                  <el-table-column
-                    prop="studentName"
-                    label="姓名"
-                    width="100"
-                  />
-                  <el-table-column prop="username" label="账号" width="120" />
-                  <el-table-column prop="email" label="邮箱" min-width="150" />
-                  <el-table-column prop="phone" label="电话" width="130" />
-                  <el-table-column label="提交状态" width="100">
-                    <template #default="scope">
-                      <el-tag
-                        :type="
-                          isStudentSubmitted(scope.row.studentId)
-                            ? 'success'
-                            : 'warning'
-                        "
-                        size="small"
-                      >
-                        {{
-                          isStudentSubmitted(scope.row.studentId)
-                            ? '已提交'
-                            : '未提交'
-                        }}
-                      </el-tag>
-                    </template>
-                  </el-table-column>
-                </el-table>
-              </div>
-            </el-tab-pane>
-          </el-tabs>
-        </div>
       </div>
-      <template #footer>
-        <el-button @click="detailVisible = false">关闭</el-button>
-        <el-button
-          type="primary"
-          @click="editAssignment(currentAssignment?.id)"
-        >
-          编辑
-        </el-button>
-      </template>
     </el-dialog>
   </div>
 </template>
@@ -455,6 +353,10 @@ const getCompletionRate = (assignment: Assignment): number => {
 
 const isStudentSubmitted = (studentId: number): boolean => {
   return submittedStudents.value.some((s) => s.studentId === studentId);
+};
+
+const goToSubmissionsPage = (row: Assignment) => {
+  router.push(`/teacher/assignments/${row.id}/submissions`);
 };
 
 const showDetail = async (row: Assignment) => {
@@ -619,6 +521,13 @@ onMounted(() => {
   min-height: calc(100vh - 84px);
 }
 
+.el-table-column {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  text-align: center;
+}
+
 :deep(.el-card) {
   border: none;
   border-radius: 16px;
@@ -633,6 +542,10 @@ onMounted(() => {
 
 :deep(.el-card__body) {
   padding: 20px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
 }
 
 .card-header {
@@ -684,6 +597,13 @@ onMounted(() => {
 
 .modern-table {
   --el-table-border-radius: 12px;
+  width: 100%;
+}
+
+.modern-table :deep(.el-table__cell) {
+  padding: 8px;
+  font-size: 13px;
+  text-align: center;
 }
 
 .modern-table :deep(.el-table__header th) {
@@ -692,6 +612,7 @@ onMounted(() => {
   font-weight: 600;
   font-size: 14px;
   padding: 12px 8px;
+  text-align: center;
 }
 
 .modern-table :deep(.el-table__row) {
@@ -710,6 +631,7 @@ onMounted(() => {
 .completion-info {
   display: flex;
   flex-direction: column;
+  align-items: center;
   gap: 4px;
 }
 
@@ -717,14 +639,25 @@ onMounted(() => {
   color: #909399;
 }
 
+.completion-text {
+  font-size: 12px;
+  color: #606266;
+}
+
 .completion-progress {
-  width: 60px;
+  width: 80px;
 }
 
 .pagination-container {
   margin-top: 20px;
   display: flex;
-  justify-content: flex-end;
+  justify-content: center;
+}
+
+.pagination {
+  margin-top: 20px;
+  display: flex;
+  justify-content: center;
 }
 
 :deep(.el-dialog) {
@@ -775,6 +708,46 @@ onMounted(() => {
 
 .detail-content {
   padding: 10px 0;
+  max-height: calc(80vh - 100px);
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.detail-dialog :deep(.el-dialog) {
+  margin: 0 !important;
+  max-width: 600px;
+  width: 90%;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.detail-dialog :deep(.el-dialog__header) {
+  padding: 16px 20px;
+  border-bottom: 1px solid #ebeef5;
+  flex-shrink: 0;
+}
+
+.detail-dialog :deep(.el-dialog__body) {
+  flex: 1;
+  overflow-x: hidden;
+  padding: 20px;
+}
+
+.detail-dialog :deep(.el-dialog__footer) {
+  padding: 16px 20px;
+  border-top: 1px solid #ebeef5;
+  flex-shrink: 0;
+}
+
+.detail-dialog :deep(.el-descriptions) {
+  width: 100%;
+  table-layout: fixed;
+}
+
+.detail-dialog :deep(.el-descriptions__cell) {
+  word-wrap: break-word;
+  word-break: break-word;
 }
 
 .completion-detail {
@@ -794,6 +767,11 @@ onMounted(() => {
   margin: 0;
   color: #303133;
   font-size: 16px;
+}
+
+.completion-actions {
+  display: flex;
+  gap: 12px;
 }
 
 .completion-rate {

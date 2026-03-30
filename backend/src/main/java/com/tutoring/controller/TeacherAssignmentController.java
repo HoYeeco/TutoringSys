@@ -2,7 +2,11 @@ package com.tutoring.controller;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.tutoring.common.Result;
+import com.tutoring.dto.AssignmentSubmissionStatusVO;
 import com.tutoring.dto.CreateAssignmentRequest;
+import com.tutoring.dto.ReviewSubmissionRequest;
+import com.tutoring.dto.SubmissionDetailVO;
+import com.tutoring.dto.SubmissionRecordVO;
 import com.tutoring.dto.TeacherAssignmentVO;
 import com.tutoring.dto.UpdateAssignmentRequest;
 import com.tutoring.entity.User;
@@ -79,6 +83,47 @@ public class TeacherAssignmentController {
     public Result<Void> deleteAssignment(@PathVariable Long assignmentId) {
         Long teacherId = getCurrentUserId();
         teacherAssignmentService.deleteAssignment(teacherId, assignmentId);
+        return Result.success(null);
+    }
+
+    @Operation(summary = "获取作业提交列表")
+    @GetMapping("/{assignmentId}/submissions")
+    public Result<Page<SubmissionRecordVO>> getAssignmentSubmissions(
+            @PathVariable Long assignmentId,
+            @RequestParam(defaultValue = "1") Integer page,
+            @RequestParam(defaultValue = "10") Integer size) {
+        Long teacherId = getCurrentUserId();
+        Page<SubmissionRecordVO> result = teacherAssignmentService.getAssignmentSubmissions(
+                teacherId, assignmentId, page, size);
+        return Result.success(result);
+    }
+
+    @Operation(summary = "获取作业提交状态")
+    @GetMapping("/{assignmentId}/submission-status")
+    public Result<AssignmentSubmissionStatusVO> getAssignmentSubmissionStatus(@PathVariable Long assignmentId) {
+        Long teacherId = getCurrentUserId();
+        AssignmentSubmissionStatusVO result = teacherAssignmentService.getAssignmentSubmissionStatus(teacherId, assignmentId);
+        return Result.success(result);
+    }
+
+    @Operation(summary = "获取提交详情")
+    @GetMapping("/submissions/{submissionId}")
+    public Result<SubmissionDetailVO> getSubmissionDetail(@PathVariable Long submissionId) {
+        Long teacherId = getCurrentUserId();
+        SubmissionDetailVO detail = teacherAssignmentService.getSubmissionDetail(teacherId, submissionId);
+        if (detail == null) {
+            return Result.error(404, "提交记录不存在");
+        }
+        return Result.success(detail);
+    }
+
+    @Operation(summary = "批改提交")
+    @PutMapping("/submissions/{submissionId}/review")
+    public Result<Void> reviewSubmission(
+            @PathVariable Long submissionId,
+            @Valid @RequestBody ReviewSubmissionRequest request) {
+        Long teacherId = getCurrentUserId();
+        teacherAssignmentService.reviewSubmission(teacherId, submissionId, request);
         return Result.success(null);
     }
 
