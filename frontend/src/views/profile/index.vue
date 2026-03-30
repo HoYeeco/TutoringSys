@@ -142,30 +142,33 @@
     <el-dialog
       v-model="avatarModalVisible"
       title="修改头像"
-      width="600px"
+      width="520px"
       :close-on-click-modal="false"
+      append-to-body
+      class="avatar-dialog"
     >
       <div class="avatar-modal">
-        <!-- 当前头像预览 -->
-        <div class="avatar-preview-section">
-          <div class="preview-title">当前头像</div>
-          <div class="current-avatar">
-            <img
-              v-if="userStore.userInfo?.avatar"
-              :src="userStore.userInfo.avatar"
-              alt="当前头像"
-            />
-            <div v-else class="avatar-placeholder-large">
-              {{ getAvatarText() }}
+        <!-- 头像预览区域 -->
+        <div class="avatar-preview-row">
+          <div class="avatar-preview-section">
+            <div class="preview-title">当前头像</div>
+            <div class="avatar-circle current-avatar">
+              <img
+                v-if="userStore.userInfo?.avatar"
+                :src="userStore.userInfo.avatar"
+                alt="当前头像"
+              />
+              <div v-else class="avatar-placeholder-large">
+                {{ getAvatarText() }}
+              </div>
             </div>
           </div>
-        </div>
-
-        <!-- 上传选项 -->
-        <div class="upload-section">
-          <div class="preview-title">新头像预览</div>
-          <div class="new-avatar-preview">
-            <div class="avatar-preview-box">
+          <div class="avatar-arrow">
+            <el-icon><ArrowRight /></el-icon>
+          </div>
+          <div class="avatar-preview-section">
+            <div class="preview-title">新头像预览</div>
+            <div class="avatar-circle new-avatar-preview">
               <img
                 v-if="previewAvatarUrl"
                 :src="previewAvatarUrl"
@@ -176,8 +179,18 @@
               </div>
             </div>
           </div>
+        </div>
+        
+        <!-- 上传选项 -->
+        <div class="upload-section">
+          <div class="upload-type-selector">
+            <el-radio-group v-model="uploadType" size="large">
+              <el-radio-button label="file">本地上传</el-radio-button>
+              <el-radio-button label="url">URL链接</el-radio-button>
+            </el-radio-group>
+          </div>
 
-          <div class="upload-local">
+          <div class="upload-local" v-if="uploadType === 'file'">
             <el-upload
               class="avatar-uploader"
               :show-file-list="false"
@@ -193,6 +206,23 @@
               支持 JPG、PNG、GIF、WebP 格式，大小不超过 10MB
             </p>
           </div>
+
+          <div class="upload-url" v-if="uploadType === 'url'">
+            <el-input
+              v-model="avatarUrl"
+              placeholder="请输入图片URL链接"
+              size="large"
+              clearable
+              @blur="handleUrlBlur"
+            >
+              <template #prefix>
+                <el-icon><Link /></el-icon>
+              </template>
+            </el-input>
+            <p class="upload-tip">
+              请输入有效的图片URL地址，支持 http:// 或 https:// 开头的链接
+            </p>
+          </div>
         </div>
       </div>
 
@@ -202,7 +232,7 @@
           <el-button
             type="primary"
             @click="confirmAvatarChange"
-            :disabled="!selectedAvatarFile"
+            :disabled="!canConfirmAvatar"
           >
             确定
           </el-button>
@@ -216,6 +246,7 @@
       title="修改密码"
       width="500px"
       :close-on-click-modal="false"
+      append-to-body
     >
       <el-form :model="passwordForm" label-width="100px">
         <el-form-item
@@ -297,6 +328,13 @@ const router = useRouter();
 const avatarModalVisible = ref(false);
 const selectedAvatarFile = ref(null);
 const previewAvatarUrl = ref('');
+const uploadType = ref('file');
+const avatarUrl = ref('');
+
+const canConfirmAvatar = computed(() => {
+  return (uploadType.value === 'file' && selectedAvatarFile.value) ||
+         (uploadType.value === 'url' && avatarUrl.value);
+});
 
 const passwordModalVisible = ref(false);
 const passwordForm = ref({
@@ -369,19 +407,55 @@ const handleAvatarUpload = (file) => {
   reader.readAsDataURL(file.raw);
 };
 
+const handleUrlBlur = () => {
+  if (avatarUrl.value) {
+    const url = avatarUrl.value.trim();
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      previewAvatarUrl.value = url;
+    } else {
+      ElMessage.warning('请输入有效的URL地址（需以http://或https://开头）');
+      previewAvatarUrl.value = '';
+    }
+  }
+};
+
 const confirmAvatarChange = async () => {
   try {
-    if (selectedAvatarFile.value) {
-      const formData = new FormData();
-      formData.append('file', selectedAvatarFile.value);
+    let newAvatarUrl = '';
 
-      const response = await request.post('/user/avatar', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
+    if (uploadType.value === 'file') {
+      if (selectedAvatarFile.value) {
+        const formData = new FormData();
+        formData.append('file', selectedAvatarFile.value);
 
-      const newAvatarUrl = response.data;
+        const response = await request.post('/user/avatar', formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        });
+
+        newAvatarUrl = response.data;
+      } else {
+        ElMessage.warning('请选择图片上传');
+        return;
+      }
+    } else if (uploadType.value === 'url') {
+      if (!avatarUrl.value) {
+        ElMessage.warning('请输入图片URL');
+        return;
+      }
+
+      const url = avatarUrl.value.trim();
+      if (!url.startsWith('http://') && !url.startsWith('https://')) {
+        ElMessage.warning('请输入有效的URL地址（需以http://或https://开头）');
+        return;
+      }
+
+      const response = await request.put('/user/avatar', { avatarUrl: url });
+      newAvatarUrl = response.data;
+    }
+
+    if (newAvatarUrl) {
       userStore.setUserInfo({
         ...userStore.userInfo,
         avatar: newAvatarUrl,
@@ -389,8 +463,6 @@ const confirmAvatarChange = async () => {
 
       avatarModalVisible.value = false;
       ElMessage.success('头像修改成功');
-    } else {
-      ElMessage.warning('请选择图片上传');
     }
   } catch (error) {
     console.error('修改头像失败:', error);
@@ -727,37 +799,67 @@ const handleLogout = () => {
 }
 
 /* 头像对话框 */
-.avatar-modal {
-  display: flex;
-  gap: 40px;
+.avatar-dialog {
+  overflow: hidden;
 }
 
-.avatar-preview-section,
-.upload-section {
+.avatar-dialog :deep(.el-dialog) {
+  max-height: 90vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.avatar-dialog :deep(.el-dialog__body) {
+  overflow: hidden;
   flex: 1;
 }
 
+.avatar-modal {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow: hidden;
+}
+
+.avatar-preview-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 30px;
+}
+
+.avatar-preview-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
 .preview-title {
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 600;
   color: #303133;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
   text-align: center;
 }
 
-.current-avatar,
-.avatar-preview-box {
-  width: 180px;
-  height: 180px;
-  margin: 0 auto 20px;
+.avatar-circle {
+  width: 120px;
+  height: 120px;
   border-radius: 50%;
   overflow: hidden;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
-  border: 4px solid #ebeef5;
+  border: 3px solid #ebeef5;
+  flex-shrink: 0;
 }
 
-.current-avatar img,
-.avatar-preview-box img {
+.current-avatar,
+.new-avatar-preview {
+  width: 100%;
+  height: 100%;
+}
+
+.avatar-circle img {
   width: 100%;
   height: 100%;
   object-fit: cover;
@@ -771,19 +873,35 @@ const handleLogout = () => {
   justify-content: center;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: #fff;
-  font-size: 72px;
+  font-size: 64px;
   font-weight: bold;
 }
 
-.upload-type-selector {
+.avatar-arrow {
   display: flex;
+  align-items: center;
   justify-content: center;
-  margin-bottom: 20px;
+  color: #909399;
+  font-size: 24px;
+  flex-shrink: 0;
+}
+
+.upload-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 12px;
+  border-top: 1px solid #ebeef5;
+}
+
+.upload-type-selector {
+  margin-bottom: 16px;
 }
 
 .upload-local,
 .upload-url {
   text-align: center;
+  width: 100%;
 }
 
 .upload-tip {
