@@ -43,7 +43,7 @@ const menuItems = [
   },
   {
     path: '/student/error-book',
-    title: '错误本',
+    title: '错题本',
     icon: Reading,
   },
   {
