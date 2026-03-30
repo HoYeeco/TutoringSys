@@ -16,6 +16,8 @@ public interface StudentAssignmentService {
 
     void saveDraft(Long studentId, Long assignmentId, SaveDraftRequest request);
 
+    Object getDraft(Long studentId, Long assignmentId);
+
     SubmitResponse submitAssignment(Long studentId, Long assignmentId, SubmitRequest request);
 
 }

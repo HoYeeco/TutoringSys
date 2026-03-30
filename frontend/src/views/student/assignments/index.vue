@@ -1,39 +1,55 @@
 <template>
   <div class="student-assignments">
-    <el-card shadow="never" class="page-header">
+    <el-card shadow="never" class="assignments-section">
       <template #header>
         <div class="card-header">
-          <span>我的作业</span>
+          <div class="card-header__title">
+            <div class="card-header__icon">
+              <el-icon><Document /></el-icon>
+            </div>
+            <span>我的作业</span>
+          </div>
         </div>
       </template>
-    </el-card>
 
-    <el-card shadow="never" class="mt-4">
       <div class="filter-bar">
-        <div class="filter-row">
-          <el-select v-model="filterStatus" placeholder="按状态筛选" class="filter-item" clearable>
-            <el-option label="全部" value="" />
-            <el-option label="待提交" value="pending" />
-            <el-option label="待批改" value="grading" />
-            <el-option label="已批改" value="graded" />
-            <el-option label="已逾期" value="overdue" />
-          </el-select>
-          <el-select v-model="filterCourse" placeholder="按课程筛选" class="filter-item" clearable>
-            <el-option label="全部" value="" />
-            <el-option v-for="course in courses" :key="course.id" :label="course.name" :value="course.id" />
-          </el-select>
-          <el-input
-            v-model="searchKeyword"
-            placeholder="搜索作业名称或课程名称"
-            clearable
-            class="filter-item search-input"
-          >
-            <template #prefix>
-              <el-icon><Search /></el-icon>
-            </template>
-          </el-input>
-        </div>
-        <div class="sort-row">
+        <el-select
+          v-model="filterStatus"
+          placeholder="按状态筛选"
+          class="filter-item"
+          clearable
+        >
+          <el-option label="全部" value="" />
+          <el-option label="待提交" value="pending" />
+          <el-option label="待批改" value="submitted" />
+          <el-option label="已批改" value="graded" />
+          <el-option label="已逾期" value="overdue" />
+        </el-select>
+        <el-select
+          v-model="filterCourse"
+          placeholder="按课程筛选"
+          class="filter-item"
+          clearable
+        >
+          <el-option label="全部" value="" />
+          <el-option
+            v-for="course in courses"
+            :key="course.id"
+            :label="course.name"
+            :value="course.id"
+          />
+        </el-select>
+        <el-input
+          v-model="searchKeyword"
+          placeholder="搜索作业名称或课程名称"
+          clearable
+          class="filter-item search-input"
+        >
+          <template #prefix>
+            <el-icon><Search /></el-icon>
+          </template>
+        </el-input>
+        <div class="sort-wrapper">
           <span class="sort-label">排序：</span>
           <el-select v-model="sortBy" placeholder="排序方式" class="sort-item">
             <el-option label="发布时间（最新）" value="createTime:desc" />
@@ -44,53 +60,63 @@
         </div>
       </div>
 
-      <el-empty v-if="filteredAssignments.length === 0" description="暂无作业" />
+      <el-empty
+        v-if="filteredAssignments.length === 0"
+        description="暂无作业"
+      />
       <div v-else class="assignment-list">
         <div
           v-for="assignment in filteredAssignments"
           :key="assignment.id"
           class="assignment-card"
+          :class="assignment.status"
         >
-          <div class="assignment-header">
-            <span class="assignment-title">{{ assignment.title }}</span>
-            <el-tag 
-              :type="getTagType(assignment.status)" 
-              :class="{ 'overdue-tag': assignment.status === 'overdue' }"
-              effect="dark"
-            >
-              {{ getStatusText(assignment.status) }}
-            </el-tag>
+          <div class="assignment-card__header">
+            <div class="assignment-icon" :class="assignment.status">
+              <el-icon v-if="assignment.status === 'pending'"><Edit /></el-icon>
+              <el-icon v-else-if="assignment.status === 'submitted'"><Loading /></el-icon>
+              <el-icon v-else-if="assignment.status === 'graded'"><CircleCheck /></el-icon>
+              <el-icon v-else><Warning /></el-icon>
+            </div>
+            <div class="assignment-info">
+              <div class="assignment-top">
+                <h4 class="assignment-title">{{ assignment.title }}</h4>
+                <el-tag
+                  :type="getTagType(assignment.status)"
+                  effect="light"
+                  class="status-tag"
+                >
+                  {{ getStatusText(assignment.status) }}
+                </el-tag>
+              </div>
+              <div class="assignment-meta">
+                <span class="meta-item">
+                  <el-icon><Notebook /></el-icon>
+                  {{ assignment.courseName }}
+                </span>
+                <span class="meta-item" v-if="assignment.status === 'pending' || assignment.status === 'overdue'">
+                  <el-icon><Clock /></el-icon>
+                  <span :class="{ 'overdue-text': assignment.status === 'overdue' }">
+                    截止：{{ formatDate(assignment.deadline) }}
+                  </span>
+                </span>
+                <span class="meta-item score-item" v-if="assignment.status === 'graded'">
+                  <el-icon><Trophy /></el-icon>
+                  得分：<strong>{{ assignment.finalScore }}</strong> / {{ assignment.totalScore }}
+                </span>
+                <span class="meta-item" v-if="assignment.status === 'submitted'">
+                  <el-icon class="loading-icon"><Loading /></el-icon>
+                  正在批改中...
+                </span>
+              </div>
+            </div>
           </div>
-          <div class="assignment-content">
-            <div class="info-row">
-              <span class="info-item">
-                <el-icon><Notebook /></el-icon>
-                {{ assignment.courseName }}
-              </span>
-            </div>
-            <div class="info-row" v-if="assignment.status === 'pending' || assignment.status === 'overdue'">
-              <span class="info-item deadline-info" :class="{ 'overdue-info': assignment.status === 'overdue' }">
-                <el-icon><Clock /></el-icon>
-                截止时间：{{ formatDate(assignment.deadline) }}
-              </span>
-            </div>
-            <div class="info-row" v-if="assignment.status === 'graded'">
-              <span class="info-item score-info">
-                <el-icon><Trophy /></el-icon>
-                得分：<span class="score-value">{{ assignment.score }}</span> / {{ assignment.totalScore }}
-              </span>
-            </div>
-            <div class="info-row" v-if="assignment.status === 'grading'">
-              <span class="info-item">
-                <el-icon><Loading /></el-icon>
-                批改中
-              </span>
-            </div>
-          </div>
-          <div class="assignment-footer">
+
+          <div class="assignment-card__footer">
             <el-button
               v-if="assignment.status === 'pending'"
               type="primary"
+              size="small"
               @click="goToSubmit(assignment)"
             >
               <el-icon><Edit /></el-icon> 写作业
@@ -98,13 +124,15 @@
             <el-button
               v-else-if="assignment.status === 'graded'"
               type="success"
+              size="small"
               @click="goToReport(assignment)"
             >
-              <el-icon><View /></el-icon> 查看报告
+              <el-icon><View /></el-icon> 批改详情
             </el-button>
             <el-button
               v-else-if="assignment.status === 'overdue'"
-              type="danger"
+              type="info"
+              size="small"
               disabled
             >
               <el-icon><Warning /></el-icon> 已逾期
@@ -112,6 +140,7 @@
             <el-button
               v-else
               type="info"
+              size="small"
               disabled
             >
               <el-icon><Loading /></el-icon> 批改中
@@ -127,7 +156,18 @@
 import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
-import { Search, Notebook, Clock, Trophy, Loading, Edit, View, Warning } from '@element-plus/icons-vue';
+import {
+  Search,
+  Document,
+  Notebook,
+  Clock,
+  Trophy,
+  Loading,
+  Edit,
+  View,
+  Warning,
+  CircleCheck,
+} from '@element-plus/icons-vue';
 import request from '@/utils/request';
 
 const router = useRouter();
@@ -153,36 +193,38 @@ const assignments = ref([]);
 
 const filteredAssignments = computed(() => {
   let result = [...assignments.value];
-  
+
   if (filterStatus.value) {
-    result = result.filter(item => item.status === filterStatus.value);
+    result = result.filter((item) => item.status === filterStatus.value);
   }
-  
+
   if (filterCourse.value) {
-    result = result.filter(item => item.courseId === Number(filterCourse.value));
+    result = result.filter(
+      (item) => item.courseId === Number(filterCourse.value),
+    );
   }
-  
+
   if (searchKeyword.value) {
     const keyword = searchKeyword.value.toLowerCase();
-    result = result.filter(item => {
+    result = result.filter((item) => {
       return (
         item.title.toLowerCase().includes(keyword) ||
         item.courseName.toLowerCase().includes(keyword)
       );
     });
   }
-  
+
   if (sortBy.value) {
     const [field, order] = sortBy.value.split(':');
     result.sort((a, b) => {
       let aValue = a[field];
       let bValue = b[field];
-      
+
       if (field === 'deadline' || field === 'createTime') {
         aValue = new Date(aValue).getTime();
         bValue = new Date(bValue).getTime();
       }
-      
+
       if (order === 'asc') {
         return aValue > bValue ? 1 : -1;
       } else {
@@ -190,7 +232,7 @@ const filteredAssignments = computed(() => {
       }
     });
   }
-  
+
   return result;
 });
 
@@ -198,7 +240,7 @@ const getAssignments = async () => {
   try {
     const params: any = {
       page: 1,
-      size: 100
+      size: 100,
     };
     if (filterStatus.value) params.status = filterStatus.value;
     if (filterCourse.value) params.courseId = filterCourse.value;
@@ -208,7 +250,7 @@ const getAssignments = async () => {
       params.sortBy = field;
       params.sortOrder = order;
     }
-    
+
     const response = await request.get('/student/assignments/list', { params });
     assignments.value = response.data.records || [];
   } catch (error) {
@@ -222,14 +264,14 @@ const goToSubmit = (assignment: any) => {
 };
 
 const goToReport = (assignment: any) => {
-  router.push(`/student/assignments/report/${assignment.id}`);
+  router.push(`/student/assignments/${assignment.id}/detail`);
 };
 
 const getTagType = (status: string) => {
   switch (status) {
     case 'pending':
       return 'warning';
-    case 'grading':
+    case 'submitted':
       return 'info';
     case 'graded':
       return 'success';
@@ -244,7 +286,7 @@ const getStatusText = (status: string) => {
   switch (status) {
     case 'pending':
       return '待提交';
-    case 'grading':
+    case 'submitted':
       return '待批改';
     case 'graded':
       return '已批改';
@@ -269,172 +311,300 @@ onMounted(() => {
 
 <style scoped>
 .student-assignments {
-  padding: 20px;
+  padding: 24px;
+  background: rgba(255, 255, 255, 0.66);
+  backdrop-filter: blur(4px);
+  border-radius: 16px;
+  margin: 16px;
+  min-height: calc(100vh - 84px);
 }
 
-.page-header {
-  margin-bottom: 20px;
+:deep(.el-card) {
+  border: none;
+  border-radius: 16px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+}
+
+:deep(.el-card__header) {
+  padding: 16px 20px;
+  border-bottom: none;
+  background: transparent;
+}
+
+:deep(.el-card__body) {
+  padding: 20px;
 }
 
 .card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.card-header__title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 20px;
+  font-weight: 600;
+  color: #303133;
+}
+
+.card-header__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgb(15, 38, 70) 0%, rgb(58, 97, 156) 50%, rgb(11, 17, 27) 100%);
+  color: #fff;
+}
+
+.card-header__icon .el-icon {
+  font-size: 24px;
 }
 
 .filter-bar {
-  margin-bottom: 20px;
-  padding-bottom: 20px;
-  border-bottom: 1px solid var(--color-border);
-}
-
-.filter-row {
   display: flex;
-  gap: 15px;
-  flex-wrap: wrap;
-  margin-bottom: 15px;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 24px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid #ebeef5;
+  flex-wrap: nowrap;
 }
 
 .filter-item {
-  min-width: 150px;
+  width: 140px;
+  flex-shrink: 0;
 }
 
 .search-input {
-  flex: 1;
-  min-width: 250px;
-  max-width: 400px;
+  width: 220px;
+  flex-shrink: 0;
 }
 
-.sort-row {
+.sort-wrapper {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
+  margin-left: auto;
+  flex-shrink: 0;
 }
 
 .sort-label {
   font-size: 14px;
-  color: var(--color-text);
+  color: #606266;
+  white-space: nowrap;
 }
 
 .sort-item {
-  min-width: 180px;
+  width: 160px;
 }
 
 .assignment-list {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
-  gap: 16px;
+  gap: 20px;
 }
 
 .assignment-card {
-  padding: 20px;
-  border: 1px solid var(--color-border);
+  background: #fff;
   border-radius: 12px;
-  background-color: var(--color-card);
+  border: 1px solid #ebeef5;
+  padding: 20px;
   transition: all 0.3s ease;
+  display: flex;
+  flex-direction: column;
+  min-height: 180px;
 }
 
 .assignment-card:hover {
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
-  transform: translateY(-2px);
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  border-color: transparent;
 }
 
-.assignment-header {
+.assignment-card.pending {
+  border-left: 4px solid #e6a23c;
+}
+
+.assignment-card.submitted {
+  border-left: 4px solid #909399;
+}
+
+.assignment-card.graded {
+  border-left: 4px solid #67c23a;
+}
+
+.assignment-card.overdue {
+  border-left: 4px solid #f56c6c;
+}
+
+.assignment-card__header {
   display: flex;
-  justify-content: space-between;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.assignment-icon {
+  display: flex;
   align-items: center;
-  margin-bottom: 16px;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  flex-shrink: 0;
+}
+
+.assignment-icon .el-icon {
+  font-size: 22px;
+}
+
+.assignment-icon.pending {
+  background: linear-gradient(135deg, #fdf6ec 0%, #faecd8 100%);
+  color: #e6a23c;
+}
+
+.assignment-icon.submitted {
+  background: linear-gradient(135deg, #f4f4f5 0%, #e9e9eb 100%);
+  color: #909399;
+}
+
+.assignment-icon.graded {
+  background: linear-gradient(135deg, #f0f9eb 0%, #e1f3d8 100%);
+  color: #67c23a;
+}
+
+.assignment-icon.overdue {
+  background: linear-gradient(135deg, #fef0f0 0%, #fde2e2 100%);
+  color: #f56c6c;
+}
+
+.assignment-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.assignment-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
 }
 
 .assignment-title {
   font-size: 16px;
   font-weight: 600;
-  color: var(--color-text);
-  flex: 1;
-  margin-right: 12px;
+  color: #303133;
+  margin: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  flex: 1;
 }
 
-.overdue-tag {
-  background-color: #f56c6c !important;
-  border-color: #f56c6c !important;
+.status-tag {
+  flex-shrink: 0;
 }
 
-.assignment-content {
-  margin-bottom: 16px;
-}
-
-.info-row {
+.assignment-meta {
   display: flex;
-  align-items: center;
-  margin-bottom: 8px;
-}
-
-.info-row:last-child {
-  margin-bottom: 0;
-}
-
-.info-item {
-  display: flex;
-  align-items: center;
+  flex-direction: column;
   gap: 6px;
+}
+
+.meta-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  color: #909399;
+}
+
+.meta-item .el-icon {
   font-size: 14px;
-  color: var(--color-text-secondary);
 }
 
-.deadline-info {
-  color: #e6a23c;
-}
-
-.deadline-info.overdue-info {
+.meta-item .overdue-text {
   color: #f56c6c;
+  font-weight: 500;
 }
 
-.score-info {
+.meta-item.score-item strong {
   color: #67c23a;
+  font-size: 15px;
 }
 
-.score-value {
-  font-size: 18px;
-  font-weight: 600;
-  color: #67c23a;
+.loading-icon {
+  animation: spin 1s linear infinite;
 }
 
-.assignment-footer {
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.assignment-card__footer {
   display: flex;
   justify-content: flex-end;
   padding-top: 16px;
-  border-top: 1px solid var(--color-border);
+  border-top: 1px solid #ebeef5;
+}
+
+:deep(.el-empty) {
+  padding: 60px 0;
 }
 
 @media (max-width: 768px) {
-  .filter-row {
-    flex-direction: column;
+  .student-assignments {
+    padding: 16px;
+    margin: 12px;
   }
-  
+
+  .filter-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
   .filter-item {
     width: 100%;
   }
-  
+
   .search-input {
-    width: 100%;
     max-width: unset;
   }
-  
-  .sort-row {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 5px;
-  }
-  
-  .sort-item {
+
+  .sort-wrapper {
+    margin-left: 0;
     width: 100%;
   }
-  
+
+  .sort-item {
+    flex: 1;
+  }
+
   .assignment-list {
     grid-template-columns: 1fr;
+  }
+
+  .assignment-top {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .assignment-card__header {
+    flex-direction: column;
+  }
+
+  .assignment-icon {
+    width: 40px;
+    height: 40px;
   }
 }
 </style>

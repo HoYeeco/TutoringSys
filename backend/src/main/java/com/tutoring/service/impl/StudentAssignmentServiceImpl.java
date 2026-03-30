@@ -11,8 +11,6 @@ import com.tutoring.service.StudentAssignmentService;
 import com.tutoring.service.SubmissionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.cache.annotation.CacheEvict;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -40,7 +38,6 @@ public class StudentAssignmentServiceImpl implements StudentAssignmentService {
     private final ApplicationEventPublisher eventPublisher;
 
     @Override
-    @Cacheable(value = "studentAssignments", key = "'list:' + #studentId + ':page:' + #page + ':size:' + #size + ':status:' + (#status ?: '') + ':course:' + (#courseId ?: '') + ':keyword:' + (#keyword ?: '')", unless = "#result == null || #result.records.isEmpty()")
     public Page<StudentAssignmentListVO> getAssignmentList(Long studentId, Integer page, Integer size,
             String status, Long courseId, String keyword, String sortBy, String sortOrder) {
         log.info("从数据库查询学生作业列表: studentId={}", studentId);
@@ -72,11 +69,17 @@ public class StudentAssignmentServiceImpl implements StudentAssignmentService {
 
         List<Long> teacherIds = courses.stream()
             .map(Course::getTeacherId)
+            .filter(Objects::nonNull)
             .distinct()
             .collect(Collectors.toList());
-        Map<Long, String> teacherNameMap = userMapper.selectBatchIds(teacherIds)
-            .stream()
-            .collect(Collectors.toMap(User::getId, User::getRealName));
+        final Map<Long, String> teacherNameMap;
+        if (!teacherIds.isEmpty()) {
+            teacherNameMap = userMapper.selectBatchIds(teacherIds)
+                .stream()
+                .collect(Collectors.toMap(User::getId, User::getRealName));
+        } else {
+            teacherNameMap = new HashMap<>();
+        }
 
         List<Long> searchCourseIds = courseIds;
         if (StringUtils.hasText(keyword)) {
@@ -86,9 +89,11 @@ public class StudentAssignmentServiceImpl implements StudentAssignmentService {
                     .like(Course::getName, keyword)
             ).stream().map(Course::getId).collect(Collectors.toList());
             
-            if (!matchedCourseIds.isEmpty()) {
-                searchCourseIds = matchedCourseIds;
-            }
+            searchCourseIds = matchedCourseIds;
+        }
+
+        if (searchCourseIds.isEmpty()) {
+            return new Page<>(page, size, 0);
         }
 
         final List<Long> finalSearchCourseIds = searchCourseIds;
@@ -97,14 +102,10 @@ public class StudentAssignmentServiceImpl implements StudentAssignmentService {
             .eq(Assignment::getStatus, "published");
 
         if (StringUtils.hasText(keyword)) {
-            queryWrapper.and(w -> w
-                .like(Assignment::getTitle, keyword)
-                .or()
-                .in(Assignment::getCourseId, finalSearchCourseIds)
-            );
+            queryWrapper.like(Assignment::getTitle, keyword);
         }
 
-        if ("publishTime".equals(sortBy)) {
+        if ("publishTime".equals(sortBy) || "createTime".equals(sortBy)) {
             if ("desc".equalsIgnoreCase(sortOrder)) {
                 queryWrapper.orderByDesc(Assignment::getCreateTime);
             } else {
@@ -197,7 +198,6 @@ public class StudentAssignmentServiceImpl implements StudentAssignmentService {
     }
 
     @Override
-    @Cacheable(value = "studentAssignments", key = "'detail:' + #studentId + ':' + #assignmentId")
     public AssignmentDetailVO getAssignmentDetail(Long studentId, Long assignmentId) {
         log.info("从数据库查询作业详情: studentId={}, assignmentId={}", studentId, assignmentId);
         
@@ -287,7 +287,6 @@ public class StudentAssignmentServiceImpl implements StudentAssignmentService {
 
     @Override
     @Transactional
-    @CacheEvict(value = "studentAssignments", key = "'detail:' + #studentId + ':' + #assignmentId")
     public void saveDraft(Long studentId, Long assignmentId, SaveDraftRequest request) {
         Assignment assignment = assignmentMapper.selectById(assignmentId);
         if (assignment == null) {
@@ -344,10 +343,36 @@ public class StudentAssignmentServiceImpl implements StudentAssignmentService {
     }
 
     @Override
+    public Object getDraft(Long studentId, Long assignmentId) {
+        List<StudentAnswer> draftAnswers = studentAnswerMapper.selectList(
+            new LambdaQueryWrapper<StudentAnswer>()
+                .eq(StudentAnswer::getStudentId, studentId)
+                .eq(StudentAnswer::getAssignmentId, assignmentId)
+                .eq(StudentAnswer::getIsDraft, 1)
+        );
+
+        if (draftAnswers.isEmpty()) {
+            return null;
+        }
+
+        List<Map<String, Object>> answers = draftAnswers.stream()
+            .map(draft -> {
+                Map<String, Object> answer = new HashMap<>();
+                answer.put("questionId", draft.getQuestionId());
+                answer.put("answerContent", draft.getAnswer());
+                return answer;
+            })
+            .collect(Collectors.toList());
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("answers", answers);
+        return result;
+    }
+
+    @Override
     @Transactional
-    @CacheEvict(value = "studentAssignments", allEntries = true)
     public SubmitResponse submitAssignment(Long studentId, Long assignmentId, SubmitRequest request) {
-        log.info("提交作业，清除学生作业缓存: studentId={}, assignmentId={}", studentId, assignmentId);
+        log.info("提交作业: studentId={}, assignmentId={}", studentId, assignmentId);
         
         Assignment assignment = assignmentMapper.selectById(assignmentId);
         if (assignment == null) {

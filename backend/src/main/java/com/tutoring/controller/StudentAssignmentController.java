@@ -64,6 +64,14 @@ public class StudentAssignmentController {
         return Result.success(null);
     }
 
+    @Operation(summary = "获取草稿")
+    @GetMapping("/{assignmentId}/draft")
+    public Result<Object> getDraft(@PathVariable Long assignmentId) {
+        Long studentId = getCurrentUserId();
+        Object draft = studentAssignmentService.getDraft(studentId, assignmentId);
+        return Result.success(draft);
+    }
+
     @Operation(summary = "提交作业")
     @PostMapping("/{assignmentId}/submit")
     public Result<SubmitResponse> submitAssignment(

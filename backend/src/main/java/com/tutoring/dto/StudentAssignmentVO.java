@@ -12,12 +12,12 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 public class StudentAssignmentVO {
-
     private Long id;
     private String title;
     private String description;
     private LocalDateTime deadline;
     private Integer totalScore;
     private String status;
-
+    private Integer score;
+    private LocalDateTime gradeTime;
 }

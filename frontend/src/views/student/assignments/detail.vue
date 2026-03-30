@@ -1,0 +1,643 @@
+<template>
+  <div class="assignment-detail">
+    <el-card shadow="never" class="header-card">
+      <template #header>
+        <div class="card-title">
+          <div class="card-title__left">
+            <div class="card-title__icon">
+              <el-icon><Document /></el-icon>
+            </div>
+            <span class="card-title__text">{{ assignment.title || '批改详情' }}</span>
+          </div>
+          <el-button class="back-btn" @click="goBack">
+            <el-icon><ArrowLeft /></el-icon>
+            返回
+          </el-button>
+        </div>
+      </template>
+      <div class="assignment-summary">
+        <div class="summary-item">
+          <span class="summary-label">所属课程：</span>
+          <span class="summary-value">{{ assignment.courseName }}</span>
+        </div>
+        <div class="summary-item">
+          <span class="summary-label">总分：</span>
+          <span class="summary-value score">
+            <strong>{{ assignment.score || 0 }}</strong> / {{ assignment.totalScore || 100 }}
+          </span>
+        </div>
+        <div class="summary-item">
+          <span class="summary-label">批改时间：</span>
+          <span class="summary-value">{{ formatDate(assignment.gradeTime) }}</span>
+        </div>
+      </div>
+    </el-card>
+
+    <el-card shadow="never" class="questions-card">
+      <template #header>
+        <div class="card-title">
+          <div class="card-title__left">
+            <div class="card-title__icon">
+              <el-icon><List /></el-icon>
+            </div>
+            <span class="card-title__text">答题详情</span>
+          </div>
+          <el-button
+            v-if="hasWrongQuestions"
+            type="warning"
+            size="small"
+            @click="addAllToWrongBook"
+          >
+            <el-icon><Collection /></el-icon> 一键加入错题本
+          </el-button>
+        </div>
+      </template>
+
+      <div class="questions-list">
+        <div
+          v-for="(question, index) in questions"
+          :key="question.id"
+          class="question-card"
+          :class="{ correct: question.isCorrect, incorrect: !question.isCorrect }"
+        >
+          <div class="question-header">
+            <div class="question-info">
+              <span class="question-number">第{{ index + 1 }}题</span>
+              <el-tag size="small" :type="getQuestionTypeTag(question.type)">
+                {{ getQuestionTypeText(question.type) }}
+              </el-tag>
+              <span class="question-score">({{ question.score }}分)</span>
+            </div>
+            <div class="question-result">
+              <el-tag
+                :type="question.isCorrect ? 'success' : 'danger'"
+                effect="dark"
+                size="small"
+              >
+                {{ question.isCorrect ? '正确' : '错误' }}
+              </el-tag>
+              <span class="earned-score">
+                得分：<strong>{{ question.earnedScore || 0 }}</strong> 分
+              </span>
+            </div>
+          </div>
+
+          <div class="question-content" v-html="question.content"></div>
+
+          <div class="answer-section">
+            <div class="answer-row">
+              <span class="answer-label">你的答案：</span>
+              <div
+                class="answer-value"
+                :class="question.isCorrect ? 'correct' : 'incorrect'"
+              >
+                <template v-if="question.type === 'essay'">
+                  <div class="essay-content" v-html="question.studentAnswer"></div>
+                </template>
+                <template v-else>
+                  {{ formatAnswer(question.studentAnswer, question.type) }}
+                </template>
+              </div>
+            </div>
+
+            <div class="answer-row" v-if="!question.isCorrect && question.correctAnswer">
+              <span class="answer-label">标准答案：</span>
+              <div class="answer-value correct">
+                <template v-if="question.type === 'essay'">
+                  <div class="essay-content" v-html="question.correctAnswer"></div>
+                </template>
+                <template v-else>
+                  {{ formatAnswer(question.correctAnswer, question.type) }}
+                </template>
+              </div>
+            </div>
+
+            <div class="ai-feedback" v-if="question.type === 'essay' && question.aiFeedback">
+              <div class="feedback-header">
+                <el-icon><Cpu /></el-icon>
+                <span>AI 批改反馈</span>
+              </div>
+              
+              <div class="feedback-section" v-if="question.aiFeedback.errorPoints?.length">
+                <div class="feedback-subtitle">核心错误点</div>
+                <div class="error-tags">
+                  <el-tag
+                    v-for="(point, idx) in question.aiFeedback.errorPoints"
+                    :key="idx"
+                    type="danger"
+                    effect="plain"
+                    class="error-tag"
+                  >
+                    {{ point }}
+                  </el-tag>
+                </div>
+              </div>
+
+              <div class="feedback-section" v-if="question.aiFeedback.suggestions">
+                <div class="feedback-subtitle">修正建议</div>
+                <div class="suggestion-content">
+                  {{ question.aiFeedback.suggestions }}
+                  <el-button
+                    type="primary"
+                    link
+                    size="small"
+                    @click="copyText(question.aiFeedback.suggestions)"
+                  >
+                    <el-icon><CopyDocument /></el-icon> 复制
+                  </el-button>
+                </div>
+              </div>
+            </div>
+
+            <div class="teacher-comment" v-if="question.teacherComment">
+              <div class="comment-header">
+                <el-icon><User /></el-icon>
+                <span>教师评语</span>
+              </div>
+              <div class="comment-content">{{ question.teacherComment }}</div>
+            </div>
+          </div>
+
+          <div class="question-footer" v-if="!question.isCorrect">
+            <el-button
+              type="warning"
+              size="small"
+              :loading="question.addingToWrongBook"
+              @click="addToWrongBook(question)"
+            >
+              <el-icon><Collection /></el-icon> 加入错题本
+            </el-button>
+          </div>
+        </div>
+      </div>
+    </el-card>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { ref, computed, onMounted } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
+import { ElMessage } from 'element-plus';
+import {
+  Document,
+  List,
+  ArrowLeft,
+  Collection,
+  Cpu,
+  CopyDocument,
+  User,
+} from '@element-plus/icons-vue';
+import request from '@/utils/request';
+
+const route = useRoute();
+const router = useRouter();
+const assignmentId = computed(() => route.params.id as string);
+
+const assignment = ref({
+  title: '',
+  courseName: '',
+  score: 0,
+  totalScore: 100,
+  gradeTime: '',
+});
+
+const questions = ref<any[]>([]);
+
+const hasWrongQuestions = computed(() => {
+  return questions.value.some(q => !q.isCorrect);
+});
+
+const getAssignmentDetail = async () => {
+  try {
+    const response = await request.get(`/student/assignments/${assignmentId.value}/detail`);
+    assignment.value = {
+      title: response.data.title,
+      courseName: response.data.courseName,
+      score: response.data.score,
+      totalScore: response.data.totalScore,
+      gradeTime: response.data.gradeTime,
+    };
+    questions.value = (response.data.questions || []).map((q: any) => ({
+      ...q,
+      addingToWrongBook: false,
+    }));
+  } catch (error) {
+    console.error('获取批改详情失败:', error);
+    ElMessage.error('获取批改详情失败');
+  }
+};
+
+const goBack = () => {
+  router.push('/student/assignments');
+};
+
+const getQuestionTypeText = (type: string) => {
+  const map: Record<string, string> = {
+    single: '单选题',
+    multiple: '多选题',
+    judgment: '判断题',
+    essay: '主观题',
+  };
+  return map[type] || type;
+};
+
+const getQuestionTypeTag = (type: string) => {
+  const map: Record<string, string> = {
+    single: '',
+    multiple: 'success',
+    judgment: 'warning',
+    essay: 'danger',
+  };
+  return map[type] || '';
+};
+
+const formatAnswer = (answer: string, type: string) => {
+  if (!answer) return '-';
+  if (type === 'multiple') {
+    try {
+      const parsed = JSON.parse(answer);
+      return Array.isArray(parsed) ? parsed.join(', ') : answer;
+    } catch {
+      return answer;
+    }
+  }
+  if (type === 'judgment') {
+    return answer === 'true' ? '正确' : '错误';
+  }
+  return answer;
+};
+
+const formatDate = (date: string) => {
+  if (!date) return '-';
+  const d = new Date(date);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+};
+
+const copyText = async (text: string) => {
+  try {
+    await navigator.clipboard.writeText(text);
+    ElMessage.success('已复制到剪贴板');
+  } catch {
+    ElMessage.error('复制失败');
+  }
+};
+
+const addToWrongBook = async (question: any) => {
+  question.addingToWrongBook = true;
+  try {
+    await request.post('/student/wrong-book/add', {
+      questionId: question.id,
+      assignmentId: assignmentId.value,
+    });
+    ElMessage.success('已加入错题本');
+  } catch (error) {
+    console.error('加入错题本失败:', error);
+    ElMessage.error('加入错题本失败');
+  } finally {
+    question.addingToWrongBook = false;
+  }
+};
+
+const addAllToWrongBook = async () => {
+  const wrongQuestions = questions.value.filter(q => !q.isCorrect);
+  if (wrongQuestions.length === 0) {
+    ElMessage.info('没有错题需要加入');
+    return;
+  }
+
+  try {
+    await request.post('/student/wrong-book/add-batch', {
+      questions: wrongQuestions.map(q => ({
+        questionId: q.id,
+        assignmentId: assignmentId.value,
+      })),
+    });
+    ElMessage.success(`已将 ${wrongQuestions.length} 道错题加入错题本`);
+  } catch (error) {
+    console.error('批量加入错题本失败:', error);
+    ElMessage.error('批量加入错题本失败');
+  }
+};
+
+onMounted(() => {
+  getAssignmentDetail();
+});
+</script>
+
+<style scoped>
+.assignment-detail {
+  padding: 24px;
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(10px);
+  border-radius: 16px;
+  margin: 16px;
+  min-height: calc(100vh - 84px);
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+:deep(.el-card) {
+  border: none;
+  border-radius: 16px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+}
+
+:deep(.el-card__header) {
+  padding: 16px 20px;
+  border-bottom: none;
+  background: transparent;
+}
+
+:deep(.el-card__body) {
+  padding: 0 20px 20px;
+}
+
+.card-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #303133;
+}
+
+.card-title__left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.card-title__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, rgb(15, 38, 70) 0%, rgb(58, 97, 156) 50%, rgb(11, 17, 27) 100%);
+  color: #fff;
+}
+
+.card-title__icon .el-icon {
+  font-size: 18px;
+}
+
+.back-btn {
+  padding: 6px 12px;
+  font-size: 13px;
+  border-radius: 8px;
+}
+
+.back-btn .el-icon {
+  margin-right: 4px;
+}
+
+.assignment-summary {
+  display: flex;
+  gap: 40px;
+  padding: 10px 0;
+  flex-wrap: wrap;
+}
+
+.summary-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+
+.summary-label {
+  color: #909399;
+}
+
+.summary-value {
+  color: #303133;
+  font-weight: 500;
+}
+
+.summary-value.score strong {
+  color: #67c23a;
+  font-size: 20px;
+}
+
+.questions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.question-card {
+  background: #fff;
+  border-radius: 12px;
+  border: 1px solid #ebeef5;
+  padding: 20px;
+  transition: all 0.3s;
+}
+
+.question-card.correct {
+  border-left: 4px solid #67c23a;
+}
+
+.question-card.incorrect {
+  border-left: 4px solid #f56c6c;
+}
+
+.question-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.question-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.question-number {
+  font-size: 16px;
+  font-weight: 600;
+  color: #303133;
+}
+
+.question-score {
+  font-size: 14px;
+  color: #f56c6c;
+}
+
+.question-result {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.earned-score {
+  font-size: 14px;
+  color: #606266;
+}
+
+.earned-score strong {
+  color: #67c23a;
+  font-size: 18px;
+}
+
+.question-content {
+  font-size: 15px;
+  line-height: 1.8;
+  color: #303133;
+  margin-bottom: 20px;
+  padding: 16px;
+  background: linear-gradient(135deg, #fafafa 0%, #f5f7fa 100%);
+  border-radius: 12px;
+  border-left: 4px solid #409eff;
+}
+
+.answer-section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.answer-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.answer-label {
+  font-size: 14px;
+  color: #606266;
+  font-weight: 500;
+}
+
+.answer-value {
+  font-size: 14px;
+  padding: 12px 16px;
+  border-radius: 8px;
+  background: #f5f7fa;
+}
+
+.answer-value.correct {
+  background: linear-gradient(135deg, #f0f9eb 0%, #e1f3d8 100%);
+  color: #67c23a;
+}
+
+.answer-value.incorrect {
+  background: linear-gradient(135deg, #fef0f0 0%, #fde2e2 100%);
+  color: #f56c6c;
+}
+
+.essay-content {
+  line-height: 1.8;
+  color: #303133;
+}
+
+.ai-feedback {
+  background: linear-gradient(135deg, #ecf5ff 0%, #f0f7ff 100%);
+  border-radius: 12px;
+  padding: 16px;
+  border: 1px solid #d9ecff;
+}
+
+.feedback-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #409eff;
+  margin-bottom: 16px;
+}
+
+.feedback-section {
+  margin-bottom: 12px;
+}
+
+.feedback-section:last-child {
+  margin-bottom: 0;
+}
+
+.feedback-subtitle {
+  font-size: 13px;
+  color: #606266;
+  font-weight: 500;
+  margin-bottom: 8px;
+}
+
+.error-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.error-tag {
+  font-size: 12px;
+}
+
+.suggestion-content {
+  font-size: 14px;
+  line-height: 1.8;
+  color: #303133;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.suggestion-content .el-button {
+  flex-shrink: 0;
+}
+
+.teacher-comment {
+  background: linear-gradient(135deg, #fdf6ec 0%, #faecd8 100%);
+  border-radius: 12px;
+  padding: 16px;
+  border: 1px solid #faecd8;
+}
+
+.comment-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #e6a23c;
+  margin-bottom: 12px;
+}
+
+.comment-content {
+  font-size: 14px;
+  line-height: 1.8;
+  color: #303133;
+}
+
+.question-footer {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #ebeef5;
+  display: flex;
+  justify-content: flex-end;
+}
+
+@media (max-width: 768px) {
+  .assignment-detail {
+    padding: 16px;
+    margin: 12px;
+  }
+
+  .assignment-summary {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .question-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+</style>

@@ -3,10 +3,10 @@
     <div class="submit-container">
       <div class="main-content">
         <div class="questions-wrapper">
-          <div 
-            v-for="(question, index) in questions" 
-            :key="question.id" 
-            :id="`question-${question.id}`" 
+          <div
+            v-for="(question, index) in questions"
+            :key="question.id"
+            :id="`question-${question.id}`"
             class="question-card"
           >
             <div class="question-header">
@@ -18,58 +18,74 @@
                 <span class="question-score">({{ question.score }}分)</span>
               </div>
             </div>
-            
+
             <div class="question-content" v-html="question.content"></div>
-            
+
             <div class="question-answer">
               <template v-if="question.type === 'single'">
                 <div class="answer-label">请选择正确答案：</div>
-                <el-radio-group v-model="answers[question.id]" @change="handleAnswerChange(question.id)">
+                <el-radio-group
+                  v-model="answers[question.id]"
+                  @change="handleAnswerChange(question.id)"
+                >
                   <div class="options-list">
-                    <div 
-                      v-for="(option, idx) in parseOptions(question.options)" 
-                      :key="idx" 
+                    <div
+                      v-for="(option, idx) in parseOptions(question.options)"
+                      :key="idx"
                       class="option-item"
                     >
                       <el-radio :label="String.fromCharCode(65 + idx)">
-                        <span class="option-label">{{ String.fromCharCode(65 + idx) }}.</span>
+                        <span class="option-label"
+                          >{{ String.fromCharCode(65 + idx) }}.</span
+                        >
                         <span class="option-text">{{ option }}</span>
                       </el-radio>
                     </div>
                   </div>
                 </el-radio-group>
               </template>
-              
+
               <template v-else-if="question.type === 'multiple'">
                 <div class="answer-label">请选择所有正确答案：</div>
                 <div class="select-all">
-                  <el-checkbox 
-                    :model-value="isAllSelected(question.id, question.options)" 
-                    @change="handleSelectAll(question.id, question.options, $event)"
+                  <el-checkbox
+                    :model-value="isAllSelected(question.id, question.options)"
+                    @change="
+                      handleSelectAll(question.id, question.options, $event)
+                    "
                   >
                     全选
                   </el-checkbox>
                 </div>
-                <el-checkbox-group v-model="answers[question.id]" @change="handleAnswerChange(question.id)">
+                <el-checkbox-group
+                  v-model="answers[question.id]"
+                  @change="handleAnswerChange(question.id)"
+                >
                   <div class="options-list">
-                    <div 
-                      v-for="(option, idx) in parseOptions(question.options)" 
-                      :key="idx" 
+                    <div
+                      v-for="(option, idx) in parseOptions(question.options)"
+                      :key="idx"
                       class="option-item"
                     >
                       <el-checkbox :label="String.fromCharCode(65 + idx)">
-                        <span class="option-label">{{ String.fromCharCode(65 + idx) }}.</span>
+                        <span class="option-label"
+                          >{{ String.fromCharCode(65 + idx) }}.</span
+                        >
                         <span class="option-text">{{ option }}</span>
                       </el-checkbox>
                     </div>
                   </div>
                 </el-checkbox-group>
               </template>
-              
+
               <template v-else-if="question.type === 'judgment'">
                 <div class="answer-label">请判断正误：</div>
                 <div class="judgment-switch">
-                  <span class="judgment-label" :class="{ 'active': answers[question.id] === 'true' }">正确</span>
+                  <span
+                    class="judgment-label"
+                    :class="{ active: answers[question.id] === 'true' }"
+                    >正确</span
+                  >
                   <el-switch
                     v-model="answers[question.id]"
                     active-value="true"
@@ -78,26 +94,40 @@
                     inactive-color="#f56c6c"
                     @change="handleAnswerChange(question.id)"
                   />
-                  <span class="judgment-label" :class="{ 'active': answers[question.id] === 'false' }">错误</span>
+                  <span
+                    class="judgment-label"
+                    :class="{ active: answers[question.id] === 'false' }"
+                    >错误</span
+                  >
                 </div>
               </template>
-              
+
               <template v-else-if="question.type === 'essay'">
                 <div class="answer-label">请输入答案：</div>
                 <div class="essay-editor-wrapper">
-                  <div class="editor-toolbar" v-if="!question.minWords && !question.maxWords">
+                  <div
+                    class="editor-toolbar"
+                    v-if="!question.minWords && !question.maxWords"
+                  >
                     <el-button-group>
-                      <el-button size="small" @click="insertFormula(question.id)">
+                      <el-button
+                        size="small"
+                        @click="insertFormula(question.id)"
+                      >
                         <el-icon><Edit /></el-icon> 插入公式
                       </el-button>
                     </el-button-group>
                   </div>
-                  <div :ref="(el) => setEditorRef(el, question.id)" class="quill-editor"></div>
+                  <div
+                    :ref="(el) => setEditorRef(el, question.id)"
+                    class="quill-editor"
+                  ></div>
                   <div class="editor-footer">
                     <div class="word-count">
                       字数：{{ getWordCount(question.id) }}
                       <template v-if="question.minWords || question.maxWords">
-                        / {{ question.minWords || 0 }} - {{ question.maxWords || '∞' }}
+                        / {{ question.minWords || 0 }} -
+                        {{ question.maxWords || '∞' }}
                       </template>
                     </div>
                     <div class="auto-save-hint" v-if="lastAutoSave">
@@ -110,11 +140,13 @@
             </div>
           </div>
         </div>
-        
+
         <div class="bottom-action-bar">
           <div class="action-left">
             <el-tag type="info">共 {{ questions.length }} 题</el-tag>
-            <el-tag :type="answeredCount === questions.length ? 'success' : 'warning'">
+            <el-tag
+              :type="answeredCount === questions.length ? 'success' : 'warning'"
+            >
               已答 {{ answeredCount }} 题
             </el-tag>
           </div>
@@ -122,20 +154,25 @@
             <el-button @click="handleSaveDraft" :loading="savingDraft">
               <el-icon><Document /></el-icon> 保存草稿
             </el-button>
-            <el-button type="primary" @click="handleSubmit" :loading="submitting" :disabled="isOverdue">
+            <el-button
+              type="primary"
+              @click="handleSubmit"
+              :loading="submitting"
+              :disabled="isOverdue"
+            >
               <el-icon><Promotion /></el-icon> 提交作业
             </el-button>
           </div>
         </div>
       </div>
-      
+
       <div class="side-panel">
         <div class="panel-header">
           <h3 class="assignment-title">{{ assignment.title }}</h3>
           <el-tag type="info" size="small">{{ assignment.courseName }}</el-tag>
         </div>
-        
-        <div class="countdown-section" :class="{ 'overdue': isOverdue }">
+
+        <div class="countdown-section" :class="{ overdue: isOverdue }">
           <div class="countdown-label">
             <el-icon><Clock /></el-icon>
             <span>{{ isOverdue ? '已逾期' : '剩余时间' }}</span>
@@ -154,42 +191,55 @@
             作业已逾期，无法提交
           </div>
         </div>
-        
+
         <div class="question-index-section">
           <h4 class="section-title">题目索引</h4>
           <div class="index-grid">
-            <div 
-              v-for="(question, index) in questions" 
+            <div
+              v-for="(question, index) in questions"
               :key="question.id"
               class="index-item"
-              :class="{ 
-                'answered': isAnswered(question.id),
-                'current': currentQuestionId === question.id 
+              :class="{
+                answered: isAnswered(question.id),
+                current: currentQuestionId === question.id,
               }"
               @click="scrollToQuestion(question.id)"
             >
               <span class="index-number">{{ index + 1 }}</span>
-              <el-icon v-if="isAnswered(question.id)" class="check-icon"><Check /></el-icon>
+              <el-icon v-if="isAnswered(question.id)" class="check-icon"
+                ><Check
+              /></el-icon>
             </div>
           </div>
         </div>
-        
+
         <div class="panel-footer">
-          <el-button @click="handleSaveDraft" :loading="savingDraft" style="flex: 1;">
+          <el-button
+            @click="handleSaveDraft"
+            :loading="savingDraft"
+            style="flex: 1"
+          >
             <el-icon><Document /></el-icon> 保存草稿
           </el-button>
-          <el-button type="primary" @click="handleSubmit" :loading="submitting" :disabled="isOverdue" style="flex: 1;">
+          <el-button
+            type="primary"
+            @click="handleSubmit"
+            :loading="submitting"
+            :disabled="isOverdue"
+            style="flex: 1"
+          >
             <el-icon><Promotion /></el-icon> 提交
           </el-button>
         </div>
       </div>
     </div>
-    
+
     <el-dialog
       v-model="submitDialogVisible"
       title="确认提交"
       width="500px"
       :close-on-click-modal="false"
+      append-to-body
     >
       <div class="submit-confirm">
         <div class="confirm-icon">
@@ -199,15 +249,17 @@
         <p class="confirm-desc">提交后将无法修改答案</p>
         <div class="answer-summary">
           <el-tag type="success">已答 {{ answeredCount }} 题</el-tag>
-          <el-tag type="danger" v-if="unansweredCount > 0">未答 {{ unansweredCount }} 题</el-tag>
+          <el-tag type="danger" v-if="unansweredCount > 0"
+            >未答 {{ unansweredCount }} 题</el-tag
+          >
         </div>
         <div class="unanswered-list" v-if="unansweredQuestions.length > 0">
           <p class="unanswered-title">未作答题目：</p>
           <div class="unanswered-numbers">
-            <el-tag 
-              v-for="q in unansweredQuestions" 
-              :key="q.id" 
-              type="danger" 
+            <el-tag
+              v-for="q in unansweredQuestions"
+              :key="q.id"
+              type="danger"
               size="small"
               class="unanswered-tag"
             >
@@ -223,12 +275,8 @@
         </el-button>
       </template>
     </el-dialog>
-    
-    <el-dialog
-      v-model="formulaDialogVisible"
-      title="插入公式"
-      width="500px"
-    >
+
+    <el-dialog v-model="formulaDialogVisible" title="插入公式" width="500px" append-to-body>
       <div class="formula-input">
         <el-input
           v-model="formulaInput"
@@ -253,8 +301,13 @@
 import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import { 
-  Clock, Check, Document, Promotion, Edit, WarningFilled 
+import {
+  Clock,
+  Check,
+  Document,
+  Promotion,
+  Edit,
+  WarningFilled,
 } from '@element-plus/icons-vue';
 import Quill from 'quill';
 import 'quill/dist/quill.snow.css';
@@ -271,7 +324,7 @@ const assignment = ref({
   title: '',
   courseName: '',
   deadline: '',
-  totalScore: 0
+  totalScore: 0,
 });
 
 const questions = ref<any[]>([]);
@@ -301,12 +354,14 @@ let autoSaveTimer: number | null = null;
 let essayAutoSaveTimer: number | null = null;
 
 const answeredCount = computed(() => answeredSet.value.size);
-const unansweredCount = computed(() => questions.value.length - answeredCount.value);
+const unansweredCount = computed(
+  () => questions.value.length - answeredCount.value,
+);
 
 const unansweredQuestions = computed(() => {
   return questions.value
     .map((q, index) => ({ ...q, index: index + 1 }))
-    .filter(q => !answeredSet.value.has(q.id));
+    .filter((q) => !answeredSet.value.has(q.id));
 });
 
 const renderedFormula = computed(() => {
@@ -323,7 +378,7 @@ const getQuestionTypeText = (type: string) => {
     single: '单选题',
     multiple: '多选题',
     judgment: '判断题',
-    essay: '主观题'
+    essay: '主观题',
   };
   return map[type] || type;
 };
@@ -333,7 +388,7 @@ const getQuestionTypeTag = (type: string) => {
     single: '',
     multiple: 'success',
     judgment: 'warning',
-    essay: 'danger'
+    essay: 'danger',
   };
   return map[type] || '';
 };
@@ -382,10 +437,16 @@ const isAllSelected = (questionId: number, options: string) => {
   return selected.length === opts.length;
 };
 
-const handleSelectAll = (questionId: number, options: string, checked: boolean) => {
+const handleSelectAll = (
+  questionId: number,
+  options: string,
+  checked: boolean,
+) => {
   const opts = parseOptions(options);
   if (checked) {
-    answers.value[questionId] = opts.map((_, idx) => String.fromCharCode(65 + idx));
+    answers.value[questionId] = opts.map((_, idx) =>
+      String.fromCharCode(65 + idx),
+    );
   } else {
     answers.value[questionId] = [];
   }
@@ -407,25 +468,25 @@ const scrollToQuestion = (questionId: number) => {
 const initQuillEditor = (questionId: number) => {
   const el = editorRefs.value[questionId];
   if (!el) return;
-  
+
   const editor = new Quill(el, {
     theme: 'snow',
     modules: {
       toolbar: [
         ['bold', 'italic', 'underline', 'strike'],
-        [{ 'list': 'ordered' }, { 'list': 'bullet' }],
-        ['clean']
-      ]
+        [{ list: 'ordered' }, { list: 'bullet' }],
+        ['clean'],
+      ],
     },
-    placeholder: '请输入答案...'
+    placeholder: '请输入答案...',
   });
-  
+
   editors.value[questionId] = editor;
-  
+
   editor.on('text-change', () => {
     const text = editor.getText().trim();
     wordCounts.value[questionId] = text.length;
-    
+
     if (text.length > 0) {
       answeredSet.value.add(questionId);
     } else {
@@ -445,58 +506,60 @@ const confirmInsertFormula = () => {
     ElMessage.warning('请输入公式');
     return;
   }
-  
+
   const editor = editors.value[currentFormulaQuestionId.value];
   if (editor) {
     const selection = editor.getSelection();
     const index = selection ? selection.index : editor.getLength();
-    
+
     const formulaHtml = `<span class="katex-formula">$${formulaInput.value}$</span>`;
     editor.clipboard.dangerouslyPasteHTML(index, formulaHtml);
   }
-  
+
   formulaDialogVisible.value = false;
 };
 
 const calculateCountdown = () => {
   if (!assignment.value.deadline) return;
-  
+
   const now = new Date().getTime();
   const deadline = new Date(assignment.value.deadline).getTime();
   const diff = deadline - now;
-  
+
   if (diff <= 0) {
     isOverdue.value = true;
     countdown.value = { days: 0, hours: 0, minutes: 0, seconds: 0 };
     return;
   }
-  
+
   isOverdue.value = false;
   countdown.value = {
     days: Math.floor(diff / (1000 * 60 * 60 * 24)),
     hours: Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)),
     minutes: Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60)),
-    seconds: Math.floor((diff % (1000 * 60)) / 1000)
+    seconds: Math.floor((diff % (1000 * 60)) / 1000),
   };
 };
 
 const fetchAssignmentData = async () => {
   try {
     loading.value = true;
-    const response = await request.get(`/student/assignments/${assignmentId.value}`);
-    
+    const response = await request.get(
+      `/student/assignments/${assignmentId.value}/detail`,
+    );
+
     if (response.data) {
       assignment.value = {
         id: response.data.id,
         title: response.data.title,
         courseName: response.data.courseName,
         deadline: response.data.deadline,
-        totalScore: response.data.totalScore
+        totalScore: response.data.totalScore,
       };
-      
+
       questions.value = response.data.questions || [];
-      
-      questions.value.forEach(q => {
+
+      questions.value.forEach((q) => {
         if (q.type === 'multiple') {
           answers.value[q.id] = [];
         } else if (q.type === 'essay') {
@@ -505,16 +568,16 @@ const fetchAssignmentData = async () => {
           answers.value[q.id] = '';
         }
       });
-      
+
       calculateCountdown();
-      
+
       await nextTick();
-      questions.value.forEach(q => {
+      questions.value.forEach((q) => {
         if (q.type === 'essay') {
           initQuillEditor(q.id);
         }
       });
-      
+
       startAutoSave();
       checkDraft();
     }
@@ -528,25 +591,25 @@ const fetchAssignmentData = async () => {
 
 const checkDraft = async () => {
   try {
-    const response = await request.get(`/student/assignments/${assignmentId.value}/draft`);
+    const response = await request.get(
+      `/student/assignments/${assignmentId.value}/draft`,
+    );
     if (response.data && response.data.answers) {
-      const hasContent = response.data.answers.some((a: any) => 
-        a.answerContent && a.answerContent.length > 0
+      const hasContent = response.data.answers.some(
+        (a: any) => a.answerContent && a.answerContent.length > 0,
       );
-      
+
       if (hasContent) {
-        ElMessageBox.confirm(
-          '你有未保存的草稿，是否恢复？',
-          '提示',
-          {
-            confirmButtonText: '恢复',
-            cancelButtonText: '放弃',
-            type: 'info'
-          }
-        ).then(() => {
-          restoreDraft(response.data.answers);
-          ElMessage.success('草稿已恢复');
-        }).catch(() => {});
+        ElMessageBox.confirm('你有未保存的草稿，是否恢复？', '提示', {
+          confirmButtonText: '恢复',
+          cancelButtonText: '放弃',
+          type: 'info',
+        })
+          .then(() => {
+            restoreDraft(response.data.answers);
+            ElMessage.success('草稿已恢复');
+          })
+          .catch(() => {});
       }
     }
   } catch (error) {
@@ -555,15 +618,17 @@ const checkDraft = async () => {
 };
 
 const restoreDraft = (draftAnswers: any[]) => {
-  draftAnswers.forEach(item => {
-    const question = questions.value.find(q => q.id === item.questionId);
+  draftAnswers.forEach((item) => {
+    const question = questions.value.find((q) => q.id === item.questionId);
     if (!question) return;
-    
+
     if (question.type === 'multiple') {
       try {
         answers.value[item.questionId] = JSON.parse(item.answerContent);
       } catch {
-        answers.value[item.questionId] = item.answerContent ? [item.answerContent] : [];
+        answers.value[item.questionId] = item.answerContent
+          ? [item.answerContent]
+          : [];
       }
     } else if (question.type === 'essay') {
       const editor = editors.value[item.questionId];
@@ -574,13 +639,13 @@ const restoreDraft = (draftAnswers: any[]) => {
     } else {
       answers.value[item.questionId] = item.answerContent || '';
     }
-    
+
     handleAnswerChange(item.questionId);
   });
 };
 
 const collectAnswers = () => {
-  questions.value.forEach(q => {
+  questions.value.forEach((q) => {
     if (q.type === 'essay') {
       const editor = editors.value[q.id];
       if (editor) {
@@ -588,12 +653,12 @@ const collectAnswers = () => {
       }
     }
   });
-  
-  return questions.value.map(q => ({
+
+  return questions.value.map((q) => ({
     questionId: q.id,
-    answerContent: Array.isArray(answers.value[q.id]) 
-      ? JSON.stringify(answers.value[q.id]) 
-      : String(answers.value[q.id] || '')
+    answerContent: Array.isArray(answers.value[q.id])
+      ? JSON.stringify(answers.value[q.id])
+      : String(answers.value[q.id] || ''),
   }));
 };
 
@@ -601,14 +666,14 @@ const handleSaveDraft = async () => {
   try {
     savingDraft.value = true;
     const answersData = collectAnswers();
-    
-    await request.post(`/student/assignments/${assignmentId.value}/draft`, {
-      answers: answersData
+
+    await request.post(`/student/assignments/${assignmentId.value}/save-draft`, {
+      answers: answersData,
     });
-    
+
     const now = new Date();
     lastAutoSave.value = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
-    
+
     ElMessage.success('草稿保存成功');
   } catch (error) {
     console.error('保存草稿失败:', error);
@@ -620,7 +685,7 @@ const handleSaveDraft = async () => {
 
 const handleSubmit = () => {
   collectAnswers();
-  
+
   if (unansweredCount.value > 0) {
     ElMessageBox.confirm(
       `还有 ${unansweredCount.value} 道题目未作答，确定要提交吗？`,
@@ -628,11 +693,13 @@ const handleSubmit = () => {
       {
         confirmButtonText: '确认提交',
         cancelButtonText: '继续作答',
-        type: 'warning'
-      }
-    ).then(() => {
-      submitDialogVisible.value = true;
-    }).catch(() => {});
+        type: 'warning',
+      },
+    )
+      .then(() => {
+        submitDialogVisible.value = true;
+      })
+      .catch(() => {});
   } else {
     submitDialogVisible.value = true;
   }
@@ -643,15 +710,15 @@ const confirmSubmit = async () => {
     ElMessage.error('作业已逾期，无法提交');
     return;
   }
-  
+
   try {
     submitting.value = true;
     const answersData = collectAnswers();
-    
+
     await request.post(`/student/assignments/${assignmentId.value}/submit`, {
-      answers: answersData
+      answers: answersData,
     });
-    
+
     ElMessage.success('作业提交成功');
     submitDialogVisible.value = false;
     router.push('/student/assignments');
@@ -667,7 +734,7 @@ const startAutoSave = () => {
   autoSaveTimer.value = window.setInterval(() => {
     handleSaveDraft();
   }, 30000);
-  
+
   essayAutoSaveTimer.value = window.setInterval(() => {
     handleSaveDraft();
   }, 60000);
@@ -675,7 +742,7 @@ const startAutoSave = () => {
 
 onMounted(() => {
   fetchAssignmentData();
-  
+
   countdownTimer.value = window.setInterval(calculateCountdown, 1000);
 });
 
@@ -691,7 +758,7 @@ onUnmounted(() => {
   height: 100vh;
   display: flex;
   flex-direction: column;
-  background-color: #f5f7fa;
+  background: linear-gradient(135deg, #f5f7fa 0%, #e4e7ed 100%);
 }
 
 .submit-container {
@@ -710,16 +777,17 @@ onUnmounted(() => {
 .questions-wrapper {
   flex: 1;
   overflow-y: auto;
-  padding: 20px;
+  padding: 24px;
   padding-bottom: 80px;
 }
 
 .question-card {
   background: white;
-  border-radius: 12px;
+  border-radius: 16px;
   padding: 24px;
   margin-bottom: 20px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+  border: 1px solid #ebeef5;
 }
 
 .question-header {
@@ -749,8 +817,9 @@ onUnmounted(() => {
   color: #303133;
   margin-bottom: 20px;
   padding: 16px;
-  background: #fafafa;
-  border-radius: 8px;
+  background: linear-gradient(135deg, #fafafa 0%, #f5f7fa 100%);
+  border-radius: 12px;
+  border-left: 4px solid #409eff;
 }
 
 .question-answer {
@@ -761,6 +830,7 @@ onUnmounted(() => {
   font-size: 14px;
   color: #606266;
   margin-bottom: 12px;
+  font-weight: 500;
 }
 
 .options-list {
@@ -770,14 +840,16 @@ onUnmounted(() => {
 }
 
 .option-item {
-  padding: 12px 16px;
-  background: #f5f7fa;
-  border-radius: 8px;
+  padding: 14px 18px;
+  background: linear-gradient(135deg, #f5f7fa 0%, #fafafa 100%);
+  border-radius: 10px;
   transition: all 0.3s;
+  border: 1px solid transparent;
 }
 
 .option-item:hover {
-  background: #ecf5ff;
+  background: linear-gradient(135deg, #ecf5ff 0%, #f0f7ff 100%);
+  border-color: #409eff;
 }
 
 .option-label {
@@ -792,9 +864,9 @@ onUnmounted(() => {
 
 .select-all {
   margin-bottom: 12px;
-  padding: 8px 16px;
+  padding: 10px 18px;
   background: #f5f7fa;
-  border-radius: 8px;
+  border-radius: 10px;
 }
 
 .judgment-switch {
@@ -802,8 +874,8 @@ onUnmounted(() => {
   align-items: center;
   gap: 16px;
   padding: 16px;
-  background: #f5f7fa;
-  border-radius: 8px;
+  background: linear-gradient(135deg, #f5f7fa 0%, #fafafa 100%);
+  border-radius: 10px;
 }
 
 .judgment-label {
@@ -814,18 +886,18 @@ onUnmounted(() => {
 
 .judgment-label.active {
   color: #303133;
-  font-weight: 500;
+  font-weight: 600;
 }
 
 .essay-editor-wrapper {
   border: 1px solid #dcdfe6;
-  border-radius: 8px;
+  border-radius: 12px;
   overflow: hidden;
 }
 
 .editor-toolbar {
-  padding: 8px 12px;
-  background: #f5f7fa;
+  padding: 10px 14px;
+  background: linear-gradient(135deg, #f5f7fa 0%, #fafafa 100%);
   border-bottom: 1px solid #dcdfe6;
 }
 
@@ -844,8 +916,8 @@ onUnmounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 8px 12px;
-  background: #f5f7fa;
+  padding: 10px 14px;
+  background: linear-gradient(135deg, #f5f7fa 0%, #fafafa 100%);
   border-top: 1px solid #dcdfe6;
 }
 
@@ -871,9 +943,10 @@ onUnmounted(() => {
   justify-content: space-between;
   align-items: center;
   padding: 16px 24px;
-  background: white;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
   border-top: 1px solid #ebeef5;
-  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.06);
+  box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.08);
   z-index: 100;
 }
 
@@ -889,11 +962,12 @@ onUnmounted(() => {
 
 .side-panel {
   width: 300px;
-  background: white;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
   border-left: 1px solid #ebeef5;
   display: flex;
   flex-direction: column;
-  box-shadow: -2px 0 8px rgba(0, 0, 0, 0.06);
+  box-shadow: -4px 0 12px rgba(0, 0, 0, 0.08);
 }
 
 .panel-header {
@@ -927,7 +1001,7 @@ onUnmounted(() => {
   gap: 6px;
   font-size: 14px;
   color: #606266;
-  margin-bottom: 8px;
+  margin-bottom: 10px;
 }
 
 .countdown-value {
@@ -941,13 +1015,14 @@ onUnmounted(() => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 32px;
-  height: 32px;
+  min-width: 36px;
+  height: 36px;
   background: white;
-  border-radius: 6px;
+  border-radius: 8px;
   font-size: 16px;
   font-weight: 600;
   color: #409eff;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .time-unit {
@@ -970,7 +1045,7 @@ onUnmounted(() => {
 .section-title {
   margin: 0 0 12px 0;
   font-size: 14px;
-  font-weight: 500;
+  font-weight: 600;
   color: #303133;
 }
 
@@ -988,7 +1063,7 @@ onUnmounted(() => {
   width: 40px;
   height: 40px;
   border: 2px solid #dcdfe6;
-  border-radius: 8px;
+  border-radius: 10px;
   cursor: pointer;
   transition: all 0.3s;
   background: white;
@@ -1001,12 +1076,12 @@ onUnmounted(() => {
 
 .index-item.answered {
   border-color: #67c23a;
-  background: #f0f9eb;
+  background: linear-gradient(135deg, #f0f9eb 0%, #e1f3d8 100%);
 }
 
 .index-item.current {
   border-color: #409eff;
-  box-shadow: 0 0 0 2px rgba(64, 158, 255, 0.2);
+  box-shadow: 0 0 0 3px rgba(64, 158, 255, 0.2);
 }
 
 .index-number {
@@ -1068,7 +1143,7 @@ onUnmounted(() => {
 .unanswered-list {
   background: #fef0f0;
   padding: 12px 16px;
-  border-radius: 8px;
+  border-radius: 10px;
 }
 
 .unanswered-title {
@@ -1095,7 +1170,7 @@ onUnmounted(() => {
   margin-top: 16px;
   padding: 12px;
   background: #f5f7fa;
-  border-radius: 8px;
+  border-radius: 10px;
 }
 
 .preview-label {
@@ -1120,7 +1195,7 @@ onUnmounted(() => {
   .side-panel {
     width: 260px;
   }
-  
+
   .bottom-action-bar {
     right: 260px;
   }
@@ -1130,17 +1205,17 @@ onUnmounted(() => {
   .submit-container {
     flex-direction: column;
   }
-  
+
   .side-panel {
     width: 100%;
     order: -1;
     max-height: 200px;
   }
-  
+
   .question-index-section {
     display: none;
   }
-  
+
   .bottom-action-bar {
     right: 0;
   }
