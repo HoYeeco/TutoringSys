@@ -6,6 +6,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 @Builder
@@ -22,4 +23,15 @@ public class AdminCourseVO {
     private Integer assignmentCount;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
+    private List<StudentInfo> students;
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class StudentInfo {
+        private Long id;
+        private String username;
+        private String realName;
+    }
 }

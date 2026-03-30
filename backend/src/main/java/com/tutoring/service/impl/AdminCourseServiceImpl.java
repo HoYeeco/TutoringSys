@@ -8,6 +8,7 @@ import com.tutoring.entity.*;
 import com.tutoring.mapper.*;
 import com.tutoring.service.AdminCourseService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -105,10 +106,26 @@ public class AdminCourseServiceImpl implements AdminCourseService {
 
         User teacher = userMapper.selectById(course.getTeacherId());
 
-        Integer studentCount = Math.toIntExact(courseSelectionMapper.selectCount(
+        List<CourseSelection> selections = courseSelectionMapper.selectList(
             new LambdaQueryWrapper<CourseSelection>()
                 .eq(CourseSelection::getCourseId, id)
-        ));
+        );
+
+        List<Long> studentIds = selections.stream()
+            .map(CourseSelection::getStudentId)
+            .collect(Collectors.toList());
+
+        List<AdminCourseVO.StudentInfo> students = new java.util.ArrayList<>();
+        if (!studentIds.isEmpty()) {
+            List<User> studentUsers = userMapper.selectBatchIds(studentIds);
+            students = studentUsers.stream()
+                .map(u -> AdminCourseVO.StudentInfo.builder()
+                    .id(u.getId())
+                    .username(u.getUsername())
+                    .realName(u.getRealName())
+                    .build())
+                .collect(Collectors.toList());
+        }
 
         Integer assignmentCount = Math.toIntExact(assignmentMapper.selectCount(
             new LambdaQueryWrapper<Assignment>()
@@ -121,14 +138,16 @@ public class AdminCourseServiceImpl implements AdminCourseService {
             .description(course.getDescription())
             .teacherId(course.getTeacherId())
             .teacherName(teacher != null ? teacher.getRealName() : "未知教师")
-            .studentCount(studentCount)
+            .studentCount(studentIds.size())
             .assignmentCount(assignmentCount)
             .createTime(course.getCreateTime())
             .updateTime(course.getUpdateTime())
+            .students(students)
             .build();
     }
 
     @Override
+    @CacheEvict(value = "teacherCourses", allEntries = true)
     public AdminCourseVO updateCourse(Long id, AdminUpdateCourseRequest request) {
         Course course = courseMapper.selectById(id);
         if (course == null) {
@@ -150,10 +169,25 @@ public class AdminCourseServiceImpl implements AdminCourseService {
 
         courseMapper.updateById(course);
 
+        if (request.getStudentIds() != null) {
+            courseSelectionMapper.delete(
+                new LambdaQueryWrapper<CourseSelection>()
+                    .eq(CourseSelection::getCourseId, id)
+            );
+
+            for (Long studentId : request.getStudentIds()) {
+                CourseSelection selection = new CourseSelection();
+                selection.setCourseId(id);
+                selection.setStudentId(studentId);
+                courseSelectionMapper.insert(selection);
+            }
+        }
+
         return getCourseById(id);
     }
 
     @Override
+    @CacheEvict(value = "teacherCourses", allEntries = true)
     public void deleteCourse(Long id) {
         Course course = courseMapper.selectById(id);
         if (course == null) {

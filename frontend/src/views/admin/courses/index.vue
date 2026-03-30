@@ -327,15 +327,26 @@ const handleCreate = () => {
 };
 
 // 打开编辑对话框
-const handleEdit = (row: any) => {
+const handleEdit = async (row: any) => {
   dialogType.value = 'edit';
   form.id = row.id;
   form.name = row.name;
   form.description = row.description;
   form.teacherId = row.teacherId;
-  form.studentIds = []; // 实际项目中应该从后端获取
+  form.studentIds = [];
   form.assignmentCount = row.assignmentCount;
-  getStudents();
+  await getStudents();
+  
+  try {
+    const response = await request.get(`/admin/courses/${row.id}`);
+    const detail = response.data;
+    if (detail && detail.students) {
+      form.studentIds = detail.students.map((s: any) => s.id);
+    }
+  } catch (error) {
+    console.error('获取课程详情失败:', error);
+  }
+  
   dialogVisible.value = true;
 };
 
