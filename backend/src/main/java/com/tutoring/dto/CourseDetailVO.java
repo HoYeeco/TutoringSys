@@ -13,13 +13,12 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 public class CourseDetailVO {
-
     private Long id;
     private String name;
     private String description;
     private Long teacherId;
     private String teacherName;
+    private String teacherAvatar;
     private LocalDateTime createTime;
     private List<StudentAssignmentVO> assignments;
-
 }

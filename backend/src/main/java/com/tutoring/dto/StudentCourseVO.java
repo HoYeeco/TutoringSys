@@ -18,6 +18,8 @@ public class StudentCourseVO {
     private String description;
     private Long teacherId;
     private String teacherName;
+    private String teacherAvatar;
+    private Integer assignmentCount;
     private LocalDateTime createTime;
 
 }

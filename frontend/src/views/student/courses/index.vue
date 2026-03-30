@@ -1,50 +1,66 @@
 <template>
   <div class="student-courses">
-    <el-card shadow="never" class="page-header">
+    <el-card shadow="never" class="courses-section">
       <template #header>
         <div class="card-header">
-          <span>我的课程</span>
-          <div class="search-box">
+          <div class="card-header__title">
+            <div class="card-header__icon">
+              <el-icon><School /></el-icon>
+            </div>
+            <span>我的课程</span>
+          </div>
+          <div class="header-actions">
             <el-input
               v-model="searchKeyword"
               placeholder="搜索课程名称或教师"
               clearable
               @keyup.enter="handleSearch"
+              class="search-input"
             >
-              <template #append>
-                <el-button @click="handleSearch"><el-icon><Search /></el-icon></el-button>
+              <template #prefix>
+                <el-icon><Search /></el-icon>
               </template>
             </el-input>
           </div>
         </div>
       </template>
-    </el-card>
 
-    <div class="courses-grid">
       <el-empty v-if="filteredCourses.length === 0" description="暂无已选课程" />
-      <el-card
-        v-else
-        v-for="course in filteredCourses"
-        :key="course.id"
-        class="course-card"
-        @click="handleCourseDetail(course.id)"
-      >
-        <div class="course-header">
-          <h3 class="course-name">{{ course.name }}</h3>
-          <span class="course-teacher">{{ course.teacherName }}</span>
-        </div>
-        <div class="course-description">{{ course.description }}</div>
-        <div class="course-footer">
-          <div class="course-info">
-            <span class="course-assignments">作业数量: {{ course.assignmentCount || 0 }}</span>
-            <span class="course-join-time">加入时间: {{ formatDate(course.joinTime) }}</span>
+      <div v-else class="courses-grid">
+        <div
+          v-for="course in filteredCourses"
+          :key="course.id"
+          class="course-card"
+          @click="handleCourseDetail(course.id)"
+        >
+          <div class="course-card__header">
+            <div class="course-meta">
+              <h3 class="course-name">{{ course.name }}</h3>
+              <div class="teacher-info">
+                <el-avatar :size="28" :src="course.teacherAvatar">
+                  {{ course.teacherName?.charAt(0) || '?' }}
+                </el-avatar>
+                <span class="teacher-name">{{ course.teacherName }}</span>
+              </div>
+            </div>
           </div>
-          <el-button type="primary" size="small" @click.stop="handleCourseDetail(course.id)">
-            查看详情
-          </el-button>
+          <div class="course-card__body">
+            <p class="course-description">{{ course.description || '暂无课程描述' }}</p>
+          </div>
+          <div class="course-card__footer">
+            <div class="course-stats">
+              <div class="stat-item">
+                <el-icon><Document /></el-icon>
+                <span>{{ course.assignmentCount || 0 }} 份作业</span>
+              </div>
+            </div>
+            <el-button type="primary" size="small" @click.stop="handleCourseDetail(course.id)">
+              查看详情
+            </el-button>
+          </div>
         </div>
-      </el-card>
-    </div>
+      </div>
+    </el-card>
   </div>
 </template>
 
@@ -52,14 +68,13 @@
 import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
-import { Search } from '@element-plus/icons-vue';
+import { Search, School, Document } from '@element-plus/icons-vue';
 import request from '@/utils/request';
 
 const router = useRouter();
 const courses = ref([]);
 const searchKeyword = ref('');
 
-// 过滤后的课程列表
 const filteredCourses = computed(() => {
   if (!searchKeyword.value) {
     return courses.value;
@@ -73,7 +88,6 @@ const filteredCourses = computed(() => {
   });
 });
 
-// 获取学生课程列表
 const getCourses = async () => {
   try {
     const response = await request.get('/student/courses');
@@ -84,21 +98,10 @@ const getCourses = async () => {
   }
 };
 
-// 处理搜索
-const handleSearch = () => {
-  // 搜索逻辑已在computed中实现
-};
+const handleSearch = () => {};
 
 const handleCourseDetail = (courseId: number) => {
   router.push(`/student/courses/${courseId}`);
-};
-
-const formatDate = (date: string) => {
-  return new Date(date).toLocaleString('zh-CN', {
-    month: '2-digit',
-    day: '2-digit',
-    year: 'numeric'
-  });
 };
 
 onMounted(() => {
@@ -108,11 +111,28 @@ onMounted(() => {
 
 <style scoped>
 .student-courses {
-  padding: 20px;
+  padding: 24px;
+  background: rgba(255, 255, 255, 0.66);
+  backdrop-filter: blur(4px);
+  border-radius: 16px;
+  margin: 16px;
+  min-height: calc(100vh - 84px);
 }
 
-.page-header {
-  margin-bottom: 20px;
+:deep(.el-card) {
+  border: none;
+  border-radius: 16px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+}
+
+:deep(.el-card__header) {
+  padding: 16px 20px;
+  border-bottom: none;
+  background: transparent;
+}
+
+:deep(.el-card__body) {
+  padding: 20px;
 }
 
 .card-header {
@@ -120,116 +140,175 @@ onMounted(() => {
   justify-content: space-between;
   align-items: center;
   flex-wrap: wrap;
-  gap: 15px;
+  gap: 16px;
 }
 
-.search-box {
-  flex: 1;
-  min-width: 300px;
-  max-width: 500px;
+.card-header__title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 20px;
+  font-weight: 600;
+  color: #303133;
+}
+
+.card-header__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgb(15, 38, 70) 0%, rgb(58, 97, 156) 50%, rgb(11, 17, 27) 100%);
+  color: #fff;
+}
+
+.card-header__icon .el-icon {
+  font-size: 24px;
+}
+
+.header-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.search-input {
+  width: 280px;
 }
 
 .courses-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
   gap: 20px;
-  margin-top: 20px;
 }
 
 .course-card {
+  background: #fff;
+  border-radius: 12px;
+  border: 1px solid #ebeef5;
+  padding: 20px;
   cursor: pointer;
-  transition: transform 0.3s ease, box-shadow 0.3s ease;
-  border-radius: 8px;
-  overflow: hidden;
+  transition: all 0.3s ease;
+  display: flex;
+  flex-direction: column;
+  min-height: 200px;
 }
 
 .course-card:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  border-color: transparent;
 }
 
-.course-header {
-  margin-bottom: 15px;
+.course-card__header {
+  margin-bottom: 16px;
+}
+
+.course-meta {
+  width: 100%;
 }
 
 .course-name {
-  font-size: 18px;
+  font-size: 17px;
   font-weight: 600;
-  color: var(--color-text);
-  margin-bottom: 5px;
+  color: #303133;
+  margin: 0 0 10px 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.course-teacher {
+.teacher-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.teacher-name {
   font-size: 14px;
-  color: #999;
-  background-color: var(--color-background-light);
-  padding: 2px 8px;
-  border-radius: 10px;
+  color: #606266;
+  font-weight: 500;
+}
+
+.course-card__body {
+  flex: 1;
+  margin-bottom: 16px;
 }
 
 .course-description {
   font-size: 14px;
-  color: var(--color-text-secondary);
-  line-height: 1.5;
-  margin-bottom: 20px;
+  color: #606266;
+  line-height: 1.6;
+  margin: 0;
   display: -webkit-box;
-  -webkit-line-clamp: 3;
+  -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.course-footer {
+.course-card__footer {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-top: auto;
-  padding-top: 15px;
-  border-top: 1px solid var(--color-border);
+  padding-top: 16px;
+  border-top: 1px solid #ebeef5;
 }
 
-.course-info {
-  font-size: 12px;
-  color: #999;
+.course-stats {
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 8px;
 }
 
-.course-assignments,
-.course-join-time {
-  display: block;
+.stat-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: #909399;
+}
+
+.stat-item .el-icon {
+  font-size: 14px;
+  color: #c0c4cc;
+}
+
+:deep(.el-empty) {
+  padding: 60px 0;
 }
 
 @media (max-width: 768px) {
+  .student-courses {
+    padding: 16px;
+    margin: 12px;
+  }
+
   .card-header {
     flex-direction: column;
     align-items: flex-start;
   }
-  
-  .search-box {
+
+  .header-actions {
     width: 100%;
-    min-width: unset;
   }
-  
+
+  .search-input {
+    width: 100%;
+  }
+
   .courses-grid {
     grid-template-columns: 1fr;
   }
-  
-  .course-footer {
+
+  .course-card__footer {
     flex-direction: column;
     align-items: flex-start;
-    gap: 10px;
+    gap: 12px;
   }
-  
-  .course-info {
-    flex-direction: row;
-    gap: 15px;
-    width: 100%;
-    justify-content: space-between;
-  }
-  
-  .course-card .el-button {
+
+  .course-card__footer .el-button {
     width: 100%;
   }
 }

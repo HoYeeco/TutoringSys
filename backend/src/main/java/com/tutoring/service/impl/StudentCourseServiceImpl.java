@@ -46,19 +46,33 @@ public class StudentCourseServiceImpl implements StudentCourseService {
             .distinct()
             .collect(Collectors.toList());
 
-        Map<Long, String> teacherNameMap = userMapper.selectBatchIds(teacherIds)
+        Map<Long, User> teacherMap = userMapper.selectBatchIds(teacherIds)
             .stream()
-            .collect(Collectors.toMap(User::getId, User::getRealName));
+            .collect(Collectors.toMap(User::getId, u -> u));
+
+        Map<Long, Integer> assignmentCountMap = new HashMap<>();
+        for (Long courseId : courseIds) {
+            Long count = assignmentMapper.selectCount(
+                new LambdaQueryWrapper<Assignment>()
+                    .eq(Assignment::getCourseId, courseId)
+            );
+            assignmentCountMap.put(courseId, count.intValue());
+        }
 
         return courses.stream()
-            .map(course -> StudentCourseVO.builder()
-                .id(course.getId())
-                .name(course.getName())
-                .description(course.getDescription())
-                .teacherId(course.getTeacherId())
-                .teacherName(teacherNameMap.getOrDefault(course.getTeacherId(), "未知"))
-                .createTime(course.getCreateTime())
-                .build())
+            .map(course -> {
+                User teacher = teacherMap.get(course.getTeacherId());
+                return StudentCourseVO.builder()
+                    .id(course.getId())
+                    .name(course.getName())
+                    .description(course.getDescription())
+                    .teacherId(course.getTeacherId())
+                    .teacherName(teacher != null ? teacher.getRealName() : "未知")
+                    .teacherAvatar(teacher != null ? teacher.getAvatar() : null)
+                    .assignmentCount(assignmentCountMap.getOrDefault(course.getId(), 0))
+                    .createTime(course.getCreateTime())
+                    .build();
+            })
             .collect(Collectors.toList());
     }
 
@@ -81,6 +95,7 @@ public class StudentCourseServiceImpl implements StudentCourseService {
 
         User teacher = userMapper.selectById(course.getTeacherId());
         String teacherName = teacher != null ? teacher.getRealName() : "未知";
+        String teacherAvatar = teacher != null ? teacher.getAvatar() : null;
 
         List<Assignment> assignments = assignmentMapper.selectList(
             new LambdaQueryWrapper<Assignment>()
@@ -108,10 +123,18 @@ public class StudentCourseServiceImpl implements StudentCourseService {
         List<StudentAssignmentVO> assignmentVOs = assignments.stream()
             .map(assignment -> {
                 String status;
+                Integer score = null;
+                LocalDateTime gradeTime = null;
                 Submission submission = finalSubmissionMap.get(assignment.getId());
 
                 if (submission != null) {
-                    status = "submitted";
+                    if (submission.getFinalTotalScore() != null) {
+                        status = "graded";
+                        score = submission.getFinalTotalScore();
+                        gradeTime = submission.getReviewTime();
+                    } else {
+                        status = "submitted";
+                    }
                 } else if (now.isAfter(assignment.getDeadline())) {
                     status = "overdue";
                 } else {
@@ -125,6 +148,8 @@ public class StudentCourseServiceImpl implements StudentCourseService {
                     .deadline(assignment.getDeadline())
                     .totalScore(assignment.getTotalScore())
                     .status(status)
+                    .score(score)
+                    .gradeTime(gradeTime)
                     .build();
             })
             .collect(Collectors.toList());
@@ -135,6 +160,7 @@ public class StudentCourseServiceImpl implements StudentCourseService {
             .description(course.getDescription())
             .teacherId(course.getTeacherId())
             .teacherName(teacherName)
+            .teacherAvatar(teacherAvatar)
             .createTime(course.getCreateTime())
             .assignments(assignmentVOs)
             .build();
