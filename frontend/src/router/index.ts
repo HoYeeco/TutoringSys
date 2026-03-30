@@ -92,27 +92,15 @@ const routes = [
     meta: { requiresAuth: true, role: 'STUDENT' },
   },
   {
-    path: '/student/reports/:id',
-    name: 'StudentReports',
-    component: () => import('@/views/student/assignments/report.vue'),
-    meta: { requiresAuth: true, role: 'STUDENT' },
-  },
-  {
-    path: '/student/history',
-    name: 'StudentHistory',
-    component: () => import('@/views/student/assignments/history.vue'),
+    path: '/student/assignments/:id/detail',
+    name: 'StudentAssignmentDetail',
+    component: () => import('@/views/student/assignments/detail.vue'),
     meta: { requiresAuth: true, role: 'STUDENT' },
   },
   {
     path: '/student/courses',
     name: 'StudentCourses',
     component: () => import('@/views/student/courses/index.vue'),
-    meta: { requiresAuth: true, role: 'STUDENT' },
-  },
-  {
-    path: '/student/error-book',
-    name: 'StudentErrorBook',
-    component: () => import('@/views/student/error-book/index.vue'),
     meta: { requiresAuth: true, role: 'STUDENT' },
   },
   {
@@ -128,15 +116,9 @@ const routes = [
     meta: { requiresAuth: true, role: 'STUDENT' },
   },
   {
-    path: '/student/grading/:id',
-    name: 'StudentGradingDetail',
-    component: () => import('@/views/student/grading/detail.vue'),
-    meta: { requiresAuth: true, role: 'STUDENT' },
-  },
-  {
-    path: '/student/assignments/report/:id',
-    name: 'StudentAssignmentReport',
-    component: () => import('@/views/student/assignments/report.vue'),
+    path: '/student/error-book',
+    name: 'StudentErrorBook',
+    component: () => import('@/views/student/error-book/index.vue'),
     meta: { requiresAuth: true, role: 'STUDENT' },
   },
   {
