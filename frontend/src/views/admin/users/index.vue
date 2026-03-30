@@ -22,13 +22,13 @@
                 <el-icon><Search /></el-icon>
               </template>
             </el-input>
-            <el-select v-model="searchRole" placeholder="按角色筛选" class="filter-item" clearable>
+            <el-select v-model="searchRole" placeholder="按角色筛选" class="filter-item" clearable @change="handleSearch">
               <el-option label="全部" value="" />
               <el-option label="学生" value="STUDENT" />
               <el-option label="教师" value="TEACHER" />
               <el-option label="管理员" value="ADMIN" />
             </el-select>
-            <el-select v-model="searchStatus" placeholder="按状态筛选" class="filter-item" clearable>
+            <el-select v-model="searchStatus" placeholder="按状态筛选" class="filter-item" clearable @change="handleSearch">
               <el-option label="全部" value="" />
               <el-option label="正常" value="active" />
               <el-option label="禁用" value="inactive" />
