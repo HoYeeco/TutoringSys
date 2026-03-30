@@ -1,234 +1,279 @@
 <template>
   <div class="student-grading">
-    <el-card shadow="never" class="page-header">
+    <el-card shadow="never" class="filter-card">
       <template #header>
         <div class="card-header">
-          <span>成绩批改</span>
+          <div class="card-header__title">
+            <div class="card-header__icon">
+              <el-icon><TrendCharts /></el-icon>
+            </div>
+            <span>成绩分析</span>
+          </div>
         </div>
       </template>
+      <div class="filter-bar">
+        <el-select
+          v-model="filterCourse"
+          placeholder="选择课程"
+          class="filter-item"
+          clearable
+        >
+          <el-option label="全部课程" value="" />
+          <el-option
+            v-for="course in courses"
+            :key="course.id"
+            :label="course.name"
+            :value="course.id"
+          />
+        </el-select>
+        <el-date-picker
+          v-model="dateRange"
+          type="daterange"
+          range-separator="至"
+          start-placeholder="开始日期"
+          end-placeholder="结束日期"
+          class="filter-item date-picker"
+          value-format="YYYY-MM-DD"
+          @change="handleDateChange"
+        />
+      </div>
     </el-card>
 
-    <div class="stats-container">
-      <el-card shadow="never" class="stat-card">
+    <div class="stats-overview">
+      <div class="stat-card">
+        <div class="stat-icon total">
+          <el-icon><Document /></el-icon>
+        </div>
         <div class="stat-content">
-          <div class="stat-value">{{ overallStats.averageScore || 0 }}</div>
-          <div class="stat-label">平均成绩</div>
+          <span class="stat-label">总作业数</span>
+          <span class="stat-value">{{ stats.totalAssignments }}</span>
         </div>
-        <div class="stat-icon">
-          <el-icon class="icon-large"><Star /></el-icon>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon average">
+          <el-icon><TrendCharts /></el-icon>
         </div>
-      </el-card>
-
-      <el-card shadow="never" class="stat-card">
         <div class="stat-content">
-          <div class="stat-value">{{ overallStats.gradedCount || 0 }}</div>
-          <div class="stat-label">已批改作业</div>
+          <span class="stat-label">平均正确率</span>
+          <span class="stat-value">{{ stats.averageAccuracy }}%</span>
         </div>
-        <div class="stat-icon">
-          <el-icon class="icon-large"><Check /></el-icon>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon highest">
+          <el-icon><Trophy /></el-icon>
         </div>
-      </el-card>
-
-      <el-card shadow="never" class="stat-card">
         <div class="stat-content">
-          <div class="stat-value">{{ overallStats.accuracy || 0 }}%</div>
-          <div class="stat-label">平均正确率</div>
+          <span class="stat-label">最高分作业</span>
+          <span class="stat-value highlight">{{ stats.highestScore }}</span>
+          <span class="stat-sub">{{ stats.highestAssignment || '-' }}</span>
         </div>
-        <div class="stat-icon">
-          <el-icon class="icon-large"><TrendCharts /></el-icon>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon lowest">
+          <el-icon><Warning /></el-icon>
         </div>
-      </el-card>
-
-      <el-card shadow="never" class="stat-card">
         <div class="stat-content">
-          <div class="stat-value">{{ overallStats.errorCount || 0 }}</div>
-          <div class="stat-label">错题总数</div>
+          <span class="stat-label">最低分作业</span>
+          <span class="stat-value warning">{{ stats.lowestScore }}</span>
+          <span class="stat-sub">{{ stats.lowestAssignment || '-' }}</span>
         </div>
-        <div class="stat-icon">
-          <el-icon class="icon-large"><Warning /></el-icon>
-        </div>
-      </el-card>
+      </div>
     </div>
 
-    <el-row :gutter="20">
-      <el-col :span="12">
+    <el-row :gutter="20" class="charts-row">
+      <el-col :xs="24" :lg="12">
         <el-card shadow="never" class="chart-card">
           <template #header>
-            <div class="card-header">
-              <span>个人成绩趋势</span>
+            <div class="chart-title">
+              <el-icon><TrendCharts /></el-icon>
+              <span>成绩变化趋势</span>
             </div>
           </template>
-          <div ref="scoreTrendChartRef" class="chart"></div>
+          <div ref="lineChartRef" class="chart-container"></div>
         </el-card>
       </el-col>
-      <el-col :span="12">
+      <el-col :xs="24" :lg="12">
         <el-card shadow="never" class="chart-card">
           <template #header>
-            <div class="card-header">
+            <div class="chart-title">
+              <el-icon><Histogram /></el-icon>
               <span>各课程成绩对比</span>
             </div>
           </template>
-          <div ref="courseCompareChartRef" class="chart"></div>
+          <div ref="barChartRef" class="chart-container"></div>
         </el-card>
       </el-col>
     </el-row>
 
-    <el-card shadow="never" class="mt-4">
+    <el-card shadow="never" class="table-card">
       <template #header>
-        <div class="card-header">
-          <span>已提交作业</span>
-          <span class="total-count">共 {{ filteredAssignments.length }} 份作业</span>
+        <div class="chart-title">
+          <el-icon><List /></el-icon>
+          <span>各课程统计信息</span>
         </div>
       </template>
-      
-      <div class="filter-bar">
-        <div class="filter-row">
-          <el-input
-            v-model="searchKeyword"
-            placeholder="搜索作业名称或课程名称"
-            clearable
-            class="filter-item search-input"
-          >
-            <template #prefix>
-              <el-icon><Search /></el-icon>
-            </template>
-          </el-input>
-          <el-select v-model="filterCourse" placeholder="按课程筛选" class="filter-item" clearable>
-            <el-option label="全部课程" value="" />
-            <el-option v-for="course in courses" :key="course.id" :label="course.name" :value="course.id" />
-          </el-select>
-        </div>
-        <div class="sort-row">
-          <span class="sort-label">排序：</span>
-          <el-select v-model="sortBy" placeholder="排序方式" class="sort-item">
-            <el-option label="提交时间（最新）" value="submitTime:desc" />
-            <el-option label="提交时间（最早）" value="submitTime:asc" />
-            <el-option label="分数（从高到低）" value="score:desc" />
-            <el-option label="分数（从低到低）" value="score:asc" />
-            <el-option label="错题数量（从多到少）" value="errorCount:desc" />
-            <el-option label="错题数量（从少到多）" value="errorCount:asc" />
-            <el-option label="发布时间（最新）" value="createTime:desc" />
-            <el-option label="截止时间（最近）" value="deadline:asc" />
-          </el-select>
-        </div>
-      </div>
-
-      <el-empty v-if="filteredAssignments.length === 0" description="暂无已批改作业" />
-      <div v-else class="assignment-grid">
-        <div
-          v-for="assignment in filteredAssignments"
-          :key="assignment.id"
-          class="assignment-card"
-          @click="goToDetail(assignment)"
-        >
-          <div class="card-header-section">
-            <div class="assignment-title">{{ assignment.title }}</div>
-            <el-tag :type="getScoreTagType(assignment.score, assignment.totalScore)" effect="dark">
-              {{ assignment.score }}/{{ assignment.totalScore }}
-            </el-tag>
-          </div>
-          
-          <div class="card-body">
-            <div class="info-row">
-              <el-icon><School /></el-icon>
-              <span>{{ assignment.courseName }}</span>
-            </div>
-            <div class="info-row">
-              <el-icon><User /></el-icon>
-              <span>{{ assignment.teacherName }}</span>
-            </div>
-            <div class="info-row">
-              <el-icon><TrendCharts /></el-icon>
-              <span>正确率：{{ assignment.accuracy }}%</span>
-            </div>
-            <div class="info-row">
-              <el-icon><Clock /></el-icon>
-              <span>批改时间：{{ formatDate(assignment.gradingTime) }}</span>
-            </div>
-          </div>
-
-          <div class="card-footer">
-            <div class="grading-type">
-              <el-tag :type="assignment.gradingType === 'AI' ? 'primary' : 'success'" size="small">
-                {{ assignment.gradingType === 'AI' ? '智能批改' : '人工复核' }}
-              </el-tag>
-            </div>
-            <div class="error-count" v-if="assignment.errorCount > 0">
-              <el-icon><Warning /></el-icon>
-              <span>{{ assignment.errorCount }} 道错题</span>
-            </div>
-          </div>
-        </div>
-      </div>
+      <el-table :data="courseStats" stripe style="width: 100%">
+        <el-table-column prop="courseName" label="课程名称" min-width="150" />
+        <el-table-column prop="assignmentCount" label="作业数" width="100" align="center" />
+        <el-table-column prop="averageScore" label="平均分" width="100" align="center">
+          <template #default="{ row }">
+            <span :class="getScoreClass(row.averageScore)">{{ row.averageScore }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="highestScore" label="最高分" width="100" align="center">
+          <template #default="{ row }">
+            <span class="score-high">{{ row.highestScore }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="lowestScore" label="最低分" width="100" align="center">
+          <template #default="{ row }">
+            <span class="score-low">{{ row.lowestScore }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="latestScore" label="最近得分" width="100" align="center">
+          <template #default="{ row }">
+            <span :class="getScoreClass(row.latestScore)">{{ row.latestScore || '-' }}</span>
+          </template>
+        </el-table-column>
+      </el-table>
     </el-card>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, nextTick, onUnmounted } from 'vue';
-import { useRouter } from 'vue-router';
+import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue';
 import { ElMessage } from 'element-plus';
-import { 
-  Star, Check, TrendCharts, Warning, Search, School, User, Clock 
+import {
+  TrendCharts,
+  Document,
+  Trophy,
+  Warning,
+  List,
 } from '@element-plus/icons-vue';
-import request from '@/utils/request';
 import * as echarts from 'echarts';
+import request from '@/utils/request';
 
-const router = useRouter();
+const Histogram = TrendCharts;
 
-const scoreTrendChartRef = ref<HTMLElement | null>(null);
-const courseCompareChartRef = ref<HTMLElement | null>(null);
-let scoreTrendChart: echarts.ECharts | null = null;
-let courseCompareChart: echarts.ECharts | null = null;
-
-const searchKeyword = ref('');
 const filterCourse = ref('');
-const sortBy = ref('submitTime:desc');
+const dateRange = ref<string[]>([]);
+const courses = ref([]);
+const grades = ref([]);
 
-const courses = ref<any[]>([]);
-const assignments = ref<any[]>([]);
+const lineChartRef = ref<HTMLElement | null>(null);
+const barChartRef = ref<HTMLElement | null>(null);
+let lineChart: echarts.ECharts | null = null;
+let barChart: echarts.ECharts | null = null;
 
-const overallStats = ref({
-  averageScore: 0,
-  gradedCount: 0,
-  accuracy: 0,
-  errorCount: 0
+const stats = computed(() => {
+  const data = filteredGrades.value;
+  if (data.length === 0) {
+    return {
+      totalAssignments: 0,
+      averageAccuracy: 0,
+      highestScore: '-',
+      highestAssignment: '',
+      lowestScore: '-',
+      lowestAssignment: '',
+    };
+  }
+
+  const percentages = data.map((item: any) => 
+    getScorePercentage(item.finalTotalScore, item.totalScore)
+  );
+  const avgAccuracy = Math.round(
+    percentages.reduce((a: number, b: number) => a + b, 0) / percentages.length
+  );
+
+  let highest = data[0];
+  let lowest = data[0];
+  data.forEach((item: any) => {
+    if (getScorePercentage(item.finalTotalScore, item.totalScore) > 
+        getScorePercentage(highest.finalTotalScore, highest.totalScore)) {
+      highest = item;
+    }
+    if (getScorePercentage(item.finalTotalScore, item.totalScore) < 
+        getScorePercentage(lowest.finalTotalScore, lowest.totalScore)) {
+      lowest = item;
+    }
+  });
+
+  return {
+    totalAssignments: data.length,
+    averageAccuracy: avgAccuracy,
+    highestScore: `${highest.finalTotalScore}/${highest.totalScore}`,
+    highestAssignment: highest.assignmentTitle,
+    lowestScore: `${lowest.finalTotalScore}/${lowest.totalScore}`,
+    lowestAssignment: lowest.assignmentTitle,
+  };
 });
 
-const filteredAssignments = computed(() => {
-  let result = [...assignments.value];
-  
-  if (searchKeyword.value) {
-    const keyword = searchKeyword.value.toLowerCase();
-    result = result.filter(item => 
-      item.title.toLowerCase().includes(keyword) ||
-      item.courseName.toLowerCase().includes(keyword)
+const filteredGrades = computed(() => {
+  let result = [...grades.value];
+
+  if (filterCourse.value) {
+    result = result.filter(
+      (item: any) => item.courseId === Number(filterCourse.value)
     );
   }
-  
-  if (filterCourse.value) {
-    result = result.filter(item => item.courseId === Number(filterCourse.value));
-  }
-  
-  if (sortBy.value) {
-    const [field, order] = sortBy.value.split(':');
-    result.sort((a, b) => {
-      let aValue = a[field];
-      let bValue = b[field];
-      
-      if (field === 'submitTime' || field === 'gradingTime' || field === 'createTime' || field === 'deadline') {
-        aValue = new Date(aValue || 0).getTime();
-        bValue = new Date(bValue || 0).getTime();
-      }
-      
-      if (order === 'asc') {
-        return aValue > bValue ? 1 : -1;
-      } else {
-        return aValue < bValue ? 1 : -1;
-      }
+
+  if (dateRange.value && dateRange.value.length === 2) {
+    const startDate = new Date(dateRange.value[0]);
+    const endDate = new Date(dateRange.value[1]);
+    endDate.setHours(23, 59, 59, 999);
+    result = result.filter((item: any) => {
+      const gradeTime = new Date(item.reviewTime);
+      return gradeTime >= startDate && gradeTime <= endDate;
     });
   }
+
+  return result.sort((a: any, b: any) => 
+    new Date(a.reviewTime).getTime() - new Date(b.reviewTime).getTime()
+  );
+});
+
+const courseStats = computed(() => {
+  const courseMap = new Map<number, any[]>();
   
+  filteredGrades.value.forEach((item: any) => {
+    if (!courseMap.has(item.courseId)) {
+      courseMap.set(item.courseId, []);
+    }
+    courseMap.get(item.courseId)!.push(item);
+  });
+
+  const result: any[] = [];
+  courseMap.forEach((items, courseId) => {
+    const scores = items.map((item: any) => ({
+      score: item.finalTotalScore,
+      total: item.totalScore,
+      percentage: getScorePercentage(item.finalTotalScore, item.totalScore),
+      reviewTime: item.reviewTime,
+    }));
+    
+    const avgScore = Math.round(
+      scores.reduce((sum, s) => sum + s.percentage, 0) / scores.length
+    );
+    const highest = Math.max(...scores.map(s => s.percentage));
+    const lowest = Math.min(...scores.map(s => s.percentage));
+    
+    const sortedByTime = [...scores].sort((a, b) => 
+      new Date(b.reviewTime).getTime() - new Date(a.reviewTime).getTime()
+    );
+    const latest = sortedByTime[0]?.percentage || 0;
+
+    const course = courses.value.find((c: any) => c.id === courseId);
+    result.push({
+      courseId,
+      courseName: course?.name || '未知课程',
+      assignmentCount: items.length,
+      averageScore: avgScore,
+      highestScore: highest,
+      lowestScore: lowest,
+      latestScore: latest,
+    });
+  });
+
   return result;
 });
 
@@ -242,167 +287,264 @@ const getCourses = async () => {
   }
 };
 
-const getGradingList = async () => {
+const getGrades = async () => {
   try {
     const response = await request.get('/student/grading/list', {
-      params: {
-        page: 1,
-        size: 100
-      }
+      params: { page: 1, size: 100 }
     });
-    const data = response.data || {};
-    assignments.value = data.records || [];
-    overallStats.value = data.stats || overallStats.value;
-    
-    if (data.scoreTrend) {
-      nextTick(() => initScoreTrendChart(data.scoreTrend));
-    }
-    if (data.courseCompare) {
-      nextTick(() => initCourseCompareChart(data.courseCompare));
-    }
+    grades.value = response.data.records || [];
+    await nextTick();
+    initCharts();
   } catch (error) {
-    console.error('获取批改列表失败:', error);
-    ElMessage.error('获取批改列表失败');
-    assignments.value = [];
+    console.error('获取成绩列表失败:', error);
+    grades.value = [];
   }
 };
 
-const initScoreTrendChart = (data: any[]) => {
-  if (scoreTrendChartRef.value) {
-    scoreTrendChart = echarts.init(scoreTrendChartRef.value);
-    const option = {
-      tooltip: {
-        trigger: 'axis',
-        axisPointer: { type: 'shadow' }
+const handleDateChange = () => {
+  nextTick(() => {
+    updateCharts();
+  });
+};
+
+const getScorePercentage = (score: number, total: number) => {
+  if (!total) return 0;
+  return Math.round((score / total) * 100);
+};
+
+const getScoreClass = (percentage: number) => {
+  if (percentage >= 80) return 'score-high';
+  if (percentage >= 60) return 'score-mid';
+  return 'score-low';
+};
+
+const initCharts = () => {
+  if (lineChartRef.value) {
+    lineChart = echarts.init(lineChartRef.value);
+  }
+  if (barChartRef.value) {
+    barChart = echarts.init(barChartRef.value);
+  }
+  updateCharts();
+};
+
+const updateCharts = () => {
+  updateLineChart();
+  updateBarChart();
+};
+
+const updateLineChart = () => {
+  if (!lineChart) return;
+
+  const data = filteredGrades.value;
+  const xData = data.map((item: any) => {
+    const d = new Date(item.reviewTime);
+    return `${d.getMonth() + 1}/${d.getDate()}`;
+  });
+  const yData = data.map((item: any) => 
+    getScorePercentage(item.finalTotalScore, item.totalScore)
+  );
+
+  const option: echarts.EChartsOption = {
+    tooltip: {
+      trigger: 'axis',
+      formatter: (params: any) => {
+        const idx = params[0].dataIndex;
+        const item = data[idx];
+        return `${item.assignmentTitle}<br/>得分: ${item.finalTotalScore}/${item.totalScore}<br/>正确率: ${params[0].value}%`;
       },
-      grid: {
-        left: '3%',
-        right: '4%',
-        bottom: '3%',
-        containLabel: true
-      },
-      xAxis: {
-        type: 'category',
-        data: data.map(item => item.label)
-      },
-      yAxis: {
-        type: 'value',
-        min: 0,
-        max: 100,
-        name: '分数'
-      },
-      series: [{
-        data: data.map(item => item.score),
+    },
+    grid: {
+      left: '3%',
+      right: '4%',
+      bottom: '3%',
+      containLabel: true,
+    },
+    xAxis: {
+      type: 'category',
+      boundaryGap: false,
+      data: xData,
+      axisLine: { lineStyle: { color: '#dcdfe6' } },
+      axisLabel: { color: '#606266' },
+    },
+    yAxis: {
+      type: 'value',
+      min: 0,
+      max: 100,
+      axisLine: { show: false },
+      axisLabel: { color: '#909399', formatter: '{value}%' },
+      splitLine: { lineStyle: { color: '#ebeef5', type: 'dashed' } },
+    },
+    series: [
+      {
+        name: '正确率',
         type: 'line',
         smooth: true,
-        itemStyle: { color: '#409EFF' },
+        symbol: 'circle',
+        symbolSize: 8,
+        lineStyle: {
+          width: 3,
+          color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
+            { offset: 0, color: '#409eff' },
+            { offset: 1, color: '#67c23a' },
+          ]),
+        },
+        itemStyle: {
+          color: '#409eff',
+          borderWidth: 2,
+        },
         areaStyle: {
           color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-            { offset: 0, color: 'rgba(64, 158, 255, 0.5)' },
-            { offset: 1, color: 'rgba(64, 158, 255, 0.1)' }
-          ])
+            { offset: 0, color: 'rgba(64, 158, 255, 0.3)' },
+            { offset: 1, color: 'rgba(64, 158, 255, 0.05)' },
+          ]),
         },
-        markLine: {
-          data: [{ type: 'average', name: '平均值' }],
-          lineStyle: { color: '#67c23a' }
-        }
-      }]
-    };
-    scoreTrendChart.setOption(option);
-  }
+        data: yData,
+      },
+    ],
+  };
+
+  lineChart.setOption(option);
 };
 
-const initCourseCompareChart = (data: any[]) => {
-  if (courseCompareChartRef.value) {
-    courseCompareChart = echarts.init(courseCompareChartRef.value);
-    const option = {
-      tooltip: {
-        trigger: 'axis',
-        axisPointer: { type: 'shadow' }
+const updateBarChart = () => {
+  if (!barChart) return;
+
+  const stats = courseStats.value;
+  const xData = stats.map((item: any) => item.courseName);
+  const avgData = stats.map((item: any) => item.averageScore);
+  const highestData = stats.map((item: any) => item.highestScore);
+  const latestData = stats.map((item: any) => item.latestScore);
+
+  const option: echarts.EChartsOption = {
+    tooltip: {
+      trigger: 'axis',
+      axisPointer: { type: 'shadow' },
+    },
+    legend: {
+      data: ['平均分', '最高分', '最近得分'],
+      bottom: 0,
+    },
+    grid: {
+      left: '3%',
+      right: '4%',
+      bottom: '15%',
+      containLabel: true,
+    },
+    xAxis: {
+      type: 'category',
+      data: xData,
+      axisLine: { lineStyle: { color: '#dcdfe6' } },
+      axisLabel: { 
+        color: '#606266',
+        rotate: xData.length > 4 ? 30 : 0,
       },
-      grid: {
-        left: '3%',
-        right: '4%',
-        bottom: '3%',
-        containLabel: true
-      },
-      xAxis: {
-        type: 'category',
-        data: data.map(item => item.courseName),
-        axisLabel: {
-          interval: 0,
-          rotate: 30
-        }
-      },
-      yAxis: {
-        type: 'value',
-        min: 0,
-        max: 100,
-        name: '平均分'
-      },
-      series: [{
-        data: data.map(item => ({
-          value: item.averageScore,
-          itemStyle: {
-            color: item.averageScore >= 80 ? '#67c23a' : 
-                   item.averageScore >= 60 ? '#e6a23c' : '#f56c6c'
-          }
-        })),
+    },
+    yAxis: {
+      type: 'value',
+      min: 0,
+      max: 100,
+      axisLine: { show: false },
+      axisLabel: { color: '#909399', formatter: '{value}' },
+      splitLine: { lineStyle: { color: '#ebeef5', type: 'dashed' } },
+    },
+    series: [
+      {
+        name: '平均分',
         type: 'bar',
-        barWidth: '50%',
-        label: {
-          show: true,
-          position: 'top'
-        }
-      }]
-    };
-    courseCompareChart.setOption(option);
-  }
-};
+        barWidth: '20%',
+        itemStyle: {
+          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+            { offset: 0, color: '#409eff' },
+            { offset: 1, color: '#79bbff' },
+          ]),
+          borderRadius: [4, 4, 0, 0],
+        },
+        data: avgData,
+      },
+      {
+        name: '最高分',
+        type: 'bar',
+        barWidth: '20%',
+        itemStyle: {
+          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+            { offset: 0, color: '#67c23a' },
+            { offset: 1, color: '#95d475' },
+          ]),
+          borderRadius: [4, 4, 0, 0],
+        },
+        data: highestData,
+      },
+      {
+        name: '最近得分',
+        type: 'bar',
+        barWidth: '20%',
+        itemStyle: {
+          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+            { offset: 0, color: '#e6a23c' },
+            { offset: 1, color: '#eebe77' },
+          ]),
+          borderRadius: [4, 4, 0, 0],
+        },
+        data: latestData,
+      },
+    ],
+  };
 
-const getScoreTagType = (score: number, total: number) => {
-  const rate = score / total;
-  if (rate >= 0.9) return 'success';
-  if (rate >= 0.8) return 'primary';
-  if (rate >= 0.6) return 'warning';
-  return 'danger';
-};
-
-const formatDate = (date: string) => {
-  if (!date) return '-';
-  const d = new Date(date);
-  return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`;
-};
-
-const goToDetail = (assignment: any) => {
-  router.push(`/student/grading/${assignment.id}`);
+  barChart.setOption(option);
 };
 
 const handleResize = () => {
-  scoreTrendChart?.resize();
-  courseCompareChart?.resize();
+  lineChart?.resize();
+  barChart?.resize();
 };
+
+watch(filterCourse, () => {
+  nextTick(() => {
+    updateCharts();
+  });
+});
 
 onMounted(() => {
   getCourses();
-  getGradingList();
+  getGrades();
   window.addEventListener('resize', handleResize);
 });
 
 onUnmounted(() => {
   window.removeEventListener('resize', handleResize);
-  scoreTrendChart?.dispose();
-  courseCompareChart?.dispose();
+  lineChart?.dispose();
+  barChart?.dispose();
 });
 </script>
 
 <style scoped>
 .student-grading {
-  padding: 20px;
+  padding: 24px;
+  background: rgba(255, 255, 255, 0.66);
+  backdrop-filter: blur(4px);
+  border-radius: 16px;
+  margin: 16px;
+  min-height: calc(100vh - 84px);
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
 }
 
-.page-header {
-  margin-bottom: 20px;
+:deep(.el-card) {
+  border: none;
+  border-radius: 16px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+}
+
+:deep(.el-card__header) {
+  padding: 16px 20px;
+  border-bottom: none;
+  background: transparent;
+}
+
+:deep(.el-card__body) {
+  padding: 20px;
 }
 
 .card-header {
@@ -411,197 +553,217 @@ onUnmounted(() => {
   align-items: center;
 }
 
-.total-count {
-  font-size: 14px;
-  color: #909399;
+.card-header__title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 20px;
+  font-weight: 600;
+  color: #303133;
 }
 
-.stats-container {
+.card-header__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgb(15, 38, 70) 0%, rgb(58, 97, 156) 50%, rgb(11, 17, 27) 100%);
+  color: #fff;
+}
+
+.card-header__icon .el-icon {
+  font-size: 24px;
+}
+
+.filter-card {
+  flex-shrink: 0;
+}
+
+.filter-bar {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.filter-item {
+  min-width: 180px;
+}
+
+.date-picker {
+  width: 280px;
+}
+
+.stats-overview {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 20px;
-  margin-bottom: 20px;
 }
 
 .stat-card {
   display: flex;
   align-items: center;
+  gap: 16px;
   padding: 20px;
-  height: 120px;
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+}
+
+.stat-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 14px;
+  flex-shrink: 0;
+}
+
+.stat-icon .el-icon {
+  font-size: 28px;
+}
+
+.stat-icon.total {
+  background: linear-gradient(135deg, #ecf5ff 0%, #d9ecff 100%);
+  color: #409eff;
+}
+
+.stat-icon.average {
+  background: linear-gradient(135deg, #f0f9eb 0%, #e1f3d8 100%);
+  color: #67c23a;
+}
+
+.stat-icon.highest {
+  background: linear-gradient(135deg, #fdf6ec 0%, #faecd8 100%);
+  color: #e6a23c;
+}
+
+.stat-icon.lowest {
+  background: linear-gradient(135deg, #fef0f0 0%, #fde2e2 100%);
+  color: #f56c6c;
 }
 
 .stat-content {
-  flex: 1;
-}
-
-.stat-value {
-  font-size: 28px;
-  font-weight: bold;
-  color: #409eff;
-  margin-bottom: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .stat-label {
   font-size: 14px;
-  color: #606266;
+  color: #909399;
 }
 
-.stat-icon {
-  margin-left: 20px;
-  color: #409eff;
+.stat-value {
+  font-size: 28px;
+  font-weight: 700;
+  color: #303133;
 }
 
-.icon-large {
-  font-size: 48px;
-  opacity: 0.6;
+.stat-value.highlight {
+  color: #67c23a;
+}
+
+.stat-value.warning {
+  color: #f56c6c;
+}
+
+.stat-sub {
+  font-size: 12px;
+  color: #909399;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 150px;
+}
+
+.charts-row {
+  flex: 1;
 }
 
 .chart-card {
-  margin-bottom: 20px;
+  height: 100%;
+  min-height: 380px;
 }
 
-.chart {
+.chart-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #303133;
+}
+
+.chart-title .el-icon {
+  color: #409eff;
+}
+
+.chart-container {
   width: 100%;
   height: 300px;
 }
 
-.filter-bar {
-  margin-bottom: 20px;
-  padding-bottom: 20px;
-  border-bottom: 1px solid var(--color-border);
+.table-card {
+  flex-shrink: 0;
 }
 
-.filter-row {
-  display: flex;
-  gap: 15px;
-  flex-wrap: wrap;
-  margin-bottom: 15px;
-}
-
-.filter-item {
-  min-width: 150px;
-}
-
-.search-input {
-  flex: 1;
-  min-width: 250px;
-  max-width: 400px;
-}
-
-.sort-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.sort-label {
-  font-size: 14px;
-  color: var(--color-text);
-}
-
-.sort-item {
-  min-width: 180px;
-}
-
-.assignment-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 16px;
-}
-
-.assignment-card {
-  padding: 20px;
-  border: 1px solid var(--color-border);
-  border-radius: 12px;
-  background-color: var(--color-card);
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.assignment-card:hover {
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
-  transform: translateY(-2px);
-}
-
-.card-header-section {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 16px;
-}
-
-.assignment-title {
-  font-size: 16px;
+.score-high {
+  color: #67c23a;
   font-weight: 600;
-  color: var(--color-text);
-  flex: 1;
-  margin-right: 12px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
 }
 
-.card-body {
-  margin-bottom: 16px;
+.score-mid {
+  color: #e6a23c;
+  font-weight: 600;
 }
 
-.info-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 8px;
-  font-size: 14px;
-  color: var(--color-text-secondary);
-}
-
-.info-row:last-child {
-  margin-bottom: 0;
-}
-
-.card-footer {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding-top: 12px;
-  border-top: 1px solid var(--color-border);
-}
-
-.error-count {
-  display: flex;
-  align-items: center;
-  gap: 4px;
+.score-low {
   color: #f56c6c;
-  font-size: 13px;
+  font-weight: 600;
+}
+
+:deep(.el-table) {
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+:deep(.el-table th) {
+  background: #f5f7fa;
+  font-weight: 600;
+  color: #303133;
+}
+
+:deep(.el-table td) {
+  padding: 14px 0;
 }
 
 @media (max-width: 768px) {
-  .filter-row {
+  .student-grading {
+    padding: 16px;
+    margin: 12px;
+  }
+
+  .filter-bar {
     flex-direction: column;
   }
-  
+
   .filter-item {
     width: 100%;
   }
-  
-  .search-input {
-    width: 100%;
-    max-width: unset;
-  }
-  
-  .sort-row {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 5px;
-  }
-  
-  .sort-item {
+
+  .date-picker {
     width: 100%;
   }
-  
-  .assignment-grid {
+
+  .stats-overview {
     grid-template-columns: 1fr;
+  }
+
+  .chart-container {
+    height: 250px;
   }
 }
 </style>
