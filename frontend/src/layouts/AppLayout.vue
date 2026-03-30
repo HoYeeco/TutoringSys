@@ -266,7 +266,7 @@ onUnmounted(() => {
 }
 
 .el-main {
-  background-color: var(--color-background);
+  background-color: transparent;
   padding: 20px;
   overflow-y: auto;
   overflow-x: hidden;
@@ -274,31 +274,34 @@ onUnmounted(() => {
   position: relative;
 }
 
+/* 背景图片层 */
 .el-main::before {
   content: '';
   position: fixed;
-  top: 60px;
+  top: 0;
   right: 0;
   bottom: 0;
-  left: calc(64px + (var(--sidebar-width, 0) * (200px - 64px)));
-  background-image: url('@/assets/images/bg_student.png');
+  left: 0;
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
   background-attachment: fixed;
-  opacity: 0.08;
-  z-index: -1;
-  transition: left 0.3s ease;
+  z-index: -2;
 }
 
+
+
+/* 学生主题背景 */
 .student-theme .el-main::before {
   background-image: url('@/assets/images/bg_student.png');
 }
 
+/* 教师主题背景 */
 .teacher-theme .el-main::before {
   background-image: url('@/assets/images/bg_teacher.png');
 }
 
+/* 管理员主题背景 */
 .admin-theme .el-main::before {
   background-image: url('@/assets/images/bg_admin.png');
 }
