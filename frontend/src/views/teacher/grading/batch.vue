@@ -593,38 +593,3 @@ fetchBatchReviewData();
   }
 }
 </style>
-n: column;
-    align-items: stretch;
-  }
-  
-  .filter-item {
-    width: 100%;
-  }
-  
-  .card-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 10px;
-  }
-  
-  .header-actions {
-    width: 100%;
-    flex-wrap: wrap;
-  }
-  
-  .students-answers {
-    grid-template-columns: 1fr;
-  }
-  
-  .student-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 10px;
-  }
-  
-  .teacher-actions {
-    width: 100%;
-    justify-content: space-between;
-  }
-}
-</style>

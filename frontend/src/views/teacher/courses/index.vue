@@ -60,6 +60,7 @@
           :page-sizes="[10, 20, 50, 100]"
           layout="total, sizes, prev, pager, next, jumper"
           :total="courses.total"
+          justify="center"
           @size-change="handleSizeChange"
           @current-change="handleCurrentChange"
         />
@@ -389,7 +390,13 @@ onMounted(() => {
 .pagination-container {
   margin-top: 20px;
   display: flex;
-  justify-content: flex-end;
+  justify-content: center;
+}
+
+.pagination {
+  margin-top: 20px;
+  display: flex;
+  justify-content: center;
 }
 
 :deep(.el-dialog) {

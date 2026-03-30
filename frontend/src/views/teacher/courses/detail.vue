@@ -123,6 +123,7 @@
           :page-sizes="[10, 20, 50, 100]"
           layout="total, sizes, prev, pager, next, jumper"
           :total="total"
+          justify="center"
           @size-change="handleSizeChange"
           @current-change="handleCurrentChange"
         />
@@ -586,6 +587,12 @@ onMounted(() => {
 
 /* 分页 */
 .pagination-container {
+  margin-top: 20px;
+  display: flex;
+  justify-content: center;
+}
+
+.pagination {
   margin-top: 20px;
   display: flex;
   justify-content: center;
