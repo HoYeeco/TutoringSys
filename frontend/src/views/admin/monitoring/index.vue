@@ -233,7 +233,7 @@
             <el-table :data="loginLogs" style="width: 100%" v-loading="loginLogsLoading">
               <el-table-column prop="time" label="时间" width="180" />
               <el-table-column prop="user" label="用户" width="150" />
-              <el-table-column prop="ip" label="IP 地址" width="150" />
+              <el-table-column prop="ip" label="IP 地址"/>
               <el-table-column prop="result" label="登录结果" width="100">
                 <template #default="scope">
                   <el-tag :type="scope.row.result === '成功' ? 'success' : 'danger'">
@@ -246,12 +246,14 @@
 
           <div class="logs-section">
             <h4 class="sub-section-title">异常日志</h4>
-            <el-table :data="errorLogs" style="width: 100%" v-loading="errorLogsLoading">
-              <el-table-column prop="time" label="时间" width="180" />
-              <el-table-column prop="api" label="接口" width="200" />
-              <el-table-column prop="error" label="错误信息" />
-            </el-table>
-            <el-empty v-if="!errorLogsLoading && errorLogs.length === 0" description="暂无异常日志" :image-size="80" />
+            <template v-if="errorLogsLoading || errorLogs.length > 0">
+              <el-table :data="errorLogs" style="width: 100%" v-loading="errorLogsLoading">
+                <el-table-column prop="time" label="时间" width="180" />
+                <el-table-column prop="api" label="接口" width="150" />
+                <el-table-column prop="error" label="错误信息" />
+              </el-table>
+            </template>
+            <el-empty v-else description="暂无异常日志" :image-size="80" />
           </div>
         </el-tab-pane>
       </el-tabs>
