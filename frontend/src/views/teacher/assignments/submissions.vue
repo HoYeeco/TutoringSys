@@ -635,7 +635,7 @@ onMounted(() => {
   width: 48px;
   height: 48px;
   border-radius: 14px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, rgb(15, 38, 70) 0%, rgb(58, 97, 156) 50%, rgb(11, 17, 27) 100%);
   color: #fff;
   box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
 }
@@ -698,7 +698,7 @@ onMounted(() => {
 }
 
 .course-card .stat-icon {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, rgb(15, 38, 70) 0%, rgb(58, 97, 156) 50%, rgb(11, 17, 27) 100%);
   box-shadow: 0 4px 12px rgba(102, 126, 234, 0.35);
 }
 
@@ -1051,7 +1051,7 @@ onMounted(() => {
 .score-display {
   text-align: center;
   padding: 16px 28px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, rgb(15, 38, 70) 0%, rgb(58, 97, 156) 50%, rgb(11, 17, 27) 100%);
   border-radius: 16px;
   color: #fff;
   box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
@@ -1115,7 +1115,7 @@ onMounted(() => {
   width: 32px;
   height: 32px;
   border-radius: 10px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, rgb(15, 38, 70) 0%, rgb(58, 97, 156) 50%, rgb(11, 17, 27) 100%);
   color: #fff;
   display: flex;
   align-items: center;

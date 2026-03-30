@@ -601,7 +601,7 @@ const handleLogout = () => {
   width: 40px;
   height: 40px;
   border-radius: 12px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, rgb(15, 38, 70) 0%, rgb(58, 97, 156) 50%, rgb(11, 17, 27) 100%);
   color: #fff;
 }
 
@@ -651,7 +651,7 @@ const handleLogout = () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, rgb(15, 38, 70) 0%, rgb(58, 97, 156) 50%, rgb(11, 17, 27) 100%);
   color: #fff;
   font-size: 72px;
   font-weight: bold;
@@ -711,20 +711,28 @@ const handleLogout = () => {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 14px;
+  font-size: 18px;
   color: #6b7280;
   margin-bottom: 8px;
   font-weight: 500;
 }
 
 .info-item__label .el-icon {
-  font-size: 16px;
+  font-size: 20px;
 }
 
 .info-item__value {
-  font-size: 16px;
+  font-size: 18px;
   color: #303133;
   font-weight: 500;
+}
+
+/* 角色和账号状态标签样式 */
+.info-item__value .el-tag {
+  font-size: 18px;
+  padding: 4px 8px;
+  height: auto;
+  line-height: 1.4;
 }
 
 /* 账号设置区域 */
@@ -743,16 +751,17 @@ const handleLogout = () => {
   border: 1px solid #ebeef5;
   cursor: pointer;
   transition: all 0.3s ease;
+  margin-top: 10px;
 }
 
 .setting-item:hover {
-  border-color: #409eff;
-  box-shadow: 0 4px 16px rgba(64, 158, 255, 0.12);
+  border-color: rgb(37, 57, 77);
+  box-shadow: 0 4px 16px rgba(37, 57, 77, 0.12);
   transform: translateY(-2px);
 }
 
 .setting-item-danger:hover {
-  border-color: #f56c6c;
+  border-color: var(--el-color-danger);
   box-shadow: 0 4px 16px rgba(245, 108, 108, 0.12);
 }
 
@@ -763,14 +772,14 @@ const handleLogout = () => {
   width: 48px;
   height: 48px;
   border-radius: 12px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, rgb(15, 38, 70) 0%, rgb(58, 97, 156) 50%, rgb(11, 17, 27) 100%);
   color: #fff;
   margin-right: 16px;
   flex-shrink: 0;
 }
 
 .setting-item-danger .setting-item__icon {
-  background: linear-gradient(135deg, #f56c6c 0%, #f78989 100%);
+  background: var(--el-color-danger);
 }
 
 .setting-item__icon .el-icon {
@@ -782,14 +791,14 @@ const handleLogout = () => {
 }
 
 .setting-item__title {
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 600;
   color: #303133;
   margin-bottom: 4px;
 }
 
 .setting-item__desc {
-  font-size: 13px;
+  font-size: 16px;
   color: #909399;
 }
 
@@ -871,7 +880,7 @@ const handleLogout = () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, rgb(15, 38, 70) 0%, rgb(58, 97, 156) 50%, rgb(11, 17, 27) 100%);
   color: #fff;
   font-size: 64px;
   font-weight: bold;

@@ -382,7 +382,7 @@ html.dark .logo-img {
 }
 
 .logout-icon:hover {
-  color: #f56c6c;
+  color: var(--el-color-danger);
 }
 
 .theme-switch {

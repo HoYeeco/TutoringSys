@@ -628,7 +628,10 @@ watch(activeTab, (newVal) => {
 <style scoped>
 .admin-monitoring {
   padding: 24px;
-  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  background: rgba(255, 255, 255, 0.66);
+  backdrop-filter: blur(4px);
+  border-radius: 16px;
+  margin: 16px;
   min-height: calc(100vh - 84px);
 }
 
@@ -674,7 +677,7 @@ watch(activeTab, (newVal) => {
   width: 40px;
   height: 40px;
   border-radius: 12px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, rgb(15, 38, 70) 0%, rgb(58, 97, 156) 50%, rgb(11, 17, 27) 100%);
   color: #fff;
 }
 

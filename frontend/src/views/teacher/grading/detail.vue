@@ -515,7 +515,7 @@ onMounted(() => {
 }
 
 .page-header {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, rgb(15, 38, 70) 0%, rgb(58, 97, 156) 50%, rgb(11, 17, 27) 100%);
   padding: 16px 24px;
   color: #fff;
   display: flex;
@@ -613,7 +613,7 @@ onMounted(() => {
 }
 
 .score-tag {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, rgb(15, 38, 70) 0%, rgb(58, 97, 156) 50%, rgb(11, 17, 27) 100%);
   color: #fff;
   padding: 2px 10px;
   border-radius: 12px;

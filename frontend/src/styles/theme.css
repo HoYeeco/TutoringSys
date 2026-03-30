@@ -1,13 +1,13 @@
 :root {
-  --el-color-primary: #409eff;
-  --el-color-primary-light-3: #73c0ff;
-  --el-color-primary-light-5: #a0d0ff;
+  --el-color-primary:rgb(58, 97, 156);
+  --el-color-primary-light-3: rgb(78, 129, 205);
+  --el-color-primary-light-5: rgb(58, 97, 156);
   --el-color-primary-light-7: #c6e0ff;
   --el-color-primary-light-8: #d9ecff;
   --el-color-primary-light-9: #ecf5ff;
-  --el-color-success: #67c23a;
+  --el-color-success: rgb(0, 169, 6);
   --el-color-warning: #e6a23c;
-  --el-color-danger: #f56c6c;
+  --el-color-danger: #b62020;
   --el-color-info: #909399;
   --el-bg-color: #ffffff;
   --el-bg-color-page: #f2f3f5;
@@ -29,21 +29,21 @@
   --el-box-shadow-lighter: 0 0 12px rgba(0, 0, 0, 0.06);
   --el-box-shadow-dark: 0 2px 4px rgba(0, 0, 0, 0.12), 0 0 6px rgba(0, 0, 0, 0.12);
 
-  --color-primary: #409eff;
+  --color-primary: rgb(12, 32, 58);
   --color-primary-light: #ecf5ff;
   --color-background: #f5f7fa;
   --color-text: #303133;
   --color-text-secondary: #909399;
   --color-card: #ffffff;
   --color-border: #dcdfe6;
-  --color-menu-bg: #ffffff;
+  --color-menu-bg: rgba(255, 255, 255, 0.9);
   --color-menu-text: #303133;
   --color-menu-active-bg: #ecf5ff;
   --color-header-bg: #ffffff;
 }
 
 html.dark {
-  --el-color-primary: #5d9eff;
+  --el-color-primary: rgb(255, 255, 255);
   --el-color-primary-light-3: #8ac0ff;
   --el-color-primary-light-5: #b3d1ff;
   --el-color-primary-light-7: #d9e7ff;
