@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.tutoring.common.Result;
 import com.tutoring.config.FileProperties;
 import com.tutoring.dto.LoginRecordResponse;
+import com.tutoring.dto.UpdateAvatarRequest;
 import com.tutoring.dto.UpdatePasswordRequest;
 import com.tutoring.dto.UserInfoResponse;
 import com.tutoring.entity.LoginRecord;
@@ -149,6 +150,33 @@ public class UserController {
         } catch (IOException e) {
             return Result.error(500, "文件上传失败: " + e.getMessage());
         }
+    }
+
+    @Operation(summary = "更新头像URL")
+    @PutMapping("/avatar")
+    public Result<String> updateAvatarUrl(@RequestBody UpdateAvatarRequest request) {
+        String username = getCurrentUsername();
+        User user = userService.lambdaQuery()
+            .eq(User::getUsername, username)
+            .one();
+
+        if (user == null) {
+            return Result.error(404, "用户不存在");
+        }
+
+        String avatarUrl = request.getAvatarUrl();
+        if (avatarUrl == null || avatarUrl.trim().isEmpty()) {
+            return Result.error(400, "头像URL不能为空");
+        }
+
+        if (!avatarUrl.startsWith("http://") && !avatarUrl.startsWith("https://")) {
+            return Result.error(400, "头像URL格式不正确，必须以http://或https://开头");
+        }
+
+        user.setAvatar(avatarUrl.trim());
+        userService.updateById(user);
+
+        return Result.success(avatarUrl);
     }
 
     @Operation(summary = "获取登录记录")
