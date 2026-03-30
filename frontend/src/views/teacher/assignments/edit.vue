@@ -1,21 +1,22 @@
 <template>
   <div class="teacher-assignment-edit">
-    <el-card shadow="never" class="config-section">
+    <el-card shadow="never" class="page-header">
       <template #header>
-        <div class="card-title">
-          <div class="card-title__icon">
-            <el-icon><Document /></el-icon>
+        <div class="card-header">
+          <div class="card-header__title">
+            <div class="card-header__icon">
+              <el-icon><Notebook /></el-icon>
+            </div>
+            <span>{{ isEdit ? '编辑作业' : '发布作业' }}</span>
           </div>
-          <span class="card-title__text">作业信息</span>
         </div>
       </template>
-
-      <el-form :model="assignment" label-width="120px" class="config-form">
-        <el-form-item label="作业标题" required>
-          <el-input v-model="assignment.title" placeholder="请输入作业标题" />
+      <el-form :model="assignment" label-width="100px" :rules="assignmentRules" ref="assignmentFormRef">
+        <el-form-item label="作业标题" prop="title">
+          <el-input v-model="assignment.title" placeholder="请输入作业标题" maxlength="100" show-word-limit />
         </el-form-item>
-        <el-form-item label="所属课程" required>
-          <el-select v-model="assignment.courseId" placeholder="选择课程">
+        <el-form-item label="所属课程" prop="courseId">
+          <el-select v-model="assignment.courseId" placeholder="选择课程" style="width: 100%" @change="handleCourseChange">
             <el-option
               v-for="course in courses"
               :key="course.id"
@@ -25,190 +26,198 @@
           </el-select>
         </el-form-item>
         <el-form-item label="总分值">
-          <el-input v-model="totalScore" disabled style="width: 120px" />
+          <el-input v-model="totalScoreDisplay" disabled style="width: 120px" />
           <span class="score-hint">（自动累加题目分值）</span>
         </el-form-item>
-        <el-form-item label="补充说明">
+        <el-form-item label="补充说明" prop="description">
           <el-input
             v-model="assignment.description"
             type="textarea"
-            :rows="3"
-            placeholder="请输入补充说明"
+            rows="4"
+            placeholder="请输入补充说明（可选）"
+            maxlength="2000"
+            show-word-limit
           />
         </el-form-item>
-        <el-form-item label="截止时间" required>
+        <el-form-item label="截止时间" prop="deadline">
           <el-date-picker
             v-model="assignment.deadline"
             type="datetime"
             placeholder="选择截止时间"
             style="width: 100%"
+            :disabled-date="disabledDate"
+            format="YYYY-MM-DD HH:mm:ss"
+            value-format="YYYY-MM-DDTHH:mm:ss"
           />
         </el-form-item>
       </el-form>
     </el-card>
 
-    <el-card shadow="never" class="questions-section">
+    <el-card shadow="never" class="mt-4">
       <template #header>
-        <div class="card-title">
-          <div class="card-title__icon">
-            <el-icon><List /></el-icon>
-          </div>
-          <span class="card-title__text">题目配置</span>
-        </div>
-        <div class="header-actions">
-          <el-button type="success" @click="openQuestionTypeDialog"
-            >添加题目</el-button
-          >
+        <div class="card-header">
+          <span class="section-title">题目配置</span>
+          <el-button type="success" @click="openQuestionTypeDialog">
+            <el-icon><Plus /></el-icon> 添加题目
+          </el-button>
         </div>
       </template>
-
+      
       <div v-if="questions.length === 0" class="empty-questions">
-        <el-empty description="暂无题目，请添加题目" :image-size="160" />
+        <el-empty description="暂无题目">
+          <el-button type="success" @click="openQuestionTypeDialog">
+            <el-icon><Plus /></el-icon> 添加题目
+          </el-button>
+        </el-empty>
+      </div>
+      
+      <div v-else class="questions-container">
+        <div v-for="(question, index) in questions" :key="question.tempId" class="question-card">
+          <div class="question-header">
+            <div class="question-title">
+              <span class="question-number">第{{ index + 1 }}题</span>
+              <el-tag size="small" :type="getQuestionTypeTag(question.type)">
+                {{ getQuestionTypeText(question.type) }}
+              </el-tag>
+            </div>
+            <div class="question-actions">
+              <el-button type="danger" size="small" @click="removeQuestion(index)">
+                <el-icon><Delete /></el-icon> 删除
+              </el-button>
+            </div>
+          </div>
+          
+          <el-form :model="question" label-width="90px" class="question-form">
+            <el-form-item label="题目内容" required>
+              <div class="rich-text-editor-wrapper">
+                <div :ref="(el) => setEditorRef(el, question.tempId)" class="quill-editor"></div>
+                <div class="word-count" v-if="question.type === 'essay'">
+                  字数：{{ getWordCount(question.tempId) }} / {{ question.minWords || '∞' }} - {{ question.maxWords || '∞' }}
+                </div>
+              </div>
+            </el-form-item>
+            
+            <el-form-item label="选项" v-if="question.type === 'single' || question.type === 'multiple'">
+              <div class="options-container">
+                <div v-for="(option, optIndex) in question.options" :key="optIndex" class="option-item">
+                  <el-radio v-if="question.type === 'single'" v-model="question.correctAnswer" :label="String.fromCharCode(65 + optIndex)" />
+                  <el-checkbox v-else v-model="question.correctAnswers" :label="String.fromCharCode(65 + optIndex)" />
+                  <span class="option-label">{{ String.fromCharCode(65 + optIndex) }}.</span>
+                  <el-input
+                    v-model="option.value"
+                    placeholder="请输入选项内容"
+                    class="option-input"
+                  />
+                  <el-button
+                    type="danger"
+                    size="small"
+                    circle
+                    @click="removeOption(question, optIndex)"
+                    :disabled="question.options.length <= 3"
+                  >
+                    <el-icon><Close /></el-icon>
+                  </el-button>
+                </div>
+                <el-button
+                  type="primary"
+                  size="small"
+                  @click="addOption(question)"
+                  :disabled="question.options.length >= 9"
+                >
+                  <el-icon><Plus /></el-icon> 添加选项
+                </el-button>
+                <div class="option-hint">
+                  当前{{ question.options.length }}个选项（最少3个，最多9个）
+                </div>
+              </div>
+            </el-form-item>
+            
+            <el-form-item label="标准答案" required v-if="question.type === 'judgment'">
+              <el-radio-group v-model="question.correctAnswer">
+                <el-radio label="true">正确</el-radio>
+                <el-radio label="false">错误</el-radio>
+              </el-radio-group>
+            </el-form-item>
+            
+            <el-form-item label="分值" required>
+              <el-input-number
+                v-model="question.score"
+                :min="1"
+                :max="100"
+                :precision="0"
+                controls-position="right"
+                style="width: 120px"
+              />
+              <span class="score-unit">分</span>
+            </el-form-item>
+            
+            <template v-if="question.type === 'essay'">
+              <el-form-item label="字数限制">
+                <div class="word-limit">
+                  <el-input-number
+                    v-model="question.minWords"
+                    :min="0"
+                    :max="10000"
+                    :precision="0"
+                    controls-position="right"
+                    placeholder="最少"
+                    style="width: 120px"
+                  />
+                  <span class="word-limit-separator">至</span>
+                  <el-input-number
+                    v-model="question.maxWords"
+                    :min="0"
+                    :max="10000"
+                    :precision="0"
+                    controls-position="right"
+                    placeholder="最多"
+                    style="width: 120px"
+                  />
+                  <span class="word-limit-hint">字（0表示无限制）</span>
+                </div>
+              </el-form-item>
+              <el-form-item label="参考答案">
+                <div class="rich-text-editor-wrapper">
+                  <div :ref="(el) => setAnswerEditorRef(el, question.tempId)" class="quill-editor"></div>
+                </div>
+                <div class="answer-hint">
+                  <el-icon><InfoFilled /></el-icon>
+                  AI大模型将基于参考答案抓取关键词及逻辑关系进行打分，并生成"错误点标注+通俗修正建议"的评语
+                </div>
+              </el-form-item>
+            </template>
+          </el-form>
+        </div>
+      </div>
+      
+      <div class="add-question-btn" v-if="questions.length > 0">
         <el-button type="success" @click="openQuestionTypeDialog">
           <el-icon><Plus /></el-icon> 添加题目
         </el-button>
       </div>
-
-      <div
-        v-else
-        v-for="(question, index) in questions"
-        :key="question.id"
-        class="question-card"
-      >
-        <div class="question-header">
-          <span class="question-number">{{ index + 1 }}.</span>
-          <el-select
-            v-model="question.type"
-            placeholder="选择题型"
-            style="width: 120px"
-            @change="handleQuestionTypeChange(question)"
-          >
-            <el-option label="单选题" value="single" />
-            <el-option label="多选题" value="multiple" />
-            <el-option label="判断题" value="judgment" />
-            <el-option label="主观题" value="essay" />
-          </el-select>
-          <el-button type="danger" size="small" @click="removeQuestion(index)">
-            删除
-          </el-button>
-        </div>
-
-        <el-form :model="question" label-width="80px" class="mt-2">
-          <el-form-item label="题目内容" required>
-            <div class="rich-text-editor">
-              <div ref="editorRefs[question.id]" class="quill-editor"></div>
-            </div>
-          </el-form-item>
-
-          <el-form-item
-            label="选项"
-            v-if="['single', 'multiple'].includes(question.type)"
-          >
-            <div
-              v-for="(option, optIndex) in question.options"
-              :key="optIndex"
-              class="option-item"
-            >
-              <span class="option-label"
-                >{{ String.fromCharCode(65 + Number(optIndex)) }}.</span
-              >
-              <el-input
-                v-model="option.value"
-                placeholder="请输入选项内容"
-                style="width: 80%"
-              />
-              <el-button
-                type="danger"
-                size="small"
-                @click="removeOption(question, Number(optIndex))"
-                :disabled="question.options.length <= 3"
-              >
-                删除
-              </el-button>
-            </div>
-            <el-button
-              type="primary"
-              size="small"
-              @click="addOption(question)"
-              :disabled="question.options.length >= 9"
-            >
-              添加选项
-            </el-button>
-            <div class="option-hint">
-              选项数量：{{ question.options.length }}/9（最少3个，最多9个）
-            </div>
-          </el-form-item>
-
-          <el-form-item
-            label="标准答案"
-            required
-            v-if="['single', 'multiple', 'judgment'].includes(question.type)"
-          >
-            <el-input
-              v-model="question.correctAnswer"
-              placeholder="请输入答案"
-            />
-          </el-form-item>
-
-          <el-form-item label="分值" required>
-            <el-input-number
-              v-model="question.score"
-              :min="1"
-              :max="100"
-              style="width: 100px"
-            />
-          </el-form-item>
-
-          <!-- 主观题特有设置 -->
-          <template v-if="question.type === 'essay'">
-            <el-form-item label="字数限制">
-              <div class="word-limit">
-                <el-input-number
-                  v-model="question.minWords"
-                  :min="0"
-                  style="width: 100px"
-                  placeholder="最小"
-                />
-                <span class="word-limit-separator">-</span>
-                <el-input-number
-                  v-model="question.maxWords"
-                  :min="0"
-                  style="width: 100px"
-                  placeholder="最大"
-                />
-                <span class="word-limit-hint">（0表示无限制）</span>
-              </div>
-            </el-form-item>
-            <el-form-item label="参考答案">
-              <div class="rich-text-editor">
-                <div
-                  ref="answerEditorRefs[question.id]"
-                  class="quill-editor"
-                ></div>
-              </div>
-              <div class="answer-hint">
-                AI大模型将基于参考答案抓取关键词及逻辑关系以打分并生成评语
-              </div>
-            </el-form-item>
-          </template>
-        </el-form>
-      </div>
-
-      <div class="total-score mt-4">
-        <span>总分：{{ totalScore }}分</span>
+      
+      <div class="total-score">
+        <span>作业总分：{{ totalScore }}分</span>
+        <span class="question-count">共{{ questions.length }}道题目</span>
       </div>
     </el-card>
 
     <div class="action-buttons mt-4">
-      <el-button @click="previewAssignment">预览模式</el-button>
-      <el-button type="primary" @click="publishAssignment">现在发布</el-button>
+      <el-button @click="previewAssignment" :disabled="!canPreview">
+        <el-icon><View /></el-icon> 预览模式
+      </el-button>
+      <el-button type="primary" @click="publishNow" :disabled="!canPublish">
+        <el-icon><Promotion /></el-icon> 现在发布
+      </el-button>
     </div>
 
-    <!-- 题型选择弹窗 -->
     <el-dialog
       v-model="questionTypeDialogVisible"
       title="选择题型"
-      width="400px"
+      width="500px"
+      :close-on-click-modal="false"
+      append-to-body
+      destroy-on-close
     >
       <div class="question-type-list">
         <div
@@ -217,14 +226,65 @@
           class="question-type-item"
           @click="addQuestionByType(type.value)"
         >
-          <el-icon class="type-icon">{{ type.icon }}</el-icon>
-          <span class="type-name">{{ type.label }}</span>
+          <div class="type-icon-wrapper" :style="{ backgroundColor: type.color }">
+            <el-icon class="type-icon"><component :is="type.icon" /></el-icon>
+          </div>
+          <div class="type-info">
+            <span class="type-name">{{ type.label }}</span>
+            <span class="type-desc">{{ type.description }}</span>
+          </div>
         </div>
       </div>
       <template #footer>
-        <span class="dialog-footer">
-          <el-button @click="questionTypeDialogVisible = false">取消</el-button>
-        </span>
+        <el-button @click="questionTypeDialogVisible = false">取消</el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog
+      v-model="previewDialogVisible"
+      :title="'预览: ' + (assignment.title || '作业预览')"
+      width="800px"
+      top="5vh"
+      append-to-body
+      destroy-on-close
+    >
+      <div class="preview-content" v-if="previewData">
+        <div class="preview-header">
+          <h2>{{ previewData.title }}</h2>
+          <div class="preview-meta">
+            <span>课程：{{ previewData.courseName }}</span>
+            <span>总分：{{ previewData.totalScore }}分</span>
+            <span>截止时间：{{ formatDateTime(previewData.deadline) }}</span>
+          </div>
+        </div>
+        <div class="preview-description" v-if="previewData.description">
+          <h4>作业说明</h4>
+          <p>{{ previewData.description }}</p>
+        </div>
+        <div class="preview-questions">
+          <div v-for="(q, idx) in previewData.questions" :key="idx" class="preview-question">
+            <div class="q-title">
+              <span class="q-number">{{ Number(idx) + 1 }}.</span>
+              <span class="q-type">[{{ getQuestionTypeText(q.type) }}]</span>
+              <span class="q-score">({{ q.score }}分)</span>
+              <div class="q-content" v-html="q.content"></div>
+            </div>
+            <div class="question-options" v-if="q.type === 'single' || q.type === 'multiple'">
+              <div v-for="(opt, optIdx) in q.options" :key="optIdx" class="option">
+                {{ String.fromCharCode(65 + (typeof optIdx === 'number' ? optIdx : parseInt(optIdx))) }}. {{ opt.value }}
+              </div>
+            </div>
+            <div class="question-answer" v-if="q.type === 'judgment'">
+              答案：{{ q.correctAnswer === 'true' ? '正确' : '错误' }}
+            </div>
+            <div class="question-essay" v-if="q.type === 'essay'">
+              <div v-if="q.minWords || q.maxWords">字数要求：{{ q.minWords || 0 }} - {{ q.maxWords || '无限制' }}字</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <template #footer>
+        <el-button @click="previewDialogVisible = false">关闭</el-button>
       </template>
     </el-dialog>
   </div>
@@ -234,75 +294,128 @@
 import { ref, computed, onMounted, nextTick } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import {
-  Document,
-  Plus,
-  Check,
-  Delete,
-  Edit,
-  List,
+import { 
+  Plus, Delete, Close, View, Promotion, 
+  InfoFilled, Check, Edit, List, Notebook
 } from '@element-plus/icons-vue';
-import request from '@/utils/request';
 import Quill from 'quill';
 import 'quill/dist/quill.snow.css';
+import request from '@/utils/request';
 
 const route = useRoute();
 const router = useRouter();
-const assignmentId = computed(() => {
-  const id = route.params.id as string;
-  // 如果是 "create" 或 undefined，返回 null
-  if (!id || id === 'create' || id === 'undefined') {
-    return null;
-  }
-  return id;
-});
-const isEdit = computed(() => !!assignmentId.value);
+const assignmentId = computed(() => route.params.id as string);
+const isEdit = computed(() => !!assignmentId.value && assignmentId.value !== 'create');
+
+interface Question {
+  tempId: number;
+  type: string;
+  content: string;
+  options: { value: string }[];
+  correctAnswer: string;
+  correctAnswers: string[];
+  score: number;
+  minWords: number;
+  maxWords: number;
+  referenceAnswer: string;
+}
 
 const assignment = ref({
-  id: '',
+  id: null as number | null,
   title: '',
-  courseId: '',
+  courseId: null as number | null,
   description: '',
   deadline: '',
+  courseName: ''
 });
 
-const courses = ref([
-  { id: 1, name: '计算机导论' },
-  { id: 2, name: '数据结构' },
-  { id: 3, name: '算法设计与分析' },
-]);
+const assignmentRules = {
+  title: [{ required: true, message: '请输入作业标题', trigger: 'blur' }],
+  courseId: [{ required: true, message: '请选择所属课程', trigger: 'change' }],
+  deadline: [{ required: true, message: '请设置截止时间', trigger: 'change' }]
+};
 
-const questions = ref([]);
+const assignmentFormRef = ref();
+const courses = ref<{id: number; name: string}[]>([]);
+const questions = ref<Question[]>([]);
 
 const questionTypes = [
-  { label: '单选题', value: 'single', icon: Check },
-  { label: '多选题', value: 'multiple', icon: Check },
-  { label: '判断题', value: 'judgment', icon: Check },
-  { label: '主观题', value: 'essay', icon: Edit },
+  { label: '单选题', value: 'single', icon: Check, color: '#409eff', description: '从多个选项中选择一个正确答案' },
+  { label: '多选题', value: 'multiple', icon: List, color: '#67c23a', description: '从多个选项中选择一个或多个正确答案' },
+  { label: '判断题', value: 'judgment', icon: Check, color: '#e6a23c', description: '判断陈述内容的对错' },
+  { label: '主观题', value: 'essay', icon: Edit, color: '#f56c6c', description: '需要详细文字作答的题目' }
 ];
 
 const questionTypeDialogVisible = ref(false);
+const previewDialogVisible = ref(false);
 
-const editorRefs = ref({});
-const answerEditorRefs = ref({});
-const editors = ref({});
-const answerEditors = ref({});
+const editorRefs = ref<Record<number, any>>({});
+const answerEditorRefs = ref<Record<number, any>>({});
+const editors = ref<Record<number, Quill>>({});
+const answerEditors = ref<Record<number, Quill>>({});
+
+const previewData = ref<any>(null);
 
 const totalScore = computed(() => {
-  return questions.value.reduce(
-    (sum, question) => sum + (question.score || 0),
-    0,
-  );
+  return questions.value.reduce((sum, q) => sum + (q.score || 0), 0);
+});
+
+const totalScoreDisplay = computed(() => `${totalScore.value}分`);
+
+const canPreview = computed(() => assignment.value.title && questions.value.length > 0);
+const canSave = computed(() => assignment.value.title && assignment.value.courseId && assignment.value.deadline);
+const canPublish = computed(() => {
+  if (!canSave.value || questions.value.length === 0) return false;
+  return questions.value.every(q => q.content && q.score > 0);
 });
 
 const getQuestionTypeText = (type: string) => {
-  const typeMap: Record<string, string> = {
-    single: '单选题',
-    multiple: '多选题',
-    judgment: '判断题',
-    essay: '主观题',
+  const map: Record<string, string> = {
+    single: '单选题', multiple: '多选题', judgment: '判断题', essay: '主观题'
   };
-  return typeMap[type] || type;
+  return map[type] || type;
+};
+
+const getQuestionTypeTag = (type: string) => {
+  const map: Record<string, string> = {
+    single: '', multiple: 'success', judgment: 'warning', essay: 'danger'
+  };
+  return map[type] || '';
+};
+
+const disabledDate = (time: Date) => {
+  return time.getTime() < Date.now() - 8.64e7;
+};
+
+const setEditorRef = (el: any, tempId: number) => {
+  if (el) editorRefs.value[tempId] = el;
+};
+
+const setAnswerEditorRef = (el: any, tempId: number) => {
+  if (el) answerEditorRefs.value[tempId] = el;
+};
+
+const getWordCount = (tempId: number) => {
+  const editor = editors.value[tempId];
+  if (!editor) return 0;
+  const text = editor.getText();
+  return text.trim().length;
+};
+
+const getCourses = async () => {
+  try {
+    const response = await request.get('/teacher/courses/list', { params: { page: 1, size: 100 } });
+    courses.value = response.data?.records || [];
+  } catch (error) {
+    console.error('获取课程列表失败:', error);
+  }
+};
+
+const handleCourseChange = (courseId: number) => {
+  const course = courses.value.find(c => c.id === courseId);
+  if (course) {
+    assignment.value.courseName = course.name;
+  }
 };
 
 const openQuestionTypeDialog = () => {
@@ -310,67 +423,270 @@ const openQuestionTypeDialog = () => {
 };
 
 const addQuestionByType = (type: string) => {
-  const newQuestion = {
-    id: Date.now(),
-    type: type,
+  const tempId = Date.now();
+  const newQuestion: Question = {
+    tempId,
+    type,
     content: '',
-    options:
-      type === 'single' || type === 'multiple'
-        ? [{ value: '' }, { value: '' }, { value: '' }]
-        : [],
+    options: (type === 'single' || type === 'multiple') 
+      ? [{ value: '' }, { value: '' }, { value: '' }] 
+      : [],
     correctAnswer: '',
+    correctAnswers: [],
     score: 10,
     minWords: 0,
     maxWords: 0,
-    referenceAnswer: '',
+    referenceAnswer: ''
   };
   questions.value.push(newQuestion);
   questionTypeDialogVisible.value = false;
-
-  // 初始化编辑器
+  
   nextTick(() => {
-    initQuillEditors();
+    initQuillEditor(tempId, type);
   });
 };
 
-const handleQuestionTypeChange = (question: any) => {
-  if (question.type === 'single' || question.type === 'multiple') {
-    if (!question.options || question.options.length < 3) {
-      question.options = [{ value: '' }, { value: '' }, { value: '' }];
-    }
-  } else {
-    question.options = [];
+const initQuillEditor = (tempId: number, type: string) => {
+  if (!editorRefs.value[tempId]) return;
+  
+  const toolbarOptions = [
+    ['bold', 'italic', 'underline', 'strike'],
+    [{ 'list': 'ordered' }, { 'list': 'bullet' }],
+    ['clean']
+  ];
+  
+  const editor = new Quill(editorRefs.value[tempId], {
+    theme: 'snow',
+    modules: {
+      toolbar: {
+        container: toolbarOptions,
+        handlers: {
+          image: () => handleImageUpload(tempId)
+        }
+      }
+    },
+    placeholder: '请输入题目内容...'
+  });
+  
+  editors.value[tempId] = editor;
+  
+  editor.on('text-change', () => {
+    const q = questions.value.find(q => q.tempId === tempId);
+    if (q) q.content = editor.root.innerHTML;
+  });
+  
+  if (type === 'essay') {
+    initAnswerEditor(tempId);
   }
+};
+
+const initAnswerEditor = (tempId: number) => {
+  if (!answerEditorRefs.value[tempId]) return;
+  
+  const editor = new Quill(answerEditorRefs.value[tempId], {
+    theme: 'snow',
+    modules: {
+      toolbar: [
+        ['bold', 'italic', 'underline', 'strike'],
+        [{ 'list': 'ordered' }, { 'list': 'bullet' }],
+        ['clean']
+      ]
+    },
+    placeholder: '请输入参考答案（可选）...'
+  });
+  
+  answerEditors.value[tempId] = editor;
+  
+  editor.on('text-change', () => {
+    const q = questions.value.find(q => q.tempId === tempId);
+    if (q) q.referenceAnswer = editor.root.innerHTML;
+  });
+};
+
+const handleImageUpload = (tempId: number) => {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'image/*';
+  input.onchange = async () => {
+    const file = input.files?.[0];
+    if (file) {
+      try {
+        const formData = new FormData();
+        formData.append('file', file);
+        const response = await request.post('/upload/image', formData);
+        const imageUrl = response.data?.url;
+        if (imageUrl && editors.value[tempId]) {
+          const range = editors.value[tempId].getSelection();
+          editors.value[tempId].insertEmbed(range?.index || 0, 'image', imageUrl);
+        }
+      } catch (error) {
+        ElMessage.error('图片上传失败');
+      }
+    }
+  };
+  input.click();
 };
 
 const removeQuestion = (index: number) => {
   ElMessageBox.confirm('确定要删除该题目吗？', '提示', {
     confirmButtonText: '确定',
     cancelButtonText: '取消',
-    type: 'warning',
+    type: 'warning'
   }).then(() => {
+    const q = questions.value[index];
+    if (q && editors.value[q.tempId]) {
+      delete editors.value[q.tempId];
+    }
     questions.value.splice(index, 1);
   });
 };
 
-const addOption = (question: any) => {
+const addOption = (question: Question) => {
   if (question.options.length < 9) {
     question.options.push({ value: '' });
   }
 };
 
-const removeOption = (question: any, index: number) => {
+const removeOption = (question: Question, index: number) => {
   if (question.options.length > 3) {
     question.options.splice(index, 1);
   }
 };
 
-const openQuestionBankDialog = () => {
-  // 题库功能已移除
+const previewAssignment = async () => {
+  questions.value.forEach(q => {
+    if (editors.value[q.tempId]) {
+      q.content = editors.value[q.tempId].root.innerHTML;
+    }
+  });
+  
+  previewData.value = {
+    title: assignment.value.title,
+    courseName: assignment.value.courseName,
+    description: assignment.value.description,
+    deadline: assignment.value.deadline,
+    totalScore: totalScore.value,
+    questions: questions.value.map(q => ({
+      ...q,
+      options: q.options
+    }))
+  };
+  previewDialogVisible.value = true;
 };
 
-const confirmSelectQuestions = () => {
-  // 题库功能已移除
+const publishNow = async () => {
+  try {
+    await assignmentFormRef.value?.validate();
+    
+    if (questions.value.length === 0) {
+      ElMessage.warning('请添加至少一道题目');
+      return;
+    }
+    
+    questions.value.forEach(q => {
+      if (editors.value[q.tempId]) {
+        q.content = editors.value[q.tempId].root.innerHTML;
+      }
+      if (q.type === 'essay' && answerEditors.value[q.tempId]) {
+        q.referenceAnswer = answerEditors.value[q.tempId].root.innerHTML;
+      }
+    });
+    
+    for (let i = 0; i < questions.value.length; i++) {
+      const question = questions.value[i];
+      const questionNum = i + 1;
+      
+      const contentText = question.content?.replace(/<[^>]+>/g, '').trim() || '';
+      if (!contentText) {
+        ElMessage.warning(`第${questionNum}题题目内容为空，请填写完整`);
+        return;
+      }
+      
+      if (question.type === 'single' || question.type === 'multiple') {
+        const emptyOptions = question.options?.filter(
+          (opt: any) => !opt.value || opt.value.trim() === ''
+        );
+        if (emptyOptions?.length > 0) {
+          ElMessage.warning(`第${questionNum}题存在空白选项，请填写完整`);
+          return;
+        }
+        if (question.type === 'single' && !question.correctAnswer) {
+          ElMessage.warning(`第${questionNum}题未设置正确答案`);
+          return;
+        }
+        if (question.type === 'multiple' && (!question.correctAnswers || question.correctAnswers.length === 0)) {
+          ElMessage.warning(`第${questionNum}题未设置正确答案`);
+          return;
+        }
+      }
+      
+      if (question.type === 'judgment') {
+        if (!question.correctAnswer) {
+          ElMessage.warning(`第${questionNum}题未设置正确答案`);
+          return;
+        }
+      }
+      
+      if (question.type === 'essay') {
+        const answerText = question.referenceAnswer?.replace(/<[^>]+>/g, '').trim() || '';
+        if (!answerText) {
+          ElMessage.warning(`第${questionNum}题参考答案为空，请填写完整`);
+          return;
+        }
+      }
+    }
+    
+    const formattedQuestions = questions.value.map((q, index) => {
+      let answer = q.correctAnswer || '';
+      if (q.type === 'multiple' && q.correctAnswers && q.correctAnswers.length > 0) {
+        answer = q.correctAnswers.join(',');
+      }
+      
+      return {
+        type: q.type,
+        content: q.content,
+        options: q.options ? q.options.map(opt => opt.value) : [],
+        answer: answer,
+        referenceAnswer: q.referenceAnswer || '',
+        score: q.score,
+        minWords: q.minWords || 0,
+        maxWords: q.maxWords || 0,
+        sortOrder: index + 1
+      };
+    });
+    
+    const data: any = {
+      title: assignment.value.title,
+      description: assignment.value.description,
+      courseId: assignment.value.courseId,
+      deadline: assignment.value.deadline,
+      totalScore: totalScore.value,
+      questions: formattedQuestions
+    };
+    
+    if (isEdit.value) {
+      data.id = Number(assignmentId.value);
+      await request.put('/teacher/assignments', data);
+    } else {
+      await request.post('/teacher/assignments', data);
+    }
+    
+    ElMessage.success('作业发布成功！');
+    router.push('/teacher/assignments');
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      ElMessage.error('发布失败: ' + (error.message || '未知错误'));
+    }
+  }
+};
+
+const formatDateTime = (dateStr: string) => {
+  if (!dateStr) return '-';
+  const date = new Date(dateStr);
+  return date.toLocaleString('zh-CN', { 
+    year: 'numeric', month: '2-digit', day: '2-digit', 
+    hour: '2-digit', minute: '2-digit', second: '2-digit' 
+  });
 };
 
 const getAssignmentDetail = async (id: string) => {
@@ -389,12 +705,34 @@ const getAssignmentDetail = async (id: string) => {
       courseId: data.courseId,
       description: data.description || '',
       deadline: data.deadline || '',
+      courseName: data.courseName || ''
     };
 
-    questions.value = data.questions || [];
+    if (data.questions && data.questions.length > 0) {
+      questions.value = data.questions.map((q: any, index: number) => ({
+        tempId: Date.now() + index,
+        type: q.type,
+        content: q.content || '',
+        options: q.options ? q.options.map((opt: string) => ({ value: opt })) : [],
+        correctAnswer: q.answer || '',
+        correctAnswers: q.answer ? q.answer.split(',') : [],
+        score: q.score || 10,
+        minWords: q.minWords || 0,
+        maxWords: q.maxWords || 0,
+        referenceAnswer: q.referenceAnswer || ''
+      }));
 
-    await nextTick();
-    initEditors();
+      await nextTick();
+      questions.value.forEach((q) => {
+        initQuillEditor(q.tempId, q.type);
+        if (q.content && editors.value[q.tempId]) {
+          editors.value[q.tempId].root.innerHTML = q.content;
+        }
+        if (q.type === 'essay' && q.referenceAnswer && answerEditors.value[q.tempId]) {
+          answerEditors.value[q.tempId].root.innerHTML = q.referenceAnswer;
+        }
+      });
+    }
 
     ElMessage.success('作业数据加载成功');
   } catch (error: any) {
@@ -403,544 +741,403 @@ const getAssignmentDetail = async (id: string) => {
   }
 };
 
-const initEditors = () => {
-  questions.value.forEach((question) => {
-    if (question.id && editorRefs.value[question.id]) {
-      const editor = new Quill(editorRefs.value[question.id], {
-        theme: 'snow',
-        placeholder: '请输入题目内容...',
-        modules: {
-          toolbar: [
-            ['bold', 'italic', 'underline'],
-            [{ list: 'ordered' }, { list: 'bullet' }],
-            ['link', 'clean'],
-          ],
-        },
-      });
-
-      if (question.content) {
-        editor.root.innerHTML = question.content;
-      }
-
-      editors.value[question.id] = editor;
-    }
-
-    // 主观题需要初始化答案编辑器
-    if (
-      question.type === 'essay' &&
-      question.id &&
-      answerEditorRefs.value[question.id]
-    ) {
-      const answerEditor = new Quill(answerEditorRefs.value[question.id], {
-        theme: 'snow',
-        placeholder: '请输入参考答案...',
-        modules: {
-          toolbar: [
-            ['bold', 'italic', 'underline'],
-            [{ list: 'ordered' }, { list: 'bullet' }],
-            ['link', 'clean'],
-          ],
-        },
-      });
-
-      if (question.referenceAnswer) {
-        answerEditor.root.innerHTML = question.referenceAnswer;
-      }
-
-      answerEditors.value[question.id] = answerEditor;
-    }
-  });
-};
-
-const publishAssignment = async () => {
-  try {
-    // 验证表单
-    if (!assignment.value.title) {
-      ElMessage.warning('请输入作业标题');
-      return;
-    }
-    if (!assignment.value.courseId) {
-      ElMessage.warning('请选择所属课程');
-      return;
-    }
-    if (!assignment.value.deadline) {
-      ElMessage.warning('请设置截止时间');
-      return;
-    }
-    if (questions.value.length === 0) {
-      ElMessage.warning('请添加至少一道题目');
-      return;
-    }
-
-    // 收集编辑器内容
-    questions.value.forEach((question) => {
-      if (editors.value[question.id]) {
-        question.content = editors.value[question.id].root.innerHTML;
-      }
-      if (question.type === 'essay' && answerEditors.value[question.id]) {
-        question.referenceAnswer =
-          answerEditors.value[question.id].root.innerHTML;
-      }
-    });
-
-    // 验证题目内容和答案
-    for (let i = 0; i < questions.value.length; i++) {
-      const question = questions.value[i];
-      const questionNum = i + 1;
-      
-      // 验证题目内容
-      const contentText = question.content?.replace(/<[^>]+>/g, '').trim() || '';
-      if (!contentText) {
-        ElMessage.warning(`第${questionNum}题题目内容为空，请填写完整`);
-        return;
-      }
-      
-      // 验证选择题选项
-      if (question.type === 'single' || question.type === 'multiple') {
-        const emptyOptions = question.options?.filter(
-          (opt: any) => !opt.value || opt.value.trim() === ''
-        );
-        if (emptyOptions?.length > 0) {
-          ElMessage.warning(`第${questionNum}题存在空白选项，请填写完整`);
-          return;
-        }
-        if (!question.correctAnswer || question.correctAnswer.length === 0) {
-          ElMessage.warning(`第${questionNum}题未设置正确答案`);
-          return;
-        }
-      }
-      
-      // 验证判断题答案
-      if (question.type === 'judgment') {
-        if (!question.correctAnswer) {
-          ElMessage.warning(`第${questionNum}题未设置正确答案`);
-          return;
-        }
-      }
-      
-      // 验证主观题参考答案
-      if (question.type === 'essay') {
-        const answerText = question.referenceAnswer?.replace(/<[^>]+>/g, '').trim() || '';
-        if (!answerText) {
-          ElMessage.warning(`第${questionNum}题参考答案为空，请填写完整`);
-          return;
-        }
-      }
-    }
-
-    ElMessageBox.confirm(
-      '确定要发布该作业吗？发布后将通知所有选课学生。',
-      '提示',
-      {
-        confirmButtonText: '确定',
-        cancelButtonText: '取消',
-        type: 'warning',
-      },
-    ).then(async () => {
-      const data = {
-        ...assignment.value,
-        questions: questions.value,
-        totalScore: totalScore.value,
-        status: 'published', // 设置为已发布状态
-      };
-
-      // 如果是编辑模式，使用 PUT 更新；否则使用 POST 创建
-      if (assignmentId.value) {
-        await request.put(`/teacher/assignments/${assignmentId.value}`, data);
-      } else {
-        await request.post('/teacher/assignments', data);
-      }
-
-      ElMessage.success('作业发布成功');
-      router.push('/teacher/courses');
-    });
-  } catch (error) {
-    ElMessage.error('发布作业失败');
+onMounted(async () => {
+  await getCourses();
+  
+  if (isEdit.value) {
+    await getAssignmentDetail(assignmentId.value);
   }
-};
-
-const previewAssignment = () => {
-  // 预览模式，实际项目中应该打开预览页面
-  ElMessage.info('预览模式功能开发中');
-};
-
-const initQuillEditors = () => {
-  questions.value.forEach((question) => {
-    if (!editors.value[question.id] && editorRefs.value[question.id]) {
-      const editor = new Quill(editorRefs.value[question.id], {
-        theme: 'snow',
-        modules: {
-          toolbar: [
-            ['bold', 'italic', 'underline', 'strike'],
-            ['blockquote', 'code-block'],
-            [{ header: 1 }, { header: 2 }],
-            [{ list: 'ordered' }, { list: 'bullet' }],
-            [{ color: [] }, { background: [] }],
-            ['image'],
-            ['clean'],
-          ],
-          syntax: true,
-        },
-        placeholder: '请输入题目内容...',
-      });
-      editors.value[question.id] = editor;
-    }
-
-    if (
-      question.type === 'essay' &&
-      !answerEditors.value[question.id] &&
-      answerEditorRefs.value[question.id]
-    ) {
-      const editor = new Quill(answerEditorRefs.value[question.id], {
-        theme: 'snow',
-        modules: {
-          toolbar: [
-            ['bold', 'italic', 'underline', 'strike'],
-            ['blockquote', 'code-block'],
-            [{ header: 1 }, { header: 2 }],
-            [{ list: 'ordered' }, { list: 'bullet' }],
-            [{ color: [] }, { background: [] }],
-            ['image'],
-            ['clean'],
-          ],
-          syntax: true,
-        },
-        placeholder: '请输入参考答案...',
-      });
-      answerEditors.value[question.id] = editor;
-    }
-  });
-};
-
-onMounted(() => {
-  if (assignmentId.value && assignmentId.value !== 'create') {
-    getAssignmentDetail(assignmentId.value);
-  }
-
-  nextTick(() => {
-    initQuillEditors();
-  });
 });
 </script>
 
 <style scoped>
 .teacher-assignment-edit {
   padding: 24px;
-  background: rgba(255, 255, 255, 0.7);
-  backdrop-filter: blur(10px);
-  border-radius: 16px;
-  margin: 16px;
+  padding-bottom: 100px;
+  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
   min-height: calc(100vh - 84px);
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
 }
 
-/* 通用卡片样式 */
 :deep(.el-card) {
   border: none;
   border-radius: 16px;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
-  overflow: hidden;
 }
 
 :deep(.el-card__header) {
   padding: 16px 20px;
   border-bottom: none;
   background: transparent;
-  overflow: hidden;
 }
 
 :deep(.el-card__body) {
-  padding: 0 20px 20px;
-  overflow: hidden;
+  padding: 20px;
 }
 
-/* 配置卡片 */
-.config-section {
-  margin-bottom: 0;
-}
-
-.questions-section {
-  margin-bottom: 0;
-}
-
-.questions-section :deep(.el-card__header) {
+.card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
 }
 
-/* 卡片标题 */
-.card-title {
+.card-header__title {
   display: flex;
   align-items: center;
-  gap: 10px;
-  font-size: 16px;
+  gap: 12px;
+  font-size: 20px;
   font-weight: 600;
   color: #303133;
 }
 
-.card-title__icon {
+.card-header__icon {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: #fff;
 }
 
-.card-title__icon .el-icon {
+.card-header__icon .el-icon {
+  font-size: 24px;
+}
+
+.section-title {
   font-size: 18px;
-}
-
-.card-title__text {
-  color: #303133;
-}
-
-/* 表单样式 */
-.config-form {
-  padding: 10px 0;
-}
-
-:deep(.el-form-item) {
-  margin-bottom: 24px;
-}
-
-:deep(.el-form-item:last-child) {
-  margin-bottom: 0;
-}
-
-:deep(.el-form-item__label) {
   font-weight: 600;
   color: #303133;
+}
+
+.mt-4 {
+  margin-top: 20px;
+}
+
+.score-hint {
+  margin-left: 12px;
   font-size: 14px;
+  color: #909399;
 }
 
-:deep(.el-input-number) {
-  width: 100%;
-}
-
-:deep(.el-select) {
-  width: 100%;
-}
-
-/* 按钮样式 */
-:deep(.el-button) {
-  border-radius: 8px;
-  padding: 10px 24px;
-  font-size: 14px;
-}
-
-:deep(.el-button--primary) {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  border: none;
-}
-
-:deep(.el-button--primary:hover) {
-  opacity: 0.9;
-}
-
-:deep(.el-button--success) {
-  background: linear-gradient(135deg, #67c23a 0%, #5daf34 100%);
-  border: none;
-}
-
-:deep(.el-button--danger) {
-  background: linear-gradient(135deg, #f56c6c 0%, #e74c3c 100%);
-  border: none;
-}
-
-/* 空题目区域 */
 .empty-questions {
   text-align: center;
-  padding: 60px 20px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 20px;
-  background: linear-gradient(135deg, #fafafa 0%, #f5f7fa 100%);
-  border-radius: 12px;
-  margin: 20px 0;
+  padding: 60px 0;
 }
 
-.empty-questions :deep(.el-empty__description) {
-  color: #909399;
-  font-size: 16px;
+.questions-container {
+  max-height: none;
 }
 
-/* 题目卡片 */
 .question-card {
+  background: #fafafa;
   border: 1px solid #ebeef5;
   border-radius: 12px;
   padding: 20px;
   margin-bottom: 20px;
-  background: #fafafa;
+  transition: all 0.3s;
+}
+
+.question-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
 }
 
 .question-header {
   display: flex;
+  justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #ebeef5;
 }
 
-.question-number {
-  font-weight: 600;
-  margin-right: 16px;
-  font-size: 16px;
-  color: #303133;
-}
-
-.option-item {
-  display: flex;
-  align-items: center;
-  margin-bottom: 12px;
-}
-
-.option-label {
-  width: 28px;
-  margin-right: 12px;
-  font-weight: 600;
-  color: #303133;
-}
-
-.option-item .el-button {
-  margin-left: 12px;
-}
-
-.option-hint {
-  font-size: 13px;
-  color: #909399;
-  margin-top: 12px;
-}
-
-.score-hint {
-  margin-left: 16px;
-  font-size: 14px;
-  color: #909399;
-}
-
-.word-limit {
+.question-title {
   display: flex;
   align-items: center;
   gap: 12px;
 }
 
-.word-limit-separator {
-  font-size: 16px;
-  color: #909399;
-}
-
-.word-limit-hint {
-  margin-left: 16px;
-  font-size: 14px;
-  color: #909399;
-}
-
-.answer-hint {
-  font-size: 13px;
-  color: #909399;
-  margin-top: 12px;
-}
-
-.rich-text-editor {
-  margin-bottom: 16px;
-}
-
-.quill-editor {
-  min-height: 120px;
-  border: 1px solid #dcdfe6;
-  border-radius: 8px;
-}
-
-.total-score {
-  font-size: 18px;
-  font-weight: 600;
-  color: #667eea;
-  text-align: right;
-  padding: 20px 0;
-}
-
-.action-buttons {
-  display: flex;
-  justify-content: flex-end;
-  gap: 16px;
-}
-
-/* 题型选择弹窗 */
-.question-type-list {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 20px;
-}
-
-.question-type-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 24px;
-  border: 1px solid #ebeef5;
-  border-radius: 12px;
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.question-type-item:hover {
-  border-color: #667eea;
-  box-shadow: 0 4px 16px rgba(102, 126, 234, 0.2);
-  transform: translateY(-2px);
-}
-
-.type-icon {
-  font-size: 36px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  margin-bottom: 12px;
-}
-
-.type-name {
+.question-number {
   font-size: 16px;
   font-weight: 600;
   color: #303133;
 }
 
-/* 响应式设计 */
+.question-form {
+  margin-top: 16px;
+}
+
+.rich-text-editor-wrapper {
+  width: 100%;
+}
+
+.quill-editor {
+  min-height: 120px;
+  background: white;
+  border-radius: 8px;
+}
+
+.quill-editor:deep(.ql-editor) {
+  min-height: 100px;
+}
+
+.word-count {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #909399;
+}
+
+.options-container {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.option-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.option-label {
+  font-weight: 500;
+  min-width: 24px;
+}
+
+.option-input {
+  flex: 1;
+}
+
+.option-hint {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #909399;
+}
+
+.score-unit {
+  margin-left: 8px;
+  color: #606266;
+}
+
+.word-limit {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.word-limit-separator {
+  color: #606266;
+}
+
+.word-limit-hint {
+  margin-left: 8px;
+  font-size: 14px;
+  color: #909399;
+}
+
+.answer-hint {
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: #fdf6ec;
+  border-radius: 8px;
+  font-size: 12px;
+  color: #e6a23c;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.add-question-btn {
+  text-align: center;
+  padding: 20px;
+}
+
+.total-score {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 12px;
+  margin-top: 20px;
+  font-size: 16px;
+  font-weight: 500;
+  color: #fff;
+}
+
+.question-count {
+  font-size: 14px;
+  opacity: 0.9;
+}
+
+.action-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 20px;
+  background: white;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.1);
+  z-index: 99;
+}
+
+.question-type-list {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+
+.question-type-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  border: 1px solid #ebeef5;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.question-type-item:hover {
+  border-color: #409eff;
+  box-shadow: 0 2px 12px rgba(64, 158, 255, 0.2);
+  transform: translateY(-2px);
+}
+
+.type-icon-wrapper {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.type-icon-wrapper .type-icon {
+  font-size: 24px;
+  color: white;
+}
+
+.type-info {
+  flex: 1;
+}
+
+.type-name {
+  display: block;
+  font-size: 16px;
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+
+.type-desc {
+  font-size: 12px;
+  color: #909399;
+}
+
+.preview-content {
+  padding: 20px;
+}
+
+.preview-header {
+  text-align: center;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 2px solid #ebeef5;
+}
+
+.preview-header h2 {
+  margin-bottom: 12px;
+  color: #303133;
+}
+
+.preview-meta {
+  display: flex;
+  justify-content: center;
+  gap: 24px;
+  font-size: 14px;
+  color: #606266;
+}
+
+.preview-description {
+  margin-bottom: 24px;
+  padding: 16px;
+  background: #f5f7fa;
+  border-radius: 8px;
+}
+
+.preview-description h4 {
+  margin-bottom: 8px;
+  color: #303133;
+}
+
+.preview-question {
+  margin-bottom: 24px;
+  padding: 16px;
+  border: 1px solid #ebeef5;
+  border-radius: 8px;
+}
+
+.q-title {
+  margin-bottom: 12px;
+}
+
+.q-number {
+  font-weight: 600;
+  margin-right: 8px;
+}
+
+.q-type {
+  color: #909399;
+  margin-right: 8px;
+}
+
+.q-score {
+  color: #f56c6c;
+}
+
+.q-content {
+  margin-top: 8px;
+  padding: 8px;
+  background: #fafafa;
+  border-radius: 4px;
+}
+
+.question-options {
+  margin-top: 12px;
+  padding-left: 20px;
+}
+
+.question-options .option {
+  padding: 6px 0;
+}
+
+.question-answer {
+  margin-top: 12px;
+  padding: 8px;
+  background: #ecf5ff;
+  border-radius: 4px;
+}
+
+.question-essay {
+  margin-top: 12px;
+  font-size: 14px;
+  color: #606266;
+}
+
 @media (max-width: 768px) {
   .teacher-assignment-edit {
     padding: 16px;
   }
-
-  .welcome-title {
-    font-size: 36px;
-  }
-
-  .welcome-subtitle {
-    font-size: 18px;
-  }
-
-  .questions-section :deep(.el-card__header) {
-    flex-direction: column;
-    gap: 12px;
-    align-items: flex-start;
-  }
-
-  .header-actions {
-    width: 100%;
-    display: flex;
-    gap: 8px;
-  }
-
-  .action-buttons {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
+  
   .question-type-list {
     grid-template-columns: 1fr;
+  }
+  
+  .action-buttons {
+    flex-wrap: wrap;
   }
 }
 </style>

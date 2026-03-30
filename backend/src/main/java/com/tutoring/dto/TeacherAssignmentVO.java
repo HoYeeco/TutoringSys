@@ -27,6 +27,7 @@ public class TeacherAssignmentVO {
     private Integer questionCount;
     private Integer submissionCount;
     private Integer gradedCount;
+    private Integer totalStudents;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
     private List<QuestionDTO> questions;

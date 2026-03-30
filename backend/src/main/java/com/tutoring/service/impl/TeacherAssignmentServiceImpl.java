@@ -74,6 +74,7 @@ public class TeacherAssignmentServiceImpl implements TeacherAssignmentService {
         Map<Long, Integer> questionCountMap = new HashMap<>();
         Map<Long, Integer> submissionCountMap = new HashMap<>();
         Map<Long, Integer> gradedCountMap = new HashMap<>();
+        Map<Long, Integer> totalStudentsMap = new HashMap<>();
 
         if (!assignmentIds.isEmpty()) {
             List<Question> questions = questionMapper.selectList(
@@ -100,9 +101,21 @@ public class TeacherAssignmentServiceImpl implements TeacherAssignmentService {
                     Collectors.collectingAndThen(Collectors.counting(), Long::intValue)));
         }
 
+        if (!courseIds.isEmpty()) {
+            List<CourseSelection> selections = courseSelectionMapper.selectList(
+                new LambdaQueryWrapper<CourseSelection>()
+                    .in(CourseSelection::getCourseId, courseIds)
+            );
+
+            totalStudentsMap = selections.stream()
+                .collect(Collectors.groupingBy(CourseSelection::getCourseId,
+                    Collectors.collectingAndThen(Collectors.counting(), Long::intValue)));
+        }
+
         Map<Long, Integer> finalQuestionCountMap = questionCountMap;
         Map<Long, Integer> finalSubmissionCountMap = submissionCountMap;
         Map<Long, Integer> finalGradedCountMap = gradedCountMap;
+        Map<Long, Integer> finalTotalStudentsMap = totalStudentsMap;
 
         List<TeacherAssignmentVO> voList = assignmentPage.getRecords().stream()
             .map(assignment -> {
@@ -120,6 +133,7 @@ public class TeacherAssignmentServiceImpl implements TeacherAssignmentService {
                     .questionCount(finalQuestionCountMap.getOrDefault(assignment.getId(), 0))
                     .submissionCount(finalSubmissionCountMap.getOrDefault(assignment.getId(), 0))
                     .gradedCount(finalGradedCountMap.getOrDefault(assignment.getId(), 0))
+                    .totalStudents(finalTotalStudentsMap.getOrDefault(assignment.getCourseId(), 0))
                     .createTime(assignment.getCreateTime())
                     .updateTime(assignment.getUpdateTime())
                     .build();

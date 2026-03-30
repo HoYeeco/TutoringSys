@@ -58,15 +58,15 @@
         @row-click="showDetail"
         class="modern-table clickable-table"
       >
-        <el-table-column prop="assignmentName" label="作业名称" min-width="180">
+        <el-table-column prop="title" label="作业名称" min-width="180">
           <template #default="scope">
             <el-tooltip
-              :content="scope.row.assignmentName"
+              :content="scope.row.title"
               placement="top"
-              :disabled="!isOverflow(scope.row.assignmentName, 15)"
+              :disabled="!isOverflow(scope.row.title, 15)"
             >
               <span class="ellipsis-text">{{
-                scope.row.assignmentName || '-'
+                scope.row.title || '-'
               }}</span>
             </el-tooltip>
           </template>
@@ -108,11 +108,11 @@
             <div class="completion-info">
               <span>
                 {{
-                  `${scope.row.submittedCount || 0}/${scope.row.totalStudents || 0}`
+                  `${scope.row.submissionCount || 0}/${scope.row.totalStudents || 0}`
                 }}
               </span>
               <el-progress
-                :percentage="scope.row.completionRate || 0"
+                :percentage="getCompletionRate(scope.row)"
                 :stroke-width="6"
                 :show-text="false"
                 class="completion-progress"
@@ -134,7 +134,7 @@
           <template #default="scope">
             <el-button
               size="small"
-              @click.stop="editAssignment(scope.row.assignmentId)"
+              @click.stop="editAssignment(scope.row.id)"
             >
               编辑
             </el-button>
@@ -163,14 +163,14 @@
 
     <el-dialog
       v-model="detailVisible"
-      :title="currentAssignment?.assignmentName || '作业详情'"
+      :title="currentAssignment?.title || '作业详情'"
       width="800px"
       class="detail-dialog"
     >
       <div v-if="currentAssignment" class="detail-content">
         <el-descriptions :column="2" border>
           <el-descriptions-item label="作业名称" :span="2">
-            {{ currentAssignment.assignmentName }}
+            {{ currentAssignment.title }}
           </el-descriptions-item>
           <el-descriptions-item label="所属课程">
             {{ currentAssignment.courseName }}
@@ -361,7 +361,7 @@
         <el-button @click="detailVisible = false">关闭</el-button>
         <el-button
           type="primary"
-          @click="editAssignment(currentAssignment?.assignmentId)"
+          @click="editAssignment(currentAssignment?.id)"
         >
           编辑
         </el-button>
@@ -383,16 +383,15 @@ interface Course {
 }
 
 interface Assignment {
-  assignmentId: number;
-  assignmentName: string;
+  id: number;
+  title: string;
   courseId: number;
   courseName: string;
   totalScore: number;
   description: string;
   deadline: string;
-  submittedCount: number;
+  submissionCount: number;
   totalStudents: number;
-  completionRate: number;
   status: string;
 }
 
@@ -447,6 +446,13 @@ const isOverflow = (text: string | null, maxChars: number): boolean => {
   return text.length > maxChars;
 };
 
+const getCompletionRate = (assignment: Assignment): number => {
+  if (!assignment || !assignment.totalStudents || assignment.totalStudents === 0) {
+    return 0;
+  }
+  return Math.round((assignment.submissionCount || 0) / assignment.totalStudents * 100);
+};
+
 const isStudentSubmitted = (studentId: number): boolean => {
   return submittedStudents.value.some((s) => s.studentId === studentId);
 };
@@ -458,7 +464,7 @@ const showDetail = async (row: Assignment) => {
 
   try {
     const response = await request.get(
-      `/teacher/assignments/${row.assignmentId}/submission-status`,
+      `/teacher/assignments/${row.id}/submission-status`,
     );
     if (response.data) {
       submittedStudents.value = response.data.submittedStudents || [];
@@ -546,7 +552,7 @@ const publishAssignment = async (assignmentId: number) => {
 const deleteAssignment = async (assignment: Assignment) => {
   try {
     await ElMessageBox.confirm(
-      `确定要删除作业「${assignment.assignmentName}」吗？`,
+      `确定要删除作业「${assignment.title}」吗？`,
       '提示',
       {
         confirmButtonText: '确定',
@@ -555,7 +561,7 @@ const deleteAssignment = async (assignment: Assignment) => {
       },
     );
 
-    await request.delete(`/teacher/assignments/${assignment.assignmentId}`);
+    await request.delete(`/teacher/assignments/${assignment.id}`);
     ElMessage.success('作业删除成功');
     getAssignments();
   } catch (error) {
@@ -568,7 +574,7 @@ const deleteAssignment = async (assignment: Assignment) => {
 const remindStudent = async (studentId: number) => {
   try {
     await request.post(
-      `/teacher/assignments/${currentAssignment.value?.assignmentId}/remind`,
+      `/teacher/assignments/${currentAssignment.value?.id}/remind`,
       null,
       { params: { studentId } },
     );
@@ -587,7 +593,7 @@ const remindAllStudents = async () => {
   try {
     remindLoading.value = true;
     await request.post(
-      `/teacher/assignments/${currentAssignment.value?.assignmentId}/remind`,
+      `/teacher/assignments/${currentAssignment.value?.id}/remind`,
     );
     ElMessage.success('已向所有未提交学生发送提醒');
   } catch (error) {
