@@ -4,6 +4,8 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.tutoring.common.Result;
 import com.tutoring.dto.AdminAssignmentVO;
 import com.tutoring.dto.CreateAssignmentRequest;
+import com.tutoring.dto.SubmissionRecordVO;
+import com.tutoring.dto.UpdateAssignmentRequest;
 import com.tutoring.service.AdminAssignmentService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -43,6 +45,14 @@ public class AdminAssignmentController {
         return Result.success(assignmentId);
     }
 
+    @Operation(summary = "更新作业", description = "管理员更新作业")
+    @PutMapping
+    @PreAuthorize("hasRole('ADMIN')")
+    public Result<Void> updateAssignment(@Valid @RequestBody UpdateAssignmentRequest request) {
+        adminAssignmentService.updateAssignment(request.getId(), request);
+        return Result.success(null);
+    }
+
     @Operation(summary = "获取作业详情", description = "根据ID获取作业详情")
     @GetMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
@@ -61,6 +71,33 @@ public class AdminAssignmentController {
         try {
             adminAssignmentService.deleteAssignment(id);
             return Result.success(null);
+        } catch (RuntimeException e) {
+            return Result.error(400, e.getMessage());
+        }
+    }
+
+    @Operation(summary = "删除学生提交", description = "管理员删除学生的作业提交记录")
+    @DeleteMapping("/submissions/{submissionId}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public Result<Void> deleteSubmission(@PathVariable Long submissionId) {
+        try {
+            adminAssignmentService.deleteSubmission(submissionId);
+            return Result.success(null);
+        } catch (RuntimeException e) {
+            return Result.error(400, e.getMessage());
+        }
+    }
+
+    @Operation(summary = "获取作业提交列表", description = "管理员获取指定作业的学生提交列表")
+    @GetMapping("/{id}/submissions")
+    @PreAuthorize("hasRole('ADMIN')")
+    public Result<Page<SubmissionRecordVO>> getAssignmentSubmissions(
+            @Parameter(description = "作业ID") @PathVariable Long id,
+            @Parameter(description = "页码") @RequestParam(defaultValue = "1") Integer page,
+            @Parameter(description = "每页数量") @RequestParam(defaultValue = "10") Integer size) {
+        try {
+            Page<SubmissionRecordVO> submissionPage = adminAssignmentService.getAssignmentSubmissions(id, page, size);
+            return Result.success(submissionPage);
         } catch (RuntimeException e) {
             return Result.error(400, e.getMessage());
         }

@@ -273,12 +273,19 @@
               <div v-for="(opt, optIdx) in q.options" :key="optIdx" class="option">
                 {{ String.fromCharCode(65 + (typeof optIdx === 'number' ? optIdx : parseInt(optIdx))) }}. {{ opt.value }}
               </div>
+              <div class="question-answer">
+                正确答案：{{ q.type === 'single' ? q.correctAnswer : q.correctAnswers.join(', ') }}
+              </div>
             </div>
             <div class="question-answer" v-if="q.type === 'judgment'">
               答案：{{ q.correctAnswer === 'true' ? '正确' : '错误' }}
             </div>
             <div class="question-essay" v-if="q.type === 'essay'">
               <div v-if="q.minWords || q.maxWords">字数要求：{{ q.minWords || 0 }} - {{ q.maxWords || '无限制' }}字</div>
+              <div v-if="q.referenceAnswer" class="reference-answer">
+                <h5>参考答案：</h5>
+                <div v-html="q.referenceAnswer"></div>
+              </div>
             </div>
           </div>
         </div>
@@ -664,13 +671,21 @@ const publishNow = async () => {
       questions: formattedQuestions
     };
     
-    await request.post('/admin/assignments', data);
+    if (isEdit.value) {
+      await request.put('/admin/assignments', {
+        id: assignmentId.value,
+        ...data
+      });
+      ElMessage.success('作业更新成功！');
+    } else {
+      await request.post('/admin/assignments', data);
+      ElMessage.success('作业发布成功！');
+    }
     
-    ElMessage.success('作业发布成功！');
     router.push('/admin/assignments');
   } catch (error: any) {
     if (error !== 'cancel') {
-      ElMessage.error('发布失败: ' + (error.message || '未知错误'));
+      ElMessage.error(isEdit.value ? '更新失败: ' + (error.message || '未知错误') : '发布失败: ' + (error.message || '未知错误'));
     }
   }
 };
@@ -684,8 +699,67 @@ const formatDateTime = (dateStr: string) => {
   });
 };
 
+const getAssignmentDetail = async () => {
+  if (!isEdit.value) return;
+  
+  try {
+    const response = await request.get(`/admin/assignments/${assignmentId.value}`);
+    const data = response.data;
+    
+    if (data) {
+      assignment.value = {
+        id: data.id,
+        title: data.title,
+        courseId: data.courseId,
+        description: data.description,
+        deadline: data.deadline,
+        courseName: data.courseName
+      };
+      
+      if (data.questions && data.questions.length > 0) {
+        questions.value = data.questions.map((q: any, index: number) => ({
+          tempId: Date.now() + index,
+          type: q.type,
+          content: q.content,
+          options: q.options ? q.options.map((opt: string) => ({ value: opt })) : [],
+          correctAnswer: q.answer,
+          correctAnswers: q.type === 'multiple' ? q.answer.split(',') : [],
+          score: q.score,
+          minWords: q.minWords || 0,
+          maxWords: q.maxWords || 0,
+          referenceAnswer: q.referenceAnswer || ''
+        }));
+      }
+    }
+  } catch (error) {
+    console.error('获取作业详情失败:', error);
+    ElMessage.error('获取作业详情失败');
+  }
+};
+
 onMounted(async () => {
   await getCourses();
+  await getAssignmentDetail();
+  await nextTick();
+  
+  if (questions.value.length > 0) {
+    questions.value.forEach((q: Question) => {
+      nextTick(() => {
+        initQuillEditor(q.tempId, q.type);
+        if (q.content) {
+          nextTick(() => {
+            const editor = editors.value[q.tempId];
+            if (editor) {
+              editor.root.innerHTML = q.content;
+            }
+          });
+        }
+        if (q.type === 'essay' && q.referenceAnswer) {
+          initAnswerEditor(q.tempId, q.referenceAnswer);
+        }
+      });
+    });
+  }
 });
 </script>
 
@@ -693,7 +767,10 @@ onMounted(async () => {
 .admin-assignment-edit {
   padding: 24px;
   padding-bottom: 100px;
-  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  background: rgba(255, 255, 255, 0.66);
+  backdrop-filter: blur(4px);
+  border-radius: 16px;
+  margin: 16px;
   min-height: calc(100vh - 84px);
 }
 
@@ -1058,6 +1135,25 @@ onMounted(async () => {
   padding: 8px;
   background: #ecf5ff;
   border-radius: 4px;
+}
+
+.reference-answer {
+  margin-top: 12px;
+  padding: 12px;
+  background: #f0f9ff;
+  border-left: 3px solid #409eff;
+  border-radius: 4px;
+}
+
+.reference-answer h5 {
+  margin: 0 0 8px 0;
+  color: #409eff;
+  font-size: 14px;
+}
+
+.reference-answer > div {
+  color: #303133;
+  line-height: 1.6;
 }
 
 .question-essay {

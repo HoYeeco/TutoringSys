@@ -47,7 +47,7 @@
               <el-option label="已逾期" value="overdue" />
             </el-select>
             <el-button type="primary" @click="createAssignment">
-              <el-icon><Plus /></el-icon> 创建作业
+              <el-icon><Plus /></el-icon> 发布作业
             </el-button>
           </div>
         </div>
@@ -141,8 +141,15 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="160" @click.stop>
+        <el-table-column label="操作" width="250" @click.stop>
           <template #default="scope">
+            <el-button
+              size="small"
+              type="primary"
+              @click.stop="viewSubmissions(scope.row)"
+            >
+              提交详情
+            </el-button>
             <el-button
               size="small"
               @click.stop="editAssignment(scope.row.id)"
@@ -269,11 +276,107 @@
         </el-button>
       </template>
     </el-dialog>
+
+    <el-dialog
+      v-model="submissionsDialogVisible"
+      :title="`${currentAssignment?.title || ''} - 学生提交列表`"
+      width="900px"
+      class="submissions-dialog"
+      append-to-body
+      destroy-on-close
+    >
+      <div class="submissions-header">
+        <el-row :gutter="16">
+          <el-col :span="8">
+            <div class="stat-item">
+              <span class="stat-label">应交人数</span>
+              <span class="stat-value">{{ currentAssignment?.totalStudents || 0 }} 人</span>
+            </div>
+          </el-col>
+          <el-col :span="8">
+            <div class="stat-item">
+              <span class="stat-label">已提交</span>
+              <span class="stat-value">{{ submissionsTotal }} 人</span>
+            </div>
+          </el-col>
+          <el-col :span="8">
+            <div class="stat-item">
+              <span class="stat-label">提交率</span>
+              <span class="stat-value">{{ submissionRate }}%</span>
+            </div>
+          </el-col>
+        </el-row>
+      </div>
+
+      <el-table
+        :data="submissions"
+        style="width: 100%"
+        v-loading="submissionsLoading"
+        class="submissions-table"
+      >
+        <el-table-column label="学生信息" min-width="180">
+          <template #default="scope">
+            <div class="student-info">
+              <el-avatar :size="36" :src="scope.row.avatar || ''">
+                {{ scope.row.studentName?.charAt(0) || '?' }}
+              </el-avatar>
+              <div class="student-details">
+                <div class="student-name">{{ scope.row.studentName }}</div>
+                <div class="student-username">@{{ scope.row.username }}</div>
+              </div>
+            </div>
+          </template>
+        </el-table-column>
+        <el-table-column prop="submitTime" label="提交时间" width="160">
+          <template #default="scope">
+            {{ formatDeadline(scope.row.submitTime) }}
+          </template>
+        </el-table-column>
+        <el-table-column prop="score" label="得分" width="100" align="center">
+          <template #default="scope">
+            <span :class="getScoreClass(scope.row.score)">
+              {{ scope.row.score !== null ? scope.row.score : '-' }}
+            </span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="status" label="批改状态" width="100" align="center">
+          <template #default="scope">
+            <el-tag :type="scope.row.status === 'graded' ? 'success' : 'warning'" size="small">
+              {{ scope.row.status === 'graded' ? '已批改' : '待批改' }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="100" align="center">
+          <template #default="scope">
+            <el-button
+              type="danger"
+              size="small"
+              @click="deleteSubmission(scope.row)"
+              :loading="scope.row.deleting"
+            >
+              删除
+            </el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+
+      <div class="pagination-container" v-if="submissionsTotal > 0">
+        <el-pagination
+          v-model:current-page="submissionsPage"
+          v-model:page-size="submissionsPageSize"
+          :page-sizes="[10, 20, 50]"
+          layout="total, sizes, prev, pager, next"
+          :total="submissionsTotal"
+          @size-change="handleSubmissionsSizeChange"
+          @current-change="handleSubmissionsPageChange"
+        />
+      </div>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { Plus, Search, Notebook } from '@element-plus/icons-vue';
@@ -319,6 +422,18 @@ const total = ref(0);
 const loading = ref(false);
 const detailVisible = ref(false);
 const currentAssignment = ref<Assignment | null>(null);
+
+const submissionsDialogVisible = ref(false);
+const submissions = ref<any[]>([]);
+const submissionsLoading = ref(false);
+const submissionsTotal = ref(0);
+const submissionsPage = ref(1);
+const submissionsPageSize = ref(10);
+
+const submissionRate = computed(() => {
+  if (!currentAssignment.value || !currentAssignment.value.totalStudents) return 0;
+  return Math.round((submissionsTotal.value / currentAssignment.value.totalStudents) * 100);
+});
 
 const formatDeadline = (deadline: string | null): string => {
   if (!deadline) return '-';
@@ -379,14 +494,23 @@ const getCourses = async () => {
 const getAssignments = async () => {
   loading.value = true;
   try {
+    const params: any = {
+      page: currentPage.value,
+      size: pageSize.value,
+    };
+    
+    if (filterForm.value.courseId) {
+      params.courseId = filterForm.value.courseId;
+    }
+    if (filterForm.value.status) {
+      params.status = filterForm.value.status;
+    }
+    if (searchKeyword.value) {
+      params.keyword = searchKeyword.value;
+    }
+    
     const response = await request.get('/admin/assignments', {
-      params: {
-        page: currentPage.value,
-        size: pageSize.value,
-        courseId: filterForm.value.courseId || undefined,
-        status: filterForm.value.status || undefined,
-        keyword: searchKeyword.value || undefined,
-      },
+      params
     });
     assignments.value = response.data?.records || [];
     total.value = response.data?.total || 0;
@@ -401,6 +525,11 @@ const getAssignments = async () => {
 };
 
 const handleSearch = () => {
+  currentPage.value = 1;
+  getAssignments();
+};
+
+const handleFilterChange = () => {
   currentPage.value = 1;
   getAssignments();
 };
@@ -448,6 +577,92 @@ const deleteAssignment = async (assignment: Assignment) => {
     if (error !== 'cancel') {
       ElMessage.error('删除作业失败');
     }
+  }
+};
+
+const viewSubmissions = async (assignment: Assignment) => {
+  currentAssignment.value = assignment;
+  submissionsDialogVisible.value = true;
+  submissionsPage.value = 1;
+  await getSubmissions();
+};
+
+const getSubmissions = async () => {
+  if (!currentAssignment.value) return;
+  
+  submissionsLoading.value = true;
+  try {
+    const response = await request.get(`/admin/assignments/${currentAssignment.value.id}/submissions`, {
+      params: {
+        page: submissionsPage.value,
+        size: submissionsPageSize.value
+      }
+    });
+    
+    if (response.data) {
+      submissionsTotal.value = response.data.total || 0;
+      submissions.value = (response.data.records || []).map((record: any) => ({
+        id: record.id,
+        studentId: record.studentId,
+        studentName: record.studentName,
+        username: record.studentUsername,
+        avatar: '',
+        submitTime: record.submitTime,
+        score: record.finalTotalScore,
+        status: record.reviewStatus === 1 ? 'graded' : 'pending',
+        deleting: false
+      }));
+    }
+  } catch (error) {
+    console.error('获取提交列表失败:', error);
+    ElMessage.error('获取提交列表失败');
+  } finally {
+    submissionsLoading.value = false;
+  }
+};
+
+const handleSubmissionsSizeChange = (size: number) => {
+  submissionsPageSize.value = size;
+  submissionsPage.value = 1;
+  getSubmissions();
+};
+
+const handleSubmissionsPageChange = (page: number) => {
+  submissionsPage.value = page;
+  getSubmissions();
+};
+
+const getScoreClass = (score: number | null) => {
+  if (score === null) return 'score-null';
+  if (score >= 90) return 'score-excellent';
+  if (score >= 80) return 'score-good';
+  if (score >= 60) return 'score-pass';
+  return 'score-fail';
+};
+
+const deleteSubmission = async (submission: any) => {
+  try {
+    await ElMessageBox.confirm(
+      `确定要删除学生「${submission.studentName}」的提交记录吗？此操作不可恢复。`,
+      '删除确认',
+      {
+        confirmButtonText: '确定删除',
+        cancelButtonText: '取消',
+        type: 'warning',
+      }
+    );
+    
+    submission.deleting = true;
+    await request.delete(`/admin/assignments/submissions/${submission.id}`);
+    ElMessage.success('提交记录已删除');
+    getSubmissions();
+    getAssignments();
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      ElMessage.error('删除失败: ' + (error.message || '未知错误'));
+    }
+  } finally {
+    submission.deleting = false;
   }
 };
 
@@ -572,6 +787,7 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  align-items: center;
 }
 
 .completion-info .draft-status {
@@ -695,5 +911,82 @@ onMounted(() => {
   .admin-assignments {
     padding: 16px;
   }
+}
+
+.submissions-dialog :deep(.el-dialog__body) {
+  padding: 0;
+}
+
+.submissions-header {
+  padding: 20px 24px;
+  background: linear-gradient(135deg, #f8faff 0%, #f0f5ff 100%);
+  border-bottom: 1px solid #e8eeff;
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.stat-label {
+  font-size: 13px;
+  color: #909399;
+}
+
+.stat-value {
+  font-size: 20px;
+  font-weight: 700;
+  color: #303133;
+}
+
+.submissions-table {
+  margin: 16px 24px;
+  width: calc(100% - 48px) !important;
+}
+
+.student-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.student-details {
+  text-align: left;
+}
+
+.student-name {
+  font-weight: 600;
+  color: #303133;
+}
+
+.student-username {
+  font-size: 12px;
+  color: #909399;
+}
+
+.score-null {
+  color: #c0c4cc;
+}
+
+.score-excellent {
+  color: #67c23a;
+  font-weight: 600;
+}
+
+.score-good {
+  color: #409eff;
+  font-weight: 600;
+}
+
+.score-pass {
+  color: #e6a23c;
+  font-weight: 600;
+}
+
+.score-fail {
+  color: #f56c6c;
+  font-weight: 600;
 }
 </style>

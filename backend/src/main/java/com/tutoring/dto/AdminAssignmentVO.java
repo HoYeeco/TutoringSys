@@ -6,6 +6,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 @Builder
@@ -30,4 +31,5 @@ public class AdminAssignmentVO {
     private Integer submittedCount;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
+    private List<QuestionDetailDTO> questions;
 }
