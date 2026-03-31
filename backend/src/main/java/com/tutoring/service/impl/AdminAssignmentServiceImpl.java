@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.tutoring.dto.AdminAssignmentVO;
 import com.tutoring.dto.CreateAssignmentRequest;
+import com.tutoring.dto.SubmissionDetailVO;
 import com.tutoring.dto.SubmissionRecordVO;
 import com.tutoring.dto.UpdateAssignmentRequest;
 import com.tutoring.dto.QuestionDTO;
@@ -377,5 +378,75 @@ public class AdminAssignmentServiceImpl implements AdminAssignmentService {
         Page<SubmissionRecordVO> resultPage = new Page<>(page, size, submissionPage.getTotal());
         resultPage.setRecords(voList);
         return resultPage;
+    }
+
+    @Override
+    public SubmissionDetailVO getSubmissionDetail(Long submissionId) {
+        Submission submission = submissionMapper.selectById(submissionId);
+        if (submission == null) {
+            return null;
+        }
+
+        Assignment assignment = assignmentMapper.selectById(submission.getAssignmentId());
+        Course course = assignment != null ? courseMapper.selectById(assignment.getCourseId()) : null;
+        User student = userMapper.selectById(submission.getStudentId());
+
+        List<StudentAnswer> answers = studentAnswerMapper.selectList(
+            new LambdaQueryWrapper<StudentAnswer>()
+                .eq(StudentAnswer::getSubmissionId, submissionId)
+                .eq(StudentAnswer::getIsDraft, 0)
+        );
+
+        List<Long> questionIds = answers.stream()
+            .map(StudentAnswer::getQuestionId)
+            .distinct()
+            .collect(Collectors.toList());
+
+        Map<Long, Question> questionMap = questionIds.isEmpty() ? Map.of() :
+            questionMapper.selectList(
+                new LambdaQueryWrapper<Question>()
+                    .in(Question::getId, questionIds)
+            ).stream().collect(Collectors.toMap(Question::getId, Function.identity()));
+
+        List<SubmissionDetailVO.AnswerDetail> answerDetails = answers.stream()
+            .map(answer -> {
+                Question question = questionMap.get(answer.getQuestionId());
+                return SubmissionDetailVO.AnswerDetail.builder()
+                    .id(answer.getId())
+                    .questionId(answer.getQuestionId())
+                    .questionType(question != null ? question.getType() : "")
+                    .questionContent(question != null ? question.getContent() : "")
+                    .questionScore(question != null ? question.getScore() : 0)
+                    .answer(answer.getAnswer())
+                    .answerContent(answer.getAnswerContent())
+                    .score(answer.getScore())
+                    .aiScore(answer.getAiScore())
+                    .finalScore(answer.getFinalScore())
+                    .aiFeedback(answer.getAiFeedback())
+                    .teacherFeedback(answer.getTeacherFeedback())
+                    .graderType(answer.getGraderType())
+                    .reviewStatus(answer.getReviewStatus())
+                    .reviewTime(answer.getReviewTime())
+                    .build();
+            })
+            .collect(Collectors.toList());
+
+        return SubmissionDetailVO.builder()
+            .id(submission.getId())
+            .submissionId(submission.getSubmissionId())
+            .studentId(submission.getStudentId())
+            .studentName(student != null ? student.getRealName() : "未知学生")
+            .assignmentId(submission.getAssignmentId())
+            .assignmentTitle(assignment != null ? assignment.getTitle() : "")
+            .courseId(assignment != null ? assignment.getCourseId() : null)
+            .courseName(course != null ? course.getName() : "")
+            .totalScore(submission.getTotalScore())
+            .aiTotalScore(submission.getAiTotalScore())
+            .finalTotalScore(submission.getFinalTotalScore())
+            .reviewStatus(submission.getReviewStatus())
+            .submitTime(submission.getSubmitTime())
+            .reviewTime(submission.getReviewTime())
+            .answers(answerDetails)
+            .build();
     }
 }

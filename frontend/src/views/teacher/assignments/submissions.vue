@@ -352,10 +352,17 @@ import {
   DocumentDelete, Warning, Close, QuestionFilled, EditPen, ChatDotRound, Delete
 } from '@element-plus/icons-vue';
 import request from '@/utils/request';
+import { useUserStore } from '@/stores/user';
 
 const route = useRoute();
 const router = useRouter();
+const userStore = useUserStore();
 const assignmentId = computed(() => route.params.id as string);
+
+const isAdmin = computed(() => {
+  const role = (userStore.userInfo?.role || userStore.role || '').toUpperCase();
+  return role === 'ADMIN';
+});
 
 const assignmentTitle = ref('');
 const courseName = ref('');
@@ -420,8 +427,9 @@ const getScoreClass = (score: number | null) => {
 const getSubmissions = async () => {
   loading.value = true;
   try {
-    // 先获取作业详情
-    const assignmentResponse = await request.get(`/teacher/assignments/${assignmentId.value}`);
+    const baseUrl = isAdmin.value ? '/admin/assignments' : '/teacher/assignments';
+    
+    const assignmentResponse = await request.get(`${baseUrl}/${assignmentId.value}`);
     if (assignmentResponse.data) {
       assignmentTitle.value = assignmentResponse.data.title || '';
       courseName.value = assignmentResponse.data.courseName || '';
@@ -429,8 +437,7 @@ const getSubmissions = async () => {
       totalStudents.value = assignmentResponse.data.totalStudents || 0;
     }
 
-    // 再获取提交列表
-    const response = await request.get(`/teacher/assignments/${assignmentId.value}/submissions`, {
+    const response = await request.get(`${baseUrl}/${assignmentId.value}/submissions`, {
       params: {
         page: currentPage.value,
         size: pageSize.value
@@ -439,13 +446,12 @@ const getSubmissions = async () => {
     
     if (response.data) {
       totalSubmissions.value = response.data.total || 0;
-      // 转换后端数据格式为前端需要的格式
       submissions.value = (response.data.records || []).map((record: any) => ({
         id: record.id,
         studentId: record.studentId,
         studentName: record.studentName,
         username: record.studentUsername,
-        avatar: '', // 后端暂无头像字段
+        avatar: '',
         submitTime: record.submitTime,
         score: record.finalTotalScore,
         status: record.reviewStatus === 1 ? 'graded' : 'pending'
@@ -461,25 +467,24 @@ const getSubmissions = async () => {
 
 const getSubmissionDetail = async (submissionId: number) => {
   try {
-    const response = await request.get(`/teacher/assignments/submissions/${submissionId}`);
+    const baseUrl = isAdmin.value ? '/admin/assignments' : '/teacher/assignments';
+    const response = await request.get(`${baseUrl}/submissions/${submissionId}`);
     if (response.data) {
-      // 转换后端数据格式为前端需要的格式
       const data = response.data;
       return {
         id: data.id,
         studentId: data.studentId,
         studentName: data.studentName,
-        avatar: '', // 后端暂无头像字段
+        avatar: '',
         submitTime: data.submitTime,
         totalScore: data.finalTotalScore,
-        // 转换答案列表
         questions: (data.answers || []).map((answer: any, index: number) => ({
           questionId: answer.questionId,
           type: answer.questionType,
           questionContent: answer.questionContent,
           maxScore: answer.questionScore,
           studentAnswer: answer.answerContent || answer.answer,
-          correctAnswer: '', // 后端暂无参考答案字段，需要从题目获取
+          correctAnswer: '',
           score: answer.finalScore,
           feedback: answer.teacherFeedback || ''
         }))
@@ -501,6 +506,10 @@ const viewSubmission = async (row: any) => {
 };
 
 const confirmReview = async () => {
+  if (isAdmin.value) {
+    ElMessage.warning('管理员无权批改作业');
+    return;
+  }
   submitting.value = true;
   try {
     const totalScore = currentSubmission.value.questions.reduce((sum: number, q: any) => sum + (q.score || 0), 0);
@@ -536,7 +545,8 @@ const deleteSubmission = async () => {
     );
     
     deleting.value = true;
-    await request.delete(`/teacher/assignments/submissions/${currentSubmission.value.id}`);
+    const baseUrl = isAdmin.value ? '/admin/assignments' : '/teacher/assignments';
+    await request.delete(`${baseUrl}/submissions/${currentSubmission.value.id}`);
     ElMessage.success('提交记录已删除');
     submissionDialogVisible.value = false;
     getSubmissions();

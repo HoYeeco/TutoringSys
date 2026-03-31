@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.tutoring.common.Result;
 import com.tutoring.dto.AdminAssignmentVO;
 import com.tutoring.dto.CreateAssignmentRequest;
+import com.tutoring.dto.SubmissionDetailVO;
 import com.tutoring.dto.SubmissionRecordVO;
 import com.tutoring.dto.UpdateAssignmentRequest;
 import com.tutoring.service.AdminAssignmentService;
@@ -101,5 +102,16 @@ public class AdminAssignmentController {
         } catch (RuntimeException e) {
             return Result.error(400, e.getMessage());
         }
+    }
+
+    @Operation(summary = "获取提交详情", description = "管理员获取学生提交的详细信息")
+    @GetMapping("/submissions/{submissionId}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public Result<SubmissionDetailVO> getSubmissionDetail(@PathVariable Long submissionId) {
+        SubmissionDetailVO detail = adminAssignmentService.getSubmissionDetail(submissionId);
+        if (detail == null) {
+            return Result.error(404, "提交记录不存在");
+        }
+        return Result.success(detail);
     }
 }

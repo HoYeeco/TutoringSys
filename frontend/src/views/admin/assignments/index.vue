@@ -580,11 +580,8 @@ const deleteAssignment = async (assignment: Assignment) => {
   }
 };
 
-const viewSubmissions = async (assignment: Assignment) => {
-  currentAssignment.value = assignment;
-  submissionsDialogVisible.value = true;
-  submissionsPage.value = 1;
-  await getSubmissions();
+const viewSubmissions = (assignment: Assignment) => {
+  router.push(`/teacher/assignments/${assignment.id}/submissions`);
 };
 
 const getSubmissions = async () => {

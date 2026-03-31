@@ -3,6 +3,7 @@ package com.tutoring.service;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.tutoring.dto.AdminAssignmentVO;
 import com.tutoring.dto.CreateAssignmentRequest;
+import com.tutoring.dto.SubmissionDetailVO;
 import com.tutoring.dto.SubmissionRecordVO;
 import com.tutoring.dto.UpdateAssignmentRequest;
 
@@ -22,4 +23,6 @@ public interface AdminAssignmentService {
     void deleteSubmission(Long submissionId);
 
     Page<SubmissionRecordVO> getAssignmentSubmissions(Long assignmentId, Integer page, Integer size);
+
+    SubmissionDetailVO getSubmissionDetail(Long submissionId);
 }
