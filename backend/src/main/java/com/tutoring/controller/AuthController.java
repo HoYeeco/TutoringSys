@@ -2,6 +2,7 @@ package com.tutoring.controller;
 
 import com.tutoring.annotation.Log;
 import com.tutoring.common.Result;
+import com.tutoring.dto.LoginRequest;
 import com.tutoring.dto.RegisterRequest;
 import com.tutoring.entity.User;
 import com.tutoring.service.UserService;
@@ -23,6 +24,13 @@ public class AuthController {
 
     private final UserService userService;
     private final PasswordEncoder passwordEncoder;
+
+    @Operation(summary = "用户登录")
+    @Log(module = "认证管理", operation = "登录", value = "用户登录")
+    @PostMapping("/login")
+    public Result<Void> login(@Valid @RequestBody LoginRequest request) {
+        return Result.success(null);
+    }
 
     @Operation(summary = "用户注册")
     @Log(module = "认证管理", operation = "注册", value = "用户注册")
@@ -50,5 +58,4 @@ public class AuthController {
 
         return Result.success("注册成功，请等待管理员审核");
     }
-
 }
