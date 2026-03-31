@@ -82,15 +82,18 @@
             </div>
           </div>
         </el-card>
-        <el-pagination
-          v-if="total > 0"
-          :current-page="currentPage"
-          class="pagination"
-          :page-size="pageSize"
-          :total="total"
-          layout="prev, pager, next"
-          @current-change="onPageChange"
-        />
+        <div class="pagination-container">
+          <el-pagination
+            v-if="total > 0"
+            v-model:current-page="currentPage"
+            v-model:page-size="pageSize"
+            :page-sizes="[10, 20, 50, 100]"
+            layout="total, sizes, prev, pager, next, jumper"
+            :total="total"
+            @size-change="handleSizeChange"
+            @current-change="handleCurrentChange"
+          />
+        </div>
       </div>
     </el-card>
   </div>
@@ -230,8 +233,15 @@ const handleTabClick = () => {
   currentPage.value = 1;
 };
 
-// 处理分页变化
-const onPageChange = (page) => {
+// 处理分页大小变化
+const handleSizeChange = (size) => {
+  pageSize.value = size;
+  currentPage.value = 1;
+  getMessages();
+};
+
+// 处理页码变化
+const handleCurrentChange = (page) => {
   currentPage.value = page;
   getMessages();
 };
@@ -452,7 +462,8 @@ const formatTime = (time) => {
   gap: 4px;
 }
 
-.pagination {
+/* 分页 */
+.pagination-container {
   margin-top: 20px;
   display: flex;
   justify-content: center;
