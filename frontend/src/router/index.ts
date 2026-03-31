@@ -155,7 +155,7 @@ const routes = [
     path: '/teacher/assignments/:id/submissions',
     name: 'TeacherSubmissions',
     component: () => import('@/views/teacher/assignments/submissions.vue'),
-    meta: { requiresAuth: true, role: 'TEACHER' },
+    meta: { requiresAuth: true, roles: ['TEACHER', 'ADMIN'] },
   },
   {
     path: '/teacher/grading',
@@ -240,17 +240,25 @@ router.beforeEach((to, from, next) => {
     return;
   }
 
-  if (to.meta.role) {
+  if (to.meta.role || to.meta.roles) {
     const userRole = (
       userStore.userInfo?.role ||
       userStore.role ||
       ''
     ).toUpperCase();
-    const requiredRole = (to.meta.role as string).toUpperCase();
 
-    if (userRole !== requiredRole) {
-      next('/403');
-      return;
+    if (to.meta.roles) {
+      const requiredRoles = (to.meta.roles as string[]).map(r => r.toUpperCase());
+      if (!requiredRoles.includes(userRole)) {
+        next('/403');
+        return;
+      }
+    } else if (to.meta.role) {
+      const requiredRole = (to.meta.role as string).toUpperCase();
+      if (userRole !== requiredRole) {
+        next('/403');
+        return;
+      }
     }
   }
 
