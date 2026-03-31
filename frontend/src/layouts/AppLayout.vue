@@ -58,19 +58,6 @@
           <el-icon class="logout-icon" @click="confirmLogout"
             ><SwitchButton
           /></el-icon>
-          <el-tooltip
-            :content="isDark ? '切换到白天模式' : '切换到黑夜模式'"
-            placement="bottom"
-          >
-            <el-switch
-              :model-value="isDark"
-              @change="handleThemeChange"
-              inline-prompt
-              :active-icon="Moon"
-              :inactive-icon="Sunny"
-              class="theme-switch"
-            />
-          </el-tooltip>
         </div>
       </el-header>
       <el-main>
@@ -105,8 +92,6 @@ import { useUserStore } from '@/stores/user';
 import { useAppStore } from '@/stores/app';
 import {
   Fold,
-  Moon,
-  Sunny,
   Menu,
   Bell,
   SwitchButton,
@@ -130,25 +115,20 @@ const themeClass = computed(() => {
   return '';
 });
 
-// 响应式布局
 const isMobile = ref(false);
 const mobileMenuVisible = ref(false);
-
-// 未读消息数量
 const unreadCount = ref(0);
 
 const checkMobile = () => {
   isMobile.value = window.innerWidth < 768;
 };
 
-// 处理头像加载失败
 const handleAvatarError = () => {
   if (userStore.userInfo) {
     userStore.userInfo.avatar = null;
   }
 };
 
-// 获取头像文字
 const getAvatarText = () => {
   const name = userStore.userInfo?.realName || userStore.userInfo?.username;
   return name ? name.charAt(0) : 'U';
@@ -162,14 +142,6 @@ const handleMenuSelect = () => {
   mobileMenuVisible.value = false;
 };
 
-// 主题切换
-const isDark = computed(() => appStore.theme === 'dark');
-
-const handleThemeChange = (value: boolean) => {
-  appStore.setTheme(value ? 'dark' : 'light');
-};
-
-// 获取未读消息数量
 const getUnreadCount = async () => {
   if (userStore.userInfo?.id) {
     try {
@@ -185,17 +157,14 @@ const getUnreadCount = async () => {
   }
 };
 
-// 跳转到消息通知页面
 const goToMessages = () => {
   router.push('/messages');
 };
 
-// 跳转到个人中心
 const goToProfile = () => {
   router.push('/profile');
 };
 
-// 确认退出登录
 const confirmLogout = () => {
   ElMessageBox.confirm('确定要退出登录吗？', '提示', {
     confirmButtonText: '确定',
@@ -210,9 +179,7 @@ const confirmLogout = () => {
 onMounted(() => {
   checkMobile();
   window.addEventListener('resize', checkMobile);
-  // 获取未读消息数量
   getUnreadCount();
-  // 每30秒刷新一次未读消息数量
   const interval = setInterval(getUnreadCount, 30000);
   onUnmounted(() => {
     clearInterval(interval);
@@ -294,7 +261,6 @@ onUnmounted(() => {
   transition: margin-left 0.3s ease;
 }
 
-/* 背景图片层 */
 .el-main::before {
   content: '';
   position: fixed;
@@ -309,25 +275,17 @@ onUnmounted(() => {
   z-index: -2;
 }
 
-
-
-/* 学生主题背景 */
 .student-theme .el-main::before {
   background-image: url('@/assets/images/bg_student.png');
 }
 
-/* 教师主题背景 */
 .teacher-theme .el-main::before {
   background-image: url('@/assets/images/bg_teacher.png');
 }
 
-/* 管理员主题背景 */
 .admin-theme .el-main::before {
   background-image: url('@/assets/images/bg_admin.png');
 }
-
-/* 灰色遮罩层 */
-
 
 .el-main::-webkit-scrollbar {
   width: 6px;
@@ -363,11 +321,6 @@ onUnmounted(() => {
   height: 32px;
   width: auto;
   object-fit: contain;
-  transition: filter 0.3s ease;
-}
-
-html.dark .logo-img {
-  filter: invert(1);
 }
 
 .header-right {
@@ -406,23 +359,6 @@ html.dark .logo-img {
 
 .logout-icon:hover {
   color: var(--el-color-danger);
-}
-
-.theme-switch {
-  --el-switch-on-color: #4a5568;
-  --el-switch-off-color: #e2e8f0;
-}
-
-.theme-switch :deep(.el-switch__core) {
-  border: 1px solid var(--color-border);
-}
-
-.theme-switch :deep(.el-switch__inner) {
-  color: var(--color-text);
-}
-
-.theme-switch :deep(.el-switch__action) {
-  background-color: var(--color-text);
 }
 
 .avatar {

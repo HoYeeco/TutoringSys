@@ -18,17 +18,6 @@
   --color-button-hover: #e5e7eb;
 }
 
-html.dark {
-  --color-primary: #5d9eff;
-  --color-primary-hover: #6ea8fe;
-  --color-background: #0a0a0a;
-  --color-text: #e0e0e0;
-  --color-card: #1a1a1a;
-  --color-border: #333333;
-  --color-button: #1a1a1a;
-  --color-button-hover: #333333;
-}
-
 a {
   font-weight: 500;
   color: var(--color-primary);
@@ -105,10 +94,6 @@ button:focus-visible {
   .card {
     padding: 1em;
   }
-}
-
-* {
-  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
 }
 
 .el-aside {
