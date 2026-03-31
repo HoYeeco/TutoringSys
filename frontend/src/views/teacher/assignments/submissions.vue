@@ -324,6 +324,10 @@
 
       <template #footer>
         <div class="dialog-footer">
+          <el-button type="danger" @click="deleteSubmission" :loading="deleting" size="large">
+            <el-icon><Delete /></el-icon>
+            删除提交
+          </el-button>
           <el-button @click="submissionDialogVisible = false" size="large">
             <el-icon><Close /></el-icon>
             取消
@@ -341,11 +345,11 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { ElMessage } from 'element-plus';
+import { ElMessage, ElMessageBox } from 'element-plus';
 import { 
   Document, Reading, Clock, User, CircleCheck, 
   View, Check, ArrowLeft, TrendCharts, List, Search, 
-  DocumentDelete, Warning, Close, QuestionFilled, EditPen, ChatDotRound
+  DocumentDelete, Warning, Close, QuestionFilled, EditPen, ChatDotRound, Delete
 } from '@element-plus/icons-vue';
 import request from '@/utils/request';
 
@@ -360,6 +364,7 @@ const totalSubmissions = ref(0);
 const totalStudents = ref(0);
 const loading = ref(false);
 const submitting = ref(false);
+const deleting = ref(false);
 
 const submissions = ref<any[]>([]);
 const searchKeyword = ref('');
@@ -498,7 +503,6 @@ const viewSubmission = async (row: any) => {
 const confirmReview = async () => {
   submitting.value = true;
   try {
-    // 计算总分
     const totalScore = currentSubmission.value.questions.reduce((sum: number, q: any) => sum + (q.score || 0), 0);
 
     await request.put(`/teacher/assignments/submissions/${currentSubmission.value.id}/review`, {
@@ -516,6 +520,32 @@ const confirmReview = async () => {
     ElMessage.error('评分提交失败');
   } finally {
     submitting.value = false;
+  }
+};
+
+const deleteSubmission = async () => {
+  try {
+    await ElMessageBox.confirm(
+      `确定要删除学生「${currentSubmission.value.studentName}」的提交记录吗？此操作不可恢复。`,
+      '删除确认',
+      {
+        confirmButtonText: '确定删除',
+        cancelButtonText: '取消',
+        type: 'warning',
+      }
+    );
+    
+    deleting.value = true;
+    await request.delete(`/teacher/assignments/submissions/${currentSubmission.value.id}`);
+    ElMessage.success('提交记录已删除');
+    submissionDialogVisible.value = false;
+    getSubmissions();
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      ElMessage.error('删除失败: ' + (error.message || '未知错误'));
+    }
+  } finally {
+    deleting.value = false;
   }
 };
 

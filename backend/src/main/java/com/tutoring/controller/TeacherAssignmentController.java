@@ -127,6 +127,14 @@ public class TeacherAssignmentController {
         return Result.success(null);
     }
 
+    @Operation(summary = "删除学生提交")
+    @DeleteMapping("/submissions/{submissionId}")
+    public Result<Void> deleteSubmission(@PathVariable Long submissionId) {
+        Long teacherId = getCurrentUserId();
+        teacherAssignmentService.deleteSubmission(teacherId, submissionId);
+        return Result.success(null);
+    }
+
     private Long getCurrentUserId() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || !authentication.isAuthenticated()) {

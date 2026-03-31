@@ -754,7 +754,10 @@ onMounted(async () => {
 .teacher-assignment-edit {
   padding: 24px;
   padding-bottom: 100px;
-  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  background: rgba(255, 255, 255, 0.66);
+  backdrop-filter: blur(4px);
+  border-radius: 16px;
+  margin: 16px;
   min-height: calc(100vh - 84px);
 }
 

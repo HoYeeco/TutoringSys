@@ -32,4 +32,6 @@ public interface TeacherAssignmentService {
 
     void reviewSubmission(Long teacherId, Long submissionId, ReviewSubmissionRequest request);
 
+    void deleteSubmission(Long teacherId, Long submissionId);
+
 }

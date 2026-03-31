@@ -720,4 +720,26 @@ public class TeacherAssignmentServiceImpl implements TeacherAssignmentService {
             .build();
     }
 
+    @Override
+    @Transactional
+    @CacheEvict(value = "teacherAssignments", allEntries = true)
+    public void deleteSubmission(Long teacherId, Long submissionId) {
+        Submission submission = submissionMapper.selectById(submissionId);
+        if (submission == null) {
+            throw new BusinessException("提交记录不存在");
+        }
+
+        Assignment assignment = assignmentMapper.selectById(submission.getAssignmentId());
+        if (assignment == null || !assignment.getTeacherId().equals(teacherId)) {
+            throw new BusinessException("无权删除此提交记录");
+        }
+
+        studentAnswerMapper.delete(
+            new LambdaQueryWrapper<StudentAnswer>()
+                .eq(StudentAnswer::getSubmissionId, submissionId)
+        );
+
+        submissionMapper.deleteById(submissionId);
+    }
+
 }
