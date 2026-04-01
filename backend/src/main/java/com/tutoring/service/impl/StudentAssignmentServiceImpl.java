@@ -402,15 +402,33 @@ public class StudentAssignmentServiceImpl implements StudentAssignmentService {
                 .eq(Question::getAssignmentId, assignmentId)
         );
 
+        log.info("作业 {} 查询到 {} 道题目", assignmentId, questions.size());
+        log.info("前端提交了 {} 道答案", request.getAnswers().size());
+
         Map<Long, Question> questionMap = questions.stream()
             .collect(Collectors.toMap(Question::getId, Function.identity()));
+
+        // 检查答案数量是否匹配
+        if (request.getAnswers().size() != questions.size()) {
+            log.error("答案数量不匹配! 期望: {}, 实际: {}", questions.size(), request.getAnswers().size());
+            Set<Long> submittedIds = request.getAnswers().stream()
+                .map(SubmitRequest.AnswerItem::getQuestionId)
+                .collect(Collectors.toSet());
+            Set<Long> expectedIds = questions.stream()
+                .map(Question::getId)
+                .collect(Collectors.toSet());
+            log.error("期望的题目IDs: {}", expectedIds);
+            log.error("提交的题目IDs: {}", submittedIds);
+            throw new BusinessException("题目数量不匹配，请刷新页面重试");
+        }
 
         for (SubmitRequest.AnswerItem item : request.getAnswers()) {
             if (!questionMap.containsKey(item.getQuestionId())) {
                 throw new BusinessException("题目ID无效: " + item.getQuestionId());
             }
             if (!StringUtils.hasText(item.getAnswer())) {
-                throw new BusinessException("请完成所有题目后再提交");
+                Question q = questionMap.get(item.getQuestionId());
+                throw new BusinessException("第 " + q.getSortOrder() + " 题未完成作答，请完成后再提交");
             }
         }
 
@@ -420,7 +438,7 @@ public class StudentAssignmentServiceImpl implements StudentAssignmentService {
         
         for (Question question : questions) {
             if (!answeredQuestionIds.contains(question.getId())) {
-                throw new BusinessException("请完成所有题目后再提交，缺少题目: " + question.getContent());
+                throw new BusinessException("第 " + question.getSortOrder() + " 题未完成作答，请完成后再提交");
             }
         }
 

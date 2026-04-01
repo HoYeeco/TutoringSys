@@ -549,6 +549,11 @@ const fetchAssignmentData = async () => {
       };
 
       questions.value = response.data.questions || [];
+      
+      // 显示题目数量提示
+      if (questions.value.length === 0) {
+        ElMessage.warning('该作业暂无题目');
+      }
 
       questions.value.forEach((q) => {
         if (q.type === 'multiple') {
@@ -657,7 +662,11 @@ const collectAnswers = () => {
     if (q.type === 'essay') {
       const editor = editors.value[q.id];
       if (editor) {
-        answers.value[q.id] = editor.root.innerHTML;
+        // 获取编辑器内容，去除HTML标签后检查是否为空
+        const htmlContent = editor.root.innerHTML;
+        const textContent = editor.getText().trim();
+        // 如果文本内容为空，则存储空字符串
+        answers.value[q.id] = textContent.length > 0 ? htmlContent : '';
       }
     }
   });
@@ -678,7 +687,7 @@ const collectAnswers = () => {
     
     return {
       questionId: q.id,
-      answerContent: String(answerContent),
+      answer: String(answerContent),
     };
   });
 
@@ -738,7 +747,58 @@ const confirmSubmit = async () => {
 
   try {
     submitting.value = true;
-    answersData = collectAnswers();
+    
+    // 提示用户当前题目数量
+    if (questions.value.length === 0) {
+      ElMessage.error('没有可提交的题目，请刷新页面重试');
+      return;
+    }
+    
+    // 强制重新收集所有答案（特别是主观题）
+    questions.value.forEach((q) => {
+      if (q.type === 'essay') {
+        const editor = editors.value[q.id];
+        if (editor) {
+          const html = editor.root.innerHTML;
+          const text = editor.getText().trim();
+          answers.value[q.id] = text.length > 0 ? html : '';
+        }
+      }
+    });
+    
+    answersData = questions.value.map((q) => {
+      let answerContent = answers.value[q.id];
+      if (q.type === 'multiple' && Array.isArray(answerContent)) {
+        answerContent = JSON.stringify(answerContent);
+      }
+      if (answerContent === null || answerContent === undefined) {
+        answerContent = '';
+      }
+      return {
+        questionId: q.id,
+        answer: String(answerContent),
+      };
+    });
+    
+    // 检查题目数量和答案数量是否匹配
+    if (answersData.length !== questions.value.length) {
+      ElMessage.error('题目数据加载异常，请刷新页面重试');
+      return;
+    }
+    
+    // 检查是否有未作答的题目
+    const unanswered = answersData.filter(a => !a.answer || a.answer === '');
+    if (unanswered.length > 0) {
+      // 找到未作答的题目序号
+      const unansweredQuestions = unanswered.map(a => {
+        const q = questions.value.find(q => q.id === a.questionId);
+        const index = questions.value.findIndex(q => q.id === a.questionId);
+        return { index: index + 1, type: q?.type };
+      });
+      const questionNumbers = unansweredQuestions.map(q => `第${q.index}题`).join('、');
+      ElMessage.warning(`${questionNumbers} 未作答，请完成后再提交`);
+      return;
+    }
 
     await request.post(`/student/assignments/${assignmentId.value}/submit`, {
       answers: answersData,
@@ -748,10 +808,7 @@ const confirmSubmit = async () => {
     submitDialogVisible.value = false;
     router.push('/student/assignments');
   } catch (error: any) {
-    console.error('提交作业失败:', error);
-    console.error('请求数据:', { answers: answersData });
     if (error.response?.data) {
-      console.error('服务器返回错误:', error.response.data);
       ElMessage.error(error.response.data.message || '提交作业失败');
     } else {
       ElMessage.error(error.message || '提交作业失败');
