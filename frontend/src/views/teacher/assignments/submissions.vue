@@ -142,7 +142,7 @@
         class="modern-table"
         :header-cell-style="{ background: '#f5f7fa' }"
       >
-        <el-table-column label="学生信息" width="160">
+        <el-table-column label="学生信息" min-width="160">
           <template #default="scope">
             <div class="student-info-cell">
               <el-avatar 
@@ -159,7 +159,7 @@
             </div>
           </template>
         </el-table-column>
-        <el-table-column prop="submitTime" label="提交时间" min-width="180">
+        <el-table-column prop="submitTime" label="提交时间" min-width="160">
           <template #default="scope">
             <div class="time-cell">
               <el-icon><Clock /></el-icon>
@@ -913,6 +913,8 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 12px;
+  width: fit-content;
+  margin: 0 auto;
 }
 
 .student-avatar {
@@ -1001,20 +1003,31 @@ onMounted(() => {
 }
 
 /* 状态标签 */
-.status-tag {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
+:deep(.status-tag) {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 6px !important;
   font-weight: 500;
-  padding: 4px 10px;
+  padding: 5px 12px !important;
   border-radius: 4px;
+  min-width: 100px;
   line-height: 1;
+  height: auto !important;
 }
 
-.status-tag .el-icon {
-  font-size: 12px;
-  vertical-align: middle;
+:deep(.status-tag .el-icon) {
+  font-size: 14px;
+  flex-shrink: 0;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+:deep(.status-tag span) {
+  display: inline-flex !important;
+  align-items: center !important;
+  line-height: 1;
 }
 
 /* 操作按钮 */
