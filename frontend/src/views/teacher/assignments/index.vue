@@ -46,7 +46,7 @@
               <el-option label="已逾期" value="overdue" />
             </el-select>
             <el-button type="primary" @click="createAssignment">
-              <el-icon><Plus /></el-icon> 创建作业
+              <el-icon><Plus /></el-icon> 发布作业
             </el-button>
           </div>
         </div>

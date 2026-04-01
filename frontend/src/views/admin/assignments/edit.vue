@@ -294,6 +294,49 @@
         <el-button @click="previewDialogVisible = false">关闭</el-button>
       </template>
     </el-dialog>
+
+    <el-dialog
+      v-model="formulaDialogVisible"
+      title="插入数学公式"
+      width="700px"
+      append-to-body
+      destroy-on-close
+    >
+      <div class="formula-editor">
+        <div class="formula-input-section">
+          <el-input
+            v-model="formulaInput"
+            type="textarea"
+            :rows="4"
+            placeholder="请输入LaTeX公式，例如：\frac{a}{b}、\sqrt{x}、x^2"
+            @input="updateFormulaPreview"
+          />
+          <div class="formula-preview" v-if="formulaInput">
+            <span class="preview-label">预览：</span>
+            <div class="preview-content" v-html="renderedFormula"></div>
+          </div>
+        </div>
+        
+        <div class="formula-templates">
+          <h4>常用公式模板</h4>
+          <div class="template-grid">
+            <el-button
+              v-for="(template, index) in commonFormulas"
+              :key="index"
+              size="small"
+              @click="insertTemplate(template.formula)"
+              class="template-btn"
+            >
+              {{ template.name }}
+            </el-button>
+          </div>
+        </div>
+      </div>
+      <template #footer>
+        <el-button @click="formulaDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="confirmInsertFormula" :disabled="!formulaInput">插入</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -307,7 +350,14 @@ import {
 } from '@element-plus/icons-vue';
 import Quill from 'quill';
 import 'quill/dist/quill.snow.css';
+import katex from 'katex';
+import 'katex/dist/katex.min.css';
+import { registerKatex, commonFormulas } from '@/utils/quill-katex';
 import request from '@/utils/request';
+
+window.katex = katex;
+
+registerKatex();
 
 const route = useRoute();
 const router = useRouter();
@@ -355,6 +405,9 @@ const questionTypes = [
 
 const questionTypeDialogVisible = ref(false);
 const previewDialogVisible = ref(false);
+const formulaDialogVisible = ref(false);
+const formulaInput = ref('');
+const currentFormulaQuestionId = ref<number | null>(null);
 
 const editorRefs = ref<Record<number, any>>({});
 const answerEditorRefs = ref<Record<number, any>>({});
@@ -362,6 +415,15 @@ const editors = ref<Record<number, Quill>>({});
 const answerEditors = ref<Record<number, Quill>>({});
 
 const previewData = ref<any>(null);
+
+const renderedFormula = computed(() => {
+  if (!formulaInput.value) return '';
+  try {
+    return katex.renderToString(formulaInput.value, { throwOnError: false });
+  } catch (e) {
+    return '<span style="color: red;">公式语法错误</span>';
+  }
+});
 
 const totalScore = computed(() => {
   return questions.value.reduce((sum, q) => sum + (q.score || 0), 0);
@@ -450,6 +512,11 @@ const addQuestionByType = (type: string) => {
   
   nextTick(() => {
     initQuillEditor(tempId, type);
+    if (type === 'essay') {
+      nextTick(() => {
+        initAnswerEditor(tempId);
+      });
+    }
   });
 };
 
@@ -459,7 +526,7 @@ const initQuillEditor = (tempId: number, type: string) => {
   const toolbarOptions = [
     ['bold', 'italic', 'underline', 'strike'],
     [{ 'list': 'ordered' }, { 'list': 'bullet' }],
-    ['clean']
+    ['katex']
   ];
   
   const editor = new Quill(editorRefs.value[tempId], {
@@ -468,7 +535,8 @@ const initQuillEditor = (tempId: number, type: string) => {
       toolbar: {
         container: toolbarOptions,
         handlers: {
-          image: () => handleImageUpload(tempId)
+          image: () => handleImageUpload(tempId),
+          katex: () => openFormulaDialog(tempId)
         }
       }
     },
@@ -481,28 +549,33 @@ const initQuillEditor = (tempId: number, type: string) => {
     const q = questions.value.find(q => q.tempId === tempId);
     if (q) q.content = editor.root.innerHTML;
   });
-  
-  if (type === 'essay') {
-    initAnswerEditor(tempId);
-  }
 };
 
-const initAnswerEditor = (tempId: number) => {
+const initAnswerEditor = (tempId: number, content: string = '') => {
   if (!answerEditorRefs.value[tempId]) return;
   
   const editor = new Quill(answerEditorRefs.value[tempId], {
     theme: 'snow',
     modules: {
-      toolbar: [
-        ['bold', 'italic', 'underline', 'strike'],
-        [{ 'list': 'ordered' }, { 'list': 'bullet' }],
-        ['clean']
-      ]
+      toolbar: {
+        container: [
+          ['bold', 'italic', 'underline', 'strike'],
+          [{ 'list': 'ordered' }, { 'list': 'bullet' }],
+          ['katex']
+        ],
+        handlers: {
+          katex: () => openFormulaDialog(tempId)
+        }
+      }
     },
     placeholder: '请输入参考答案（可选）...'
   });
   
   answerEditors.value[tempId] = editor;
+  
+  if (content) {
+    editor.root.innerHTML = content;
+  }
   
   editor.on('text-change', () => {
     const q = questions.value.find(q => q.tempId === tempId);
@@ -532,6 +605,41 @@ const handleImageUpload = (tempId: number) => {
     }
   };
   input.click();
+};
+
+const openFormulaDialog = (tempId: number) => {
+  currentFormulaQuestionId.value = tempId;
+  formulaInput.value = '';
+  formulaDialogVisible.value = true;
+};
+
+const insertTemplate = (formula: string) => {
+  formulaInput.value = formula;
+};
+
+const confirmInsertFormula = () => {
+  if (!formulaInput.value || currentFormulaQuestionId.value === null) {
+    ElMessage.warning('请输入公式');
+    return;
+  }
+
+  let editor = editors.value[currentFormulaQuestionId.value];
+  if (!editor) {
+    editor = answerEditors.value[currentFormulaQuestionId.value];
+  }
+  
+  if (editor) {
+    const selection = editor.getSelection();
+    const index = selection ? selection.index : editor.getLength();
+
+    const formulaHtml = `<div class="ql-katex" data-formula="${formulaInput.value}"><div>${katex.renderToString(formulaInput.value, { throwOnError: false, displayMode: true })}</div></div>`;
+    editor.clipboard.dangerouslyPasteHTML(index, formulaHtml);
+  }
+
+  formulaDialogVisible.value = false;
+};
+
+const updateFormulaPreview = () => {
 };
 
 const removeQuestion = (index: number) => {
@@ -897,6 +1005,32 @@ onMounted(async () => {
   min-height: 100px;
 }
 
+.ql-katex {
+  display: block;
+  margin: 8px 0;
+}
+
+.ql-katex-inline {
+  display: inline;
+}
+
+:deep(.ql-toolbar .ql-katex) {
+  position: relative;
+}
+
+:deep(.ql-toolbar .ql-katex::before) {
+  content: 'fx';
+  font-family: 'Times New Roman', serif;
+  font-style: italic;
+  font-weight: bold;
+  font-size: 14px;
+  display: block;
+}
+
+:deep(.ql-toolbar .ql-katex svg) {
+  display: none;
+}
+
 .word-count {
   margin-top: 8px;
   font-size: 12px;
@@ -1160,6 +1294,54 @@ onMounted(async () => {
   margin-top: 12px;
   font-size: 14px;
   color: #606266;
+}
+
+.formula-editor {
+  padding: 12px 0;
+}
+
+.formula-input-section {
+  margin-bottom: 20px;
+}
+
+.formula-preview {
+  margin-top: 16px;
+  padding: 12px;
+  background: #f5f7fa;
+  border-radius: 8px;
+}
+
+.preview-label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 500;
+  color: #606266;
+}
+
+.preview-content {
+  padding: 12px;
+  background: white;
+  border-radius: 4px;
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.formula-templates h4 {
+  margin-bottom: 12px;
+  font-size: 14px;
+  color: #303133;
+}
+
+.template-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  gap: 8px;
+}
+
+.template-btn {
+  margin: 0;
 }
 
 @media (max-width: 768px) {
