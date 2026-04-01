@@ -28,11 +28,11 @@
                   v-model="answers[question.id]"
                   @change="handleAnswerChange(question.id)"
                 >
-                  <div class="options-list">
+                  <div class="options-list single-options">
                     <div
                       v-for="(option, idx) in parseOptions(question.options)"
                       :key="idx"
-                      class="option-item"
+                      class="option-item single-option-item"
                     >
                       <el-radio :label="String.fromCharCode(65 + idx)">
                         <span class="option-label"
@@ -61,11 +61,11 @@
                   v-model="answers[question.id]"
                   @change="handleAnswerChange(question.id)"
                 >
-                  <div class="options-list">
+                  <div class="options-list multiple-options">
                     <div
                       v-for="(option, idx) in parseOptions(question.options)"
                       :key="idx"
-                      class="option-item"
+                      class="option-item multiple-option-item"
                     >
                       <el-checkbox :label="String.fromCharCode(65 + idx)">
                         <span class="option-label"
@@ -80,44 +80,27 @@
 
               <template v-else-if="question.type === 'judgment'">
                 <div class="answer-label">请判断正误：</div>
-                <div class="judgment-switch">
-                  <span
-                    class="judgment-label"
-                    :class="{ active: answers[question.id] === 'true' }"
-                    >正确</span
-                  >
-                  <el-switch
-                    v-model="answers[question.id]"
-                    active-value="true"
-                    inactive-value="false"
-                    active-color="#67c23a"
-                    inactive-color="#f56c6c"
-                    @change="handleAnswerChange(question.id)"
-                  />
-                  <span
-                    class="judgment-label"
-                    :class="{ active: answers[question.id] === 'false' }"
-                    >错误</span
-                  >
-                </div>
+                <el-radio-group
+                  v-model="answers[question.id]"
+                  @change="handleAnswerChange(question.id)"
+                  class="judgment-options"
+                >
+                  <el-radio label="true" class="judgment-option">
+                    <span class="judgment-label" :class="{ active: answers[question.id] === 'true' }">
+                      正确
+                    </span>
+                  </el-radio>
+                  <el-radio label="false" class="judgment-option">
+                    <span class="judgment-label" :class="{ active: answers[question.id] === 'false' }">
+                      错误
+                    </span>
+                  </el-radio>
+                </el-radio-group>
               </template>
 
               <template v-else-if="question.type === 'essay'">
                 <div class="answer-label">请输入答案：</div>
                 <div class="essay-editor-wrapper">
-                  <div
-                    class="editor-toolbar"
-                    v-if="!question.minWords && !question.maxWords"
-                  >
-                    <el-button-group>
-                      <el-button
-                        size="small"
-                        @click="insertFormula(question.id)"
-                      >
-                        <el-icon><Edit /></el-icon> 插入公式
-                      </el-button>
-                    </el-button-group>
-                  </div>
                   <div
                     :ref="(el) => setEditorRef(el, question.id)"
                     class="quill-editor"
@@ -138,30 +121,6 @@
                 </div>
               </template>
             </div>
-          </div>
-        </div>
-
-        <div class="bottom-action-bar">
-          <div class="action-left">
-            <el-tag type="info">共 {{ questions.length }} 题</el-tag>
-            <el-tag
-              :type="answeredCount === questions.length ? 'success' : 'warning'"
-            >
-              已答 {{ answeredCount }} 题
-            </el-tag>
-          </div>
-          <div class="action-right">
-            <el-button @click="handleSaveDraft" :loading="savingDraft">
-              <el-icon><Document /></el-icon> 保存草稿
-            </el-button>
-            <el-button
-              type="primary"
-              @click="handleSubmit"
-              :loading="submitting"
-              :disabled="isOverdue"
-            >
-              <el-icon><Promotion /></el-icon> 提交作业
-            </el-button>
           </div>
         </div>
       </div>
@@ -276,22 +235,40 @@
       </template>
     </el-dialog>
 
-    <el-dialog v-model="formulaDialogVisible" title="插入公式" width="500px" append-to-body>
-      <div class="formula-input">
-        <el-input
-          v-model="formulaInput"
-          type="textarea"
-          :rows="4"
-          placeholder="请输入LaTeX公式，例如：\frac{a}{b}、\sqrt{x}、x^2"
-        />
-        <div class="formula-preview" v-if="formulaInput">
-          <span class="preview-label">预览：</span>
-          <div class="preview-content" v-html="renderedFormula"></div>
+    <el-dialog v-model="formulaDialogVisible" title="插入数学公式" width="700px" append-to-body>
+      <div class="formula-editor">
+        <div class="formula-input-section">
+          <el-input
+            v-model="formulaInput"
+            type="textarea"
+            :rows="4"
+            placeholder="请输入LaTeX公式，例如：\frac{a}{b}、\sqrt{x}、x^2"
+            @input="updateFormulaPreview"
+          />
+          <div class="formula-preview" v-if="formulaInput">
+            <span class="preview-label">预览：</span>
+            <div class="preview-content" v-html="renderedFormula"></div>
+          </div>
+        </div>
+        
+        <div class="formula-templates">
+          <h4>常用公式模板</h4>
+          <div class="template-grid">
+            <el-button
+              v-for="(template, index) in commonFormulas"
+              :key="index"
+              size="small"
+              @click="insertTemplate(template.formula)"
+              class="template-btn"
+            >
+              {{ template.name }}
+            </el-button>
+          </div>
         </div>
       </div>
       <template #footer>
         <el-button @click="formulaDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="confirmInsertFormula">插入</el-button>
+        <el-button type="primary" @click="confirmInsertFormula" :disabled="!formulaInput">插入</el-button>
       </template>
     </el-dialog>
   </div>
@@ -314,6 +291,9 @@ import 'quill/dist/quill.snow.css';
 import request from '@/utils/request';
 import katex from 'katex';
 import 'katex/dist/katex.min.css';
+import { registerKatex, commonFormulas } from '@/utils/quill-katex';
+
+registerKatex();
 
 const route = useRoute();
 const router = useRouter();
@@ -349,9 +329,8 @@ const formulaDialogVisible = ref(false);
 const formulaInput = ref('');
 const currentFormulaQuestionId = ref<number | null>(null);
 
-let countdownTimer: number | null = null;
-let autoSaveTimer: number | null = null;
-let essayAutoSaveTimer: number | null = null;
+const countdownTimer = ref<number | null>(null);
+const autoSaveTimer = ref<number | null>(null);
 
 const answeredCount = computed(() => answeredSet.value.size);
 const unansweredCount = computed(
@@ -472,11 +451,16 @@ const initQuillEditor = (questionId: number) => {
   const editor = new Quill(el, {
     theme: 'snow',
     modules: {
-      toolbar: [
-        ['bold', 'italic', 'underline', 'strike'],
-        [{ list: 'ordered' }, { list: 'bullet' }],
-        ['clean'],
-      ],
+      toolbar: {
+        container: [
+          ['bold', 'italic', 'underline', 'strike'],
+          [{ list: 'ordered' }, { list: 'bullet' }],
+          ['katex']
+        ],
+        handlers: {
+          katex: () => insertFormula(questionId)
+        }
+      }
     },
     placeholder: '请输入答案...',
   });
@@ -501,6 +485,13 @@ const insertFormula = (questionId: number) => {
   formulaDialogVisible.value = true;
 };
 
+const insertTemplate = (formula: string) => {
+  formulaInput.value = formula;
+};
+
+const updateFormulaPreview = () => {
+};
+
 const confirmInsertFormula = () => {
   if (!formulaInput.value || !currentFormulaQuestionId.value) {
     ElMessage.warning('请输入公式');
@@ -512,7 +503,7 @@ const confirmInsertFormula = () => {
     const selection = editor.getSelection();
     const index = selection ? selection.index : editor.getLength();
 
-    const formulaHtml = `<span class="katex-formula">$${formulaInput.value}$</span>`;
+    const formulaHtml = `<div class="ql-katex" data-formula="${formulaInput.value}"><div>${katex.renderToString(formulaInput.value, { throwOnError: false, displayMode: true })}</div></div>`;
     editor.clipboard.dangerouslyPasteHTML(index, formulaHtml);
   }
 
@@ -578,12 +569,21 @@ const fetchAssignmentData = async () => {
         }
       });
 
+      // 延迟检查草稿，确保编辑器已初始化
+      setTimeout(() => {
+        checkDraft();
+      }, 500);
+
       startAutoSave();
-      checkDraft();
+    } else {
+      questions.value = [];
+      answers.value = {};
     }
   } catch (error) {
     console.error('获取作业详情失败:', error);
     ElMessage.error('获取作业详情失败');
+    questions.value = [];
+    answers.value = {};
   } finally {
     loading.value = false;
   }
@@ -617,10 +617,10 @@ const checkDraft = async () => {
   }
 };
 
-const restoreDraft = (draftAnswers: any[]) => {
-  draftAnswers.forEach((item) => {
+const restoreDraft = async (draftAnswers: any[]) => {
+  for (const item of draftAnswers) {
     const question = questions.value.find((q) => q.id === item.questionId);
-    if (!question) return;
+    if (!question) continue;
 
     if (question.type === 'multiple') {
       try {
@@ -631,6 +631,13 @@ const restoreDraft = (draftAnswers: any[]) => {
           : [];
       }
     } else if (question.type === 'essay') {
+      // 等待编辑器初始化完成
+      let retries = 0;
+      while (!editors.value[item.questionId] && retries < 10) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+        retries++;
+      }
+      
       const editor = editors.value[item.questionId];
       if (editor && item.answerContent) {
         editor.root.innerHTML = item.answerContent;
@@ -641,10 +648,11 @@ const restoreDraft = (draftAnswers: any[]) => {
     }
 
     handleAnswerChange(item.questionId);
-  });
+  }
 };
 
 const collectAnswers = () => {
+  // 先收集主观题答案
   questions.value.forEach((q) => {
     if (q.type === 'essay') {
       const editor = editors.value[q.id];
@@ -654,12 +662,27 @@ const collectAnswers = () => {
     }
   });
 
-  return questions.value.map((q) => ({
-    questionId: q.id,
-    answerContent: Array.isArray(answers.value[q.id])
-      ? JSON.stringify(answers.value[q.id])
-      : String(answers.value[q.id] || ''),
-  }));
+  // 返回答案数据
+  const answersData = questions.value.map((q) => {
+    let answerContent = answers.value[q.id];
+    
+    // 处理多选题答案
+    if (q.type === 'multiple' && Array.isArray(answerContent)) {
+      answerContent = JSON.stringify(answerContent);
+    }
+    
+    // 确保答案不为null或undefined
+    if (answerContent === null || answerContent === undefined) {
+      answerContent = '';
+    }
+    
+    return {
+      questionId: q.id,
+      answerContent: String(answerContent),
+    };
+  });
+
+  return answersData;
 };
 
 const handleSaveDraft = async () => {
@@ -711,9 +734,11 @@ const confirmSubmit = async () => {
     return;
   }
 
+  let answersData: any[] = [];
+
   try {
     submitting.value = true;
-    const answersData = collectAnswers();
+    answersData = collectAnswers();
 
     await request.post(`/student/assignments/${assignmentId.value}/submit`, {
       answers: answersData,
@@ -724,20 +749,23 @@ const confirmSubmit = async () => {
     router.push('/student/assignments');
   } catch (error: any) {
     console.error('提交作业失败:', error);
-    ElMessage.error(error.message || '提交作业失败');
+    console.error('请求数据:', { answers: answersData });
+    if (error.response?.data) {
+      console.error('服务器返回错误:', error.response.data);
+      ElMessage.error(error.response.data.message || '提交作业失败');
+    } else {
+      ElMessage.error(error.message || '提交作业失败');
+    }
   } finally {
     submitting.value = false;
   }
 };
 
 const startAutoSave = () => {
+  // 只启动一个定时器，每30秒自动保存一次
   autoSaveTimer.value = window.setInterval(() => {
     handleSaveDraft();
   }, 30000);
-
-  essayAutoSaveTimer.value = window.setInterval(() => {
-    handleSaveDraft();
-  }, 60000);
 };
 
 onMounted(() => {
@@ -749,7 +777,6 @@ onMounted(() => {
 onUnmounted(() => {
   if (countdownTimer.value) clearInterval(countdownTimer.value);
   if (autoSaveTimer.value) clearInterval(autoSaveTimer.value);
-  if (essayAutoSaveTimer.value) clearInterval(essayAutoSaveTimer.value);
 });
 </script>
 
@@ -833,23 +860,63 @@ onUnmounted(() => {
   font-weight: 500;
 }
 
-.options-list {
+/* 单选题样式 - 水平排列，根据文本长度自适应宽度，不重合 */
+.single-options {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
+  flex-wrap: wrap;
   gap: 12px;
+  justify-content: center;
 }
 
-.option-item {
-  padding: 14px 18px;
+.single-option-item {
+  padding: 12px 20px;
   background: linear-gradient(135deg, #f5f7fa 0%, #fafafa 100%);
   border-radius: 10px;
   transition: all 0.3s;
   border: 1px solid transparent;
+  display: flex;
+  align-items: flex-start;
+  flex: 0 0 auto;        /* 不伸缩，根据内容自适应宽度 */
+  min-width: 80px;       /* 最小宽度 */
+  max-width: 100%;       /* 最大宽度不超过容器 */
+  word-break: break-word;
 }
 
-.option-item:hover {
+.single-option-item:hover {
   background: linear-gradient(135deg, #ecf5ff 0%, #f0f7ff 100%);
   border-color: #409eff;
+}
+
+/* 多选题样式 - 垂直排列，每项一行，水平居中 */
+.multiple-options {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: center;
+}
+
+.multiple-option-item {
+  padding: 12px 20px;
+  background: linear-gradient(135deg, #f5f7fa 0%, #fafafa 100%);
+  border-radius: 10px;
+  transition: all 0.3s;
+  border: 1px solid transparent;
+  display: flex;
+  align-items: flex-start;
+  width: 100%;
+  max-width: 500px;
+  word-break: break-word;
+}
+
+.multiple-option-item:hover {
+  background: linear-gradient(135deg, #ecf5ff 0%, #f0f7ff 100%);
+  border-color: #409eff;
+}
+
+.single-option-item:deep(.el-radio__label),
+.multiple-option-item:deep(.el-checkbox__label) {
+  margin: 0;
 }
 
 .option-label {
@@ -869,13 +936,35 @@ onUnmounted(() => {
   border-radius: 10px;
 }
 
-.judgment-switch {
+.judgment-options {
   display: flex;
   align-items: center;
-  gap: 16px;
+  justify-content: center;
+  gap: 24px;
   padding: 16px;
   background: linear-gradient(135deg, #f5f7fa 0%, #fafafa 100%);
   border-radius: 10px;
+}
+
+.judgment-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 20px;
+  background: linear-gradient(135deg, #f5f7fa 0%, #fafafa 100%);
+  border-radius: 10px;
+  border: 1px solid transparent;
+  transition: all 0.3s;
+  cursor: pointer;
+}
+
+.judgment-option:hover {
+  background: linear-gradient(135deg, #ecf5ff 0%, #f0f7ff 100%);
+  border-color: #409eff;
+}
+
+.judgment-option:deep(.el-radio__label) {
+  margin: 0;
 }
 
 .judgment-label {
@@ -910,6 +999,23 @@ onUnmounted(() => {
   min-height: 180px;
   font-size: 14px;
   line-height: 1.8;
+}
+
+:deep(.ql-toolbar .ql-katex) {
+  position: relative;
+}
+
+:deep(.ql-toolbar .ql-katex::before) {
+  content: 'fx';
+  font-family: 'Times New Roman', serif;
+  font-style: italic;
+  font-weight: bold;
+  font-size: 14px;
+  display: block;
+}
+
+:deep(.ql-toolbar .ql-katex svg) {
+  display: none;
 }
 
 .editor-footer {
@@ -1162,26 +1268,52 @@ onUnmounted(() => {
   cursor: pointer;
 }
 
-.formula-input {
+.formula-editor {
   padding: 12px 0;
+}
+
+.formula-input-section {
+  margin-bottom: 20px;
 }
 
 .formula-preview {
   margin-top: 16px;
   padding: 12px;
   background: #f5f7fa;
-  border-radius: 10px;
+  border-radius: 8px;
 }
 
 .preview-label {
-  font-size: 12px;
-  color: #909399;
-  margin-bottom: 8px;
   display: block;
+  margin-bottom: 8px;
+  font-weight: 500;
+  color: #606266;
 }
 
 .preview-content {
-  font-size: 16px;
+  padding: 12px;
+  background: white;
+  border-radius: 4px;
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.formula-templates h4 {
+  margin-bottom: 12px;
+  font-size: 14px;
+  color: #303133;
+}
+
+.template-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  gap: 8px;
+}
+
+.template-btn {
+  margin: 0;
 }
 
 .katex-formula {
