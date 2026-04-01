@@ -142,11 +142,11 @@
         class="modern-table"
         :header-cell-style="{ background: '#f5f7fa' }"
       >
-        <el-table-column label="学生信息" min-width="220">
+        <el-table-column label="学生信息" width="160">
           <template #default="scope">
             <div class="student-info-cell">
               <el-avatar 
-                :size="44" 
+                :size="40" 
                 :src="scope.row.avatar || ''"
                 class="student-avatar"
               >
@@ -159,7 +159,7 @@
             </div>
           </template>
         </el-table-column>
-        <el-table-column prop="submitTime" label="提交时间" width="180">
+        <el-table-column prop="submitTime" label="提交时间" min-width="180">
           <template #default="scope">
             <div class="time-cell">
               <el-icon><Clock /></el-icon>
@@ -167,7 +167,7 @@
             </div>
           </template>
         </el-table-column>
-        <el-table-column prop="score" label="得分" width="120" align="center">
+        <el-table-column prop="score" label="得分" width="150" align="center">
           <template #default="scope">
             <div class="score-cell">
               <span :class="['score-value', getScoreClass(scope.row.score)]">
@@ -177,7 +177,7 @@
             </div>
           </template>
         </el-table-column>
-        <el-table-column prop="status" label="批改状态" width="120" align="center">
+        <el-table-column prop="status" label="批改状态" width="150" align="center">
           <template #default="scope">
             <el-tag 
               :type="scope.row.status === 'graded' ? 'success' : 'warning'" 
@@ -451,7 +451,7 @@ const getSubmissions = async () => {
         studentId: record.studentId,
         studentName: record.studentName,
         username: record.studentUsername,
-        avatar: '',
+        avatar: record.studentAvatar,
         submitTime: record.submitTime,
         score: record.finalTotalScore,
         status: record.reviewStatus === 1 ? 'graded' : 'pending'
@@ -475,7 +475,7 @@ const getSubmissionDetail = async (submissionId: number) => {
         id: data.id,
         studentId: data.studentId,
         studentName: data.studentName,
-        avatar: '',
+        avatar: data.studentAvatar,
         submitTime: data.submitTime,
         totalScore: data.finalTotalScore,
         questions: (data.answers || []).map((answer: any, index: number) => ({
@@ -912,7 +912,7 @@ onMounted(() => {
 .student-info-cell {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 12px;
 }
 
 .student-avatar {
@@ -922,15 +922,18 @@ onMounted(() => {
 }
 
 .student-details {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
   text-align: left;
   min-width: 0;
+  line-height: 1.4;
 }
 
 .student-details .student-name {
   font-weight: 600;
   color: #1a1a2e;
-  font-size: 15px;
-  margin-bottom: 4px;
+  font-size: 14px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -940,6 +943,7 @@ onMounted(() => {
   font-size: 12px;
   color: #909399;
   font-weight: 500;
+  white-space: nowrap;
 }
 
 /* 时间单元格 */
@@ -998,14 +1002,19 @@ onMounted(() => {
 
 /* 状态标签 */
 .status-tag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
   font-weight: 500;
   padding: 4px 10px;
   border-radius: 4px;
+  line-height: 1;
 }
 
 .status-tag .el-icon {
-  margin-right: 4px;
   font-size: 12px;
+  vertical-align: middle;
 }
 
 /* 操作按钮 */

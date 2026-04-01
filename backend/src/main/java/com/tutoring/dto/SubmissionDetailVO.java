@@ -19,6 +19,7 @@ public class SubmissionDetailVO {
     private Long studentId;
     private String studentName;
     private String studentUsername;
+    private String studentAvatar;
     private Long assignmentId;
     private String assignmentTitle;
     private Long courseId;
