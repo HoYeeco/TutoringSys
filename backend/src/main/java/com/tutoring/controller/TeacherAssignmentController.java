@@ -135,6 +135,14 @@ public class TeacherAssignmentController {
         return Result.success(null);
     }
 
+    @Operation(summary = "打回重做")
+    @PostMapping("/submissions/{submissionId}/reject")
+    public Result<Void> rejectSubmission(@PathVariable Long submissionId) {
+        Long teacherId = getCurrentUserId();
+        teacherAssignmentService.rejectSubmission(teacherId, submissionId);
+        return Result.success(null);
+    }
+
     private Long getCurrentUserId() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || !authentication.isAuthenticated()) {

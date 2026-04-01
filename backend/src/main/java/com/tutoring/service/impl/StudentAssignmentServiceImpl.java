@@ -184,10 +184,26 @@ public class StudentAssignmentServiceImpl implements StudentAssignmentService {
 
     private String calculateStatus(Assignment assignment, Submission submission, LocalDateTime now) {
         if (submission != null) {
-            if (submission.getFinalTotalScore() != null) {
-                return "graded";
+            Integer status = submission.getStatus();
+            
+            if (status != null && status == 4) {
+                return "overdue"; // 失败
             }
-            return "submitted";
+            
+            if (status != null && status == 2) {
+                return "submitted"; // 批改中
+            }
+            
+            if (status != null && status == 3) {
+                // 批改完成
+                Integer reviewStatus = submission.getReviewStatus();
+                if (reviewStatus != null && reviewStatus == 1) {
+                    return "submitted"; // 有主观题，待教师复核
+                }
+                return "graded"; // 全客观题已批改 或 教师已复核完成
+            }
+            
+            return "submitted"; // 已提交(status=0或1)
         }
 
         if (now.isAfter(assignment.getDeadline())) {

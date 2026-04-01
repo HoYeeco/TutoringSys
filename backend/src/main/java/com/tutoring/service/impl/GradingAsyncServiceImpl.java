@@ -31,6 +31,7 @@ public class GradingAsyncServiceImpl implements GradingAsyncService {
     private final QwenService qwenService;
 
     private static final String SUBJECTIVE_TYPE = "SUBJECTIVE";
+    private static final String ESSAY_TYPE = "ESSAY";
 
     @Override
     @Async("taskExecutor")
@@ -89,7 +90,8 @@ public class GradingAsyncServiceImpl implements GradingAsyncService {
                     continue;
                 }
 
-                if (SUBJECTIVE_TYPE.equals(question.getType())) {
+                String questionType = question.getType() != null ? question.getType().toUpperCase() : "";
+                if (SUBJECTIVE_TYPE.equals(questionType) || ESSAY_TYPE.equals(questionType)) {
                     hasSubjectiveQuestion = true;
                     int aiScore = gradeSubjectiveQuestion(answer, question);
                     totalAiScore += aiScore;

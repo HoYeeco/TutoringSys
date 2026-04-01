@@ -34,4 +34,6 @@ public interface TeacherAssignmentService {
 
     void deleteSubmission(Long teacherId, Long submissionId);
 
+    void rejectSubmission(Long teacherId, Long submissionId);
+
 }

@@ -21,6 +21,12 @@
           <span class="summary-value">{{ assignment.courseName }}</span>
         </div>
         <div class="summary-item">
+          <span class="summary-label">作业状态：</span>
+          <el-tag :type="getStatusTagType(assignment.status)" effect="light" size="small">
+            {{ getStatusText(assignment.status) }}
+          </el-tag>
+        </div>
+        <div class="summary-item">
           <span class="summary-label">总分：</span>
           <span class="summary-value score">
             <strong>{{ assignment.score || 0 }}</strong> / {{ assignment.totalScore || 100 }}
@@ -58,7 +64,7 @@
           v-for="(question, index) in questions"
           :key="question.id"
           class="question-card"
-          :class="{ correct: question.isCorrect, incorrect: !question.isCorrect }"
+          :class="{ correct: question.type !== 'essay' && question.isCorrect, incorrect: question.type !== 'essay' && !question.isCorrect }"
         >
           <div class="question-header">
             <div class="question-info">
@@ -69,7 +75,9 @@
               <span class="question-score">({{ question.score }}分)</span>
             </div>
             <div class="question-result">
+              <!-- 主观题不显示正确/错误标签 -->
               <el-tag
+                v-if="question.type !== 'essay'"
                 :type="question.isCorrect ? 'success' : 'danger'"
                 effect="dark"
                 size="small"
@@ -89,10 +97,10 @@
               <span class="answer-label">你的答案：</span>
               <div
                 class="answer-value"
-                :class="question.isCorrect ? 'correct' : 'incorrect'"
+                :class="question.type !== 'essay' ? (question.isCorrect ? 'correct' : 'incorrect') : ''"
               >
                 <template v-if="question.type === 'essay'">
-                  <div class="essay-content" v-html="question.studentAnswer"></div>
+                  <div class="essay-content readonly-editor" v-html="question.studentAnswer"></div>
                 </template>
                 <template v-else>
                   {{ formatAnswer(question.studentAnswer, question.type) }}
@@ -100,11 +108,11 @@
               </div>
             </div>
 
-            <div class="answer-row" v-if="!question.isCorrect && question.correctAnswer">
+            <div class="answer-row" v-if="question.correctAnswer">
               <span class="answer-label">标准答案：</span>
               <div class="answer-value correct">
                 <template v-if="question.type === 'essay'">
-                  <div class="essay-content" v-html="question.correctAnswer"></div>
+                  <div class="essay-content readonly-editor" v-html="question.correctAnswer"></div>
                 </template>
                 <template v-else>
                   {{ formatAnswer(question.correctAnswer, question.type) }}
@@ -158,7 +166,7 @@
             </div>
           </div>
 
-          <div class="question-footer" v-if="!question.isCorrect">
+          <div class="question-footer" v-if="question.type !== 'essay' && !question.isCorrect">
             <el-button
               type="warning"
               size="small"
@@ -199,32 +207,120 @@ const assignment = ref({
   score: 0,
   totalScore: 100,
   gradeTime: '',
+  status: 'graded',
 });
 
 const questions = ref<any[]>([]);
 
 const hasWrongQuestions = computed(() => {
-  return questions.value.some(q => !q.isCorrect);
+  // 只有客观题才有错题概念
+  return questions.value.some(q => q.type !== 'essay' && !q.isCorrect);
 });
 
-const getAssignmentDetail = async () => {
+const getGradingDetail = async () => {
   try {
-    const response = await request.get(`/student/assignments/${assignmentId.value}/detail`);
+    // 先获取作业列表，找到对应的 submissionId
+    const listResponse = await request.get('/student/grading/list', {
+      params: { page: 1, size: 100 }
+    });
+    
+    const submissions = listResponse.data.records || [];
+    const submission = submissions.find((s: any) => s.assignmentId === parseInt(assignmentId.value));
+    
+    if (!submission) {
+      ElMessage.error('未找到该作业的批改记录');
+      return;
+    }
+    
+    // 获取批改详情
+    const response = await request.get(`/student/grading/${submission.submissionId}`);
+    const data = response.data;
+    
+    // 判断作业状态：有主观题且reviewStatus=1表示待复核，否则已批改
+    const hasSubjective = data.answers?.some((a: any) => {
+      const type = a.type?.toUpperCase();
+      return type === 'ESSAY' || type === 'SUBJECTIVE';
+    });
+    const status = hasSubjective && data.reviewStatus === 1 ? 'submitted' : 'graded';
+    
     assignment.value = {
-      title: response.data.title,
-      courseName: response.data.courseName,
-      score: response.data.score,
-      totalScore: response.data.totalScore,
-      gradeTime: response.data.gradeTime,
+      title: data.assignmentTitle,
+      courseName: data.courseName,
+      score: data.finalTotalScore,
+      totalScore: data.totalScore,
+      gradeTime: data.reviewTime,
+      status: status,
     };
-    questions.value = (response.data.questions || []).map((q: any) => ({
-      ...q,
+    
+    // 转换答案数据格式
+    questions.value = (data.answers || []).map((a: any) => ({
+      id: a.questionId,
+      type: a.type?.toLowerCase(),
+      content: a.content,
+      options: a.options,
+      score: a.maxScore,
+      studentAnswer: a.studentAnswer,
+      correctAnswer: a.correctAnswer,
+      isCorrect: a.isCorrect,
+      earnedScore: a.finalScore ?? a.score,
+      aiFeedback: parseAiFeedback(a.aiFeedback),
+      teacherComment: a.teacherFeedback,
       addingToWrongBook: false,
     }));
   } catch (error) {
     console.error('获取批改详情失败:', error);
     ElMessage.error('获取批改详情失败');
   }
+};
+
+// 解析AI反馈字符串为对象
+const parseAiFeedback = (aiFeedback: string | null) => {
+  if (!aiFeedback) return null;
+  
+  try {
+    // 尝试解析为JSON
+    const parsed = JSON.parse(aiFeedback);
+    if (parsed.errorPoints || parsed.suggestions) {
+      return parsed;
+    }
+  } catch {
+    // 不是JSON格式，作为纯文本处理
+  }
+  
+  // 尝试从文本中提取核心错误点和修正建议
+  const errorPoints: string[] = [];
+  let suggestions = '';
+  
+  const lines = aiFeedback.split('\n');
+  let inSuggestions = false;
+  
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    
+    if (trimmed.includes('错误') || trimmed.includes('问题')) {
+      const match = trimmed.match(/[:：]\s*(.+)/);
+      if (match) {
+        errorPoints.push(match[1]);
+      } else if (trimmed.length > 5) {
+        errorPoints.push(trimmed);
+      }
+    } else if (trimmed.includes('建议') || trimmed.includes('改进')) {
+      inSuggestions = true;
+    } else if (inSuggestions) {
+      suggestions += trimmed + '\n';
+    }
+  }
+  
+  if (errorPoints.length === 0 && !suggestions) {
+    // 无法解析，将整个文本作为建议
+    suggestions = aiFeedback;
+  }
+  
+  return {
+    errorPoints: errorPoints.length > 0 ? errorPoints : undefined,
+    suggestions: suggestions.trim() || undefined,
+  };
 };
 
 const goBack = () => {
@@ -237,6 +333,11 @@ const getQuestionTypeText = (type: string) => {
     multiple: '多选题',
     judgment: '判断题',
     essay: '主观题',
+    // 后端返回的大写类型
+    SINGLE: '单选题',
+    MULTIPLE: '多选题',
+    JUDGE: '判断题',
+    ESSAY: '主观题',
   };
   return map[type] || type;
 };
@@ -247,13 +348,20 @@ const getQuestionTypeTag = (type: string) => {
     multiple: 'success',
     judgment: 'warning',
     essay: 'danger',
+    // 后端返回的大写类型
+    SINGLE: '',
+    MULTIPLE: 'success',
+    JUDGE: 'warning',
+    ESSAY: 'danger',
   };
   return map[type] || '';
 };
 
 const formatAnswer = (answer: string, type: string) => {
   if (!answer) return '-';
-  if (type === 'multiple') {
+  // 支持大小写类型
+  const lowerType = type?.toLowerCase();
+  if (lowerType === 'multiple') {
     try {
       const parsed = JSON.parse(answer);
       return Array.isArray(parsed) ? parsed.join(', ') : answer;
@@ -261,7 +369,7 @@ const formatAnswer = (answer: string, type: string) => {
       return answer;
     }
   }
-  if (type === 'judgment') {
+  if (lowerType === 'judgment' || lowerType === 'judge') {
     return answer === 'true' ? '正确' : '错误';
   }
   return answer;
@@ -271,6 +379,36 @@ const formatDate = (date: string) => {
   if (!date) return '-';
   const d = new Date(date);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+};
+
+const getStatusTagType = (status: string) => {
+  switch (status) {
+    case 'pending':
+      return 'warning';
+    case 'submitted':
+      return 'info';
+    case 'graded':
+      return 'success';
+    case 'overdue':
+      return 'danger';
+    default:
+      return 'default';
+  }
+};
+
+const getStatusText = (status: string) => {
+  switch (status) {
+    case 'pending':
+      return '待提交';
+    case 'submitted':
+      return '待批改';
+    case 'graded':
+      return '已批改';
+    case 'overdue':
+      return '已逾期';
+    default:
+      return '未知';
+  }
 };
 
 const copyText = async (text: string) => {
@@ -299,7 +437,8 @@ const addToWrongBook = async (question: any) => {
 };
 
 const addAllToWrongBook = async () => {
-  const wrongQuestions = questions.value.filter(q => !q.isCorrect);
+  // 只筛选客观题的错题
+  const wrongQuestions = questions.value.filter(q => q.type !== 'essay' && !q.isCorrect);
   if (wrongQuestions.length === 0) {
     ElMessage.info('没有错题需要加入');
     return;
@@ -320,7 +459,7 @@ const addAllToWrongBook = async () => {
 };
 
 onMounted(() => {
-  getAssignmentDetail();
+  getGradingDetail();
 });
 </script>
 
@@ -536,6 +675,56 @@ onMounted(() => {
 .essay-content {
   line-height: 1.8;
   color: #303133;
+}
+
+.readonly-editor {
+  background: #fff;
+  border: 1px solid #e4e7ed;
+  border-radius: 8px;
+  padding: 16px;
+  min-height: 100px;
+}
+
+.readonly-editor :deep(p) {
+  margin: 0 0 12px 0;
+}
+
+.readonly-editor :deep(p:last-child) {
+  margin-bottom: 0;
+}
+
+.readonly-editor :deep(ul),
+.readonly-editor :deep(ol) {
+  margin: 8px 0;
+  padding-left: 24px;
+}
+
+.readonly-editor :deep(li) {
+  margin: 4px 0;
+}
+
+.readonly-editor :deep(strong) {
+  font-weight: 600;
+}
+
+.readonly-editor :deep(em) {
+  font-style: italic;
+}
+
+.readonly-editor :deep(u) {
+  text-decoration: underline;
+}
+
+.readonly-editor :deep(s) {
+  text-decoration: line-through;
+}
+
+.readonly-editor :deep(.ql-katex) {
+  background: #f5f7fa;
+  padding: 8px 12px;
+  border-radius: 4px;
+  margin: 8px 0;
+  overflow-x: auto;
 }
 
 .ai-feedback {

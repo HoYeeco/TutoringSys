@@ -732,4 +732,35 @@ public class TeacherAssignmentServiceImpl implements TeacherAssignmentService {
         submissionMapper.deleteById(submissionId);
     }
 
+    @Override
+    @Transactional
+    @CacheEvict(value = "teacherAssignments", allEntries = true)
+    public void rejectSubmission(Long teacherId, Long submissionId) {
+        Submission submission = submissionMapper.selectById(submissionId);
+        if (submission == null) {
+            throw new BusinessException("提交记录不存在");
+        }
+
+        Assignment assignment = assignmentMapper.selectById(submission.getAssignmentId());
+        if (assignment == null || !assignment.getTeacherId().equals(teacherId)) {
+            throw new BusinessException("无权操作此提交记录");
+        }
+
+        // 将学生答案标记为草稿状态，保留原提交数据
+        studentAnswerMapper.updateStatusToDraft(submissionId);
+
+        // 删除提交记录，让学生可以重新提交
+        submissionMapper.deleteById(submissionId);
+
+        // 发送消息通知学生
+        Message message = new Message();
+        message.setTitle("作业打回重做");
+        message.setContent(String.format("您的作业「%s」已被教师打回，请重新提交。", assignment.getTitle()));
+        message.setType("system");
+        messageService.sendMessage(message, List.of(submission.getStudentId()));
+
+        log.info("作业已打回重做: submissionId={}, studentId={}, assignmentId={}", 
+            submissionId, submission.getStudentId(), submission.getAssignmentId());
+    }
+
 }

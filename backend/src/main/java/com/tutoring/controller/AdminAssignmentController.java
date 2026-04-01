@@ -89,6 +89,18 @@ public class AdminAssignmentController {
         }
     }
 
+    @Operation(summary = "打回重做", description = "管理员将学生作业打回，让学生重新提交")
+    @PostMapping("/submissions/{submissionId}/reject")
+    @PreAuthorize("hasRole('ADMIN')")
+    public Result<Void> rejectSubmission(@PathVariable Long submissionId) {
+        try {
+            adminAssignmentService.rejectSubmission(submissionId);
+            return Result.success(null);
+        } catch (RuntimeException e) {
+            return Result.error(400, e.getMessage());
+        }
+    }
+
     @Operation(summary = "获取作业提交列表", description = "管理员获取指定作业的学生提交列表")
     @GetMapping("/{id}/submissions")
     @PreAuthorize("hasRole('ADMIN')")

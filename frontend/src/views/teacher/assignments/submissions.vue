@@ -191,7 +191,7 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="150" fixed="right" align="center">
+        <el-table-column label="操作" width="250" fixed="right" align="center">
           <template #default="scope">
             <el-button
               type="primary"
@@ -201,6 +201,16 @@
             >
               <el-icon><View /></el-icon>
               查看详情
+            </el-button>
+            <el-button
+              type="primary"
+              size="small"
+              @click="rejectSubmission(scope.row)"
+              class="action-btn"
+              plain
+            >
+              <el-icon><RefreshLeft /></el-icon>
+              打回重做
             </el-button>
           </template>
         </el-table-column>
@@ -349,7 +359,7 @@ import { ElMessage, ElMessageBox } from 'element-plus';
 import { 
   Document, Reading, Clock, User, CircleCheck, 
   View, Check, ArrowLeft, TrendCharts, List, Search, 
-  DocumentDelete, Warning, Close, QuestionFilled, EditPen, ChatDotRound, Delete
+  DocumentDelete, Warning, Close, QuestionFilled, EditPen, ChatDotRound, Delete, RefreshLeft
 } from '@element-plus/icons-vue';
 import request from '@/utils/request';
 import { useUserStore } from '@/stores/user';
@@ -556,6 +566,34 @@ const deleteSubmission = async () => {
     }
   } finally {
     deleting.value = false;
+  }
+};
+
+const rejecting = ref(false);
+
+const rejectSubmission = async (row: any) => {
+  try {
+    await ElMessageBox.confirm(
+      `确定要将学生「${row.studentName}」的作业打回重做吗？学生将可以重新提交作业，原提交数据将被保留。`,
+      '打回重做确认',
+      {
+        confirmButtonText: '确定打回',
+        cancelButtonText: '取消',
+        type: 'warning',
+      }
+    );
+    
+    rejecting.value = true;
+    const baseUrl = isAdmin.value ? '/admin/assignments' : '/teacher/assignments';
+    await request.post(`${baseUrl}/submissions/${row.id}/reject`);
+    ElMessage.success('作业已打回，学生可重新提交');
+    getSubmissions();
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      ElMessage.error('打回失败: ' + (error.response?.data?.message || error.message || '未知错误'));
+    }
+  } finally {
+    rejecting.value = false;
   }
 };
 

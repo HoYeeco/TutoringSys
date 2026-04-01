@@ -22,6 +22,8 @@ public interface AdminAssignmentService {
 
     void deleteSubmission(Long submissionId);
 
+    void rejectSubmission(Long submissionId);
+
     Page<SubmissionRecordVO> getAssignmentSubmissions(Long assignmentId, Integer page, Integer size);
 
     SubmissionDetailVO getSubmissionDetail(Long submissionId);
