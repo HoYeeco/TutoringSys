@@ -720,8 +720,11 @@ onMounted(() => {
 <style scoped>
 /* ========== 基础布局 ========== */
 .teacher-submissions {
-  padding: 20px;
-  background: linear-gradient(135deg, #f5f7fa 0%, #e4e7ed 100%);
+  padding: 24px;
+  background: rgba(255, 255, 255, 0.66);
+  backdrop-filter: blur(4px);
+  border-radius: 16px;
+  margin: 16px;
   min-height: calc(100vh - 84px);
 }
 
