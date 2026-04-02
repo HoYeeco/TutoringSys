@@ -43,8 +43,7 @@
       
       <div class="batch-actions" v-if="selectedRows.length > 0">
         <span class="selected-count">已选择 {{ selectedRows.length }} 项</span>
-        <el-button type="success" @click="handleBatchAccept">批量采用AI评分</el-button>
-        <el-button type="warning" @click="showBatchModifyDialog">批量修改分数</el-button>
+        <el-button type="success" @click="handleBatchAccept">批量采用 AI 评分</el-button>
         <el-button @click="clearSelection">取消选择</el-button>
       </div>
       
@@ -112,21 +111,6 @@
         />
       </div>
     </el-card>
-    
-    <el-dialog v-model="batchModifyDialogVisible" title="批量修改分数" width="400px">
-      <el-form label-width="100px">
-        <el-form-item label="新分数">
-          <el-input-number v-model="batchModifyScore" :min="0" :max="100" />
-        </el-form-item>
-        <el-form-item label="教师评语">
-          <el-input v-model="batchTeacherFeedback" type="textarea" :rows="3" placeholder="可选填写教师评语" />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="batchModifyDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="handleBatchModify">确定</el-button>
-      </template>
-    </el-dialog>
   </div>
 </template>
 
@@ -154,10 +138,6 @@ const loading = ref(false);
 const courses = ref<any[]>([]);
 const submissions = ref<any[]>([]);
 const selectedRows = ref<any[]>([]);
-
-const batchModifyDialogVisible = ref(false);
-const batchModifyScore = ref(0);
-const batchTeacherFeedback = ref('');
 
 const getQuestionTypeTag = (type: string): string => {
   const typeMap: Record<string, string> = {
@@ -314,7 +294,7 @@ const handleBatchAccept = async () => {
   
   try {
     await ElMessageBox.confirm(
-      `确定要批量采用 ${selectedRows.value.length} 条记录的AI评分吗？`,
+      `确定要批量采用 ${selectedRows.value.length} 条记录的 AI 评分吗？`,
       '确认操作',
       { type: 'warning' }
     );
@@ -331,35 +311,6 @@ const handleBatchAccept = async () => {
     if (error !== 'cancel') {
       ElMessage.error('批量操作失败');
     }
-  }
-};
-
-const showBatchModifyDialog = () => {
-  if (selectedRows.value.length === 0) {
-    ElMessage.warning('请选择要操作的记录');
-    return;
-  }
-  batchModifyScore.value = 0;
-  batchTeacherFeedback.value = '';
-  batchModifyDialogVisible.value = true;
-};
-
-const handleBatchModify = async () => {
-  try {
-    const answerIds = selectedRows.value.map(row => row.answerId);
-    await request.post('/teacher/review/batch/modify', answerIds, {
-      params: { 
-        newScore: batchModifyScore.value,
-        teacherFeedback: batchTeacherFeedback.value || ''
-      }
-    });
-    
-    ElMessage.success('批量修改成功');
-    batchModifyDialogVisible.value = false;
-    clearSelection();
-    getSubmissions();
-  } catch (error) {
-    ElMessage.error('批量操作失败');
   }
 };
 
