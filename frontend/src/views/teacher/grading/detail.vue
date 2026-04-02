@@ -8,6 +8,9 @@
         </el-button>
         <div class="header-title">
           <h2>批改复核</h2>
+          <span v-if="isBatchMode" class="batch-progress">
+            ({{ currentIndex + 1 }} / {{ answerIds.length }})
+          </span>
         </div>
       </div>
       <div class="header-info">
@@ -77,9 +80,9 @@
             <div class="ai-box">
               <div class="box-header">
                 <span class="box-title">AI 批改结果</span>
-                <el-button 
-                  type="primary" 
-                  size="small" 
+                <el-button
+                  type="primary"
+                  size="small"
                   :loading="regrading"
                   @click="handleRegrade"
                   plain
@@ -138,23 +141,9 @@
                     </el-button>
                   </div>
                 </div>
-                <div v-else-if="reviewDetail.aiFeedback" class="ai-feedback">
-                  <p class="feedback-raw" :class="{ 'is-truncated': shouldTruncateFeedback }">
-                    {{ reviewDetail.aiFeedback }}
-                  </p>
-                  <el-button 
-                    v-if="shouldTruncateFeedback" 
-                    type="primary" 
-                    text 
-                    size="small"
-                    @click="showFullFeedback"
-                  >
-                    查看完整内容
-                  </el-button>
-                </div>
                 <div v-else class="empty-feedback">
-                  <span>暂无AI批改结果</span>
-                  <span class="hint">点击"重新生成"获取AI批改结果</span>
+                  <span>暂无 AI 批改结果</span>
+                  <span class="hint">点击"重新生成"获取 AI 批改结果</span>
                 </div>
               </div>
             </div>
@@ -210,6 +199,36 @@
             </div>
           </div>
         </div>
+
+        <!-- 批量模式导航 -->
+        <div v-if="isBatchMode" class="batch-nav">
+          <el-button
+            :disabled="currentIndex === 0"
+            @click="goToPrev"
+            size="large"
+          >
+            <el-icon><ArrowLeft /></el-icon>
+            上一个
+          </el-button>
+          <div class="batch-actions">
+            <el-button type="success" @click="batchAdopt" :loading="batchSubmitting">
+              <el-icon><Check /></el-icon>
+              批量采用
+            </el-button>
+            <el-button @click="batchSkip" :loading="batchSubmitting">
+              <el-icon><Right /></el-icon>
+              批量跳过
+            </el-button>
+          </div>
+          <el-button
+            :disabled="currentIndex === answerIds.length - 1"
+            @click="goToNext"
+            size="large"
+          >
+            下一个
+            <el-icon><ArrowRight /></el-icon>
+          </el-button>
+        </div>
       </div>
     </div>
 
@@ -239,7 +258,7 @@
 import { ref, onMounted, computed } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { ElMessage } from 'element-plus';
-import { ArrowLeft, User, Document, Clock, Check, Edit, Warning, InfoFilled } from '@element-plus/icons-vue';
+import { ArrowLeft, ArrowRight, User, Document, Clock, Check, Edit, Warning, InfoFilled, Right } from '@element-plus/icons-vue';
 import request from '@/utils/request';
 
 interface ReviewDetail {
@@ -271,12 +290,17 @@ const router = useRouter();
 const route = useRoute();
 const loading = ref(false);
 const submitting = ref(false);
+const batchSubmitting = ref(false);
 const regrading = ref(false);
 const regraded = ref(false);
 const showFeedbackDialog = ref(false);
 const teacherFeedbackText = ref('');
 
-const answerId = computed(() => route.params.id as string);
+// 批量模式相关
+const isBatchMode = computed(() => answerIds.value.length > 1);
+const answerIds = ref<number[]>([]);
+const currentIndex = ref(0);
+const currentAnswerId = computed(() => answerIds.value[currentIndex.value] || route.params.id as string);
 
 const reviewDetail = ref<ReviewDetail>({
   answerId: 0,
@@ -325,15 +349,13 @@ const parsedFeedback = computed(() => {
   const errors: string[] = [];
   let suggestions = '';
 
-  // 提取错误点
+  // 提取错误点 - 使用顿号、分隔
   const errorMatch = feedback.match(/【错误点】([^【]+)/);
   if (errorMatch) {
     const errorStr = errorMatch[1].trim();
     if (errorStr) {
-      errors.push(...errorStr.split('|||').map(e => {
-        // 去除格式符号（如 -、•、* 等）
-        return e.trim().replace(/^[\s\-•*·]+/, '').trim();
-      }).filter(e => e));
+      // 使用顿号分隔多个错误点
+      errors.push(...errorStr.split('、').map(e => e.trim()).filter(e => e));
     }
   }
 
@@ -424,7 +446,7 @@ const showFullFeedback = () => {
 const getReviewDetail = async () => {
   loading.value = true;
   try {
-    const response = await request.get(`/teacher/review/${answerId.value}`);
+    const response = await request.get(`/teacher/review/${currentAnswerId.value}`);
     const data = response.data;
     reviewDetail.value = {
       answerId: data.answerId || 0,
@@ -463,7 +485,9 @@ const getReviewDetail = async () => {
 const handleRegrade = async () => {
   regrading.value = true;
   try {
-    const response = await request.post(`/teacher/review/${answerId.value}/regrade`);
+    console.log('开始重新生成 AI 批改:', currentAnswerId.value);
+    const response = await request.post(`/teacher/review/${currentAnswerId.value}/regrade`);
+    console.log('AI 批改返回数据:', response.data);
     const data = response.data;
     reviewDetail.value = {
       answerId: data.answerId || 0,
@@ -491,8 +515,10 @@ const handleRegrade = async () => {
     };
     manualScore.value = data.aiScore || 0;
     regraded.value = true;
+    console.log('AI 批改结果 - aiScore:', data.aiScore, 'aiFeedback:', data.aiFeedback);
     ElMessage.success('AI 批改完成');
   } catch (error) {
+    console.error('AI 批改失败:', error);
     ElMessage.error('AI 批改失败，请稍后重试');
   } finally {
     regrading.value = false;
@@ -507,20 +533,26 @@ const completeReview = async () => {
   submitting.value = true;
   try {
     if (feedbackAction.value === 'adopt') {
-      await request.post(`/teacher/review/${answerId.value}/accept`, null, {
+      await request.post(`/teacher/review/${currentAnswerId.value}/accept`, null, {
         params: { teacherFeedback: teacherFeedbackText.value }
       });
     } else {
-      await request.post(`/teacher/review/${answerId.value}/modify`, null, {
-        params: { 
+      await request.post(`/teacher/review/${currentAnswerId.value}/modify`, null, {
+        params: {
           newScore: manualScore.value,
           teacherFeedback: teacherFeedbackText.value
         }
       });
     }
-    
+
     ElMessage.success('复核完成');
-    router.push('/teacher/grading');
+
+    // 批量模式下自动跳到下一个
+    if (isBatchMode.value && currentIndex.value < answerIds.value.length - 1) {
+      goToNext();
+    } else {
+      router.push('/teacher/grading');
+    }
   } catch (error) {
     ElMessage.error('操作失败');
   } finally {
@@ -528,7 +560,67 @@ const completeReview = async () => {
   }
 };
 
+// 批量模式方法
+const goToPrev = () => {
+  if (currentIndex.value > 0) {
+    currentIndex.value--;
+    getReviewDetail();
+  }
+};
+
+const goToNext = () => {
+  if (currentIndex.value < answerIds.value.length - 1) {
+    currentIndex.value++;
+    getReviewDetail();
+  }
+};
+
+const batchAdopt = async () => {
+  batchSubmitting.value = true;
+  try {
+    // 采用当前AI评分
+    await request.post(`/teacher/review/${currentAnswerId.value}/accept`, null, {
+      params: { teacherFeedback: teacherFeedbackText.value }
+    });
+    ElMessage.success('已采用AI评分');
+
+    // 自动跳到下一个
+    if (currentIndex.value < answerIds.value.length - 1) {
+      goToNext();
+    } else {
+      ElMessage.success('所有复核已完成');
+      router.push('/teacher/grading');
+    }
+  } catch (error) {
+    ElMessage.error('操作失败');
+  } finally {
+    batchSubmitting.value = false;
+  }
+};
+
+const batchSkip = () => {
+  // 跳过当前，跳到下一个
+  if (currentIndex.value < answerIds.value.length - 1) {
+    goToNext();
+  } else {
+    ElMessage.info('已经是最后一个了');
+  }
+};
+
 onMounted(() => {
+  // 解析路由参数
+  const idsParam = route.query.ids as string;
+  if (idsParam) {
+    // 批量模式：ids=1,2,3,4
+    answerIds.value = idsParam.split(',').map(id => parseInt(id)).filter(id => !isNaN(id));
+    const idxParam = route.query.index as string;
+    if (idxParam) {
+      currentIndex.value = parseInt(idxParam) || 0;
+    }
+  } else {
+    // 单条模式
+    answerIds.value = [parseInt(route.params.id as string)];
+  }
   getReviewDetail();
 });
 </script>
@@ -556,12 +648,29 @@ onMounted(() => {
 
 .back-btn {
   color: rgba(255, 255, 255, 0.9);
+  &:hover {
+    background-color: #022aa1;
+  }
+}
+
+.header-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .header-title h2 {
   margin: 0;
   font-size: 18px;
   font-weight: 600;
+}
+
+.batch-progress {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.8);
+  background: rgba(255, 255, 255, 0.15);
+  padding: 2px 10px;
+  border-radius: 12px;
 }
 
 .header-info {
@@ -916,6 +1025,21 @@ onMounted(() => {
   gap: 10px;
 }
 
+/* 批量导航 */
+.batch-nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  background: #f5f7fa;
+  border-top: 1px solid #e4e7ed;
+}
+
+.batch-actions {
+  display: flex;
+  gap: 12px;
+}
+
 .dialog-content {
   padding: 10px 0;
 }
@@ -953,14 +1077,23 @@ onMounted(() => {
   .block-main {
     grid-template-columns: 1fr;
   }
-  
+
   .left-section {
     border-right: none;
     border-bottom: 1px solid #f0f0f0;
   }
-  
+
   .header-info {
     display: none;
+  }
+
+  .batch-nav {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .batch-actions {
+    order: -1;
   }
 }
 </style>

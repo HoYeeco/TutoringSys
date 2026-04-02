@@ -125,8 +125,8 @@ public class GradingAsyncServiceImpl implements GradingAsyncService {
                         totalAiScore += score;
                         processedCount++;
                     } catch (Exception ex) {
-                        log.error("客观题评分异常: questionId={}, 使用默认0分", question.getId(), ex);
-                        safeSetDefaultScore(answer, score);
+                        log.error("客观题评分异常：questionId={}, 使用默认 0 分", question.getId(), ex);
+                        safeSetDefaultScore(answer, 0);
                     }
                 }
             }
@@ -249,31 +249,32 @@ public class GradingAsyncServiceImpl implements GradingAsyncService {
 
         } catch (Exception e) {
             log.error("主观题AI评分失败: questionId={}", question.getId(), e);
-            
+
             answer.setAiScore(0);
             answer.setScore(0);
-            answer.setAiFeedback("AI评分失败，等待教师人工批改");
+            answer.setAiFeedback("【错误点】AI评分失败\n\n【改进建议】请稍后重试或联系管理员");
             answer.setGraderType("AI");
             answer.setReviewStatus(1);
             studentAnswerMapper.updateById(answer);
-            
+
             return 0;
         }
     }
 
     private String buildAiFeedback(GradingResult result) {
         StringBuilder feedback = new StringBuilder();
-        
-        // 错误点 - 使用 ||| 分隔多个错误，每个错误不超过6个字
+
+        // 错误点 - 多个错误用顿号分隔，每个错误不超过6个字
         if (result.getErrors() != null && !result.getErrors().isEmpty()) {
             feedback.append("【错误点】");
             List<String> truncatedErrors = result.getErrors().stream()
                 .map(e -> e.length() > 6 ? e.substring(0, 6) : e)
+                .distinct()
                 .collect(Collectors.toList());
-            String errorsStr = String.join("|||", truncatedErrors);
+            String errorsStr = String.join("、", truncatedErrors);
             feedback.append(errorsStr);
         }
-        
+
         // 改进建议 - 合并为一段文本
         if (result.getSuggestions() != null && !result.getSuggestions().isEmpty()) {
             if (feedback.length() > 0) {
@@ -283,7 +284,7 @@ public class GradingAsyncServiceImpl implements GradingAsyncService {
             String suggestionsStr = String.join("；", result.getSuggestions());
             feedback.append(suggestionsStr);
         }
-        
+
         return feedback.toString().trim();
     }
 

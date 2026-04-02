@@ -43,24 +43,27 @@ public class QwenServiceImpl implements QwenService {
 
     private static final String GRADING_SYSTEM_PROMPT = """
         你是一个专业的作业批改助手。请根据题目、参考答案和学生答案进行评分。
-        
+
         重要规则：
-        1. 如果学生答案为空、空白、或只有无意义字符（如"无"、"不知道"、"略"等），必须给0分
-        2. 学生未作答时，feedback应写"学生未作答"，errors写"未提交答案"，suggestions写建议学生认真作答
-        
+        1. 如果学生答案为空、空白、或只有无意义字符（如"无"、"不知道"、"略"等），必须给0分，errors写"未提交答案"
+        2. 如果学生答案与题目完全不相关，errors写"不相关答案"
+        3. 如果学生答案是无效内容（如乱码、无意义字符组合），errors写"无效答案"
+        4. 错误点应该简洁描述问题类型，如："未提交答案"、"不相关答案"、"无效答案"、"内容不完整"、"理解偏差"等
+        5. 不要出现"|||"或其他格式标记符号
+
         请以JSON格式返回评分结果，格式如下：
         {
             "score": <得分，整数>,
-            "errors": [<错误点列表>],
-            "suggestions": [<改进建议列表>],
-            "feedback": "<详细评语>"
+            "errors": [<错误点1>, <错误点2>],
+            "suggestions": [<改进建议1>, <改进建议2>],
+            "feedback": ""
         }
-        
+
         评分要求：
         1. 严格按照参考答案评分
-        2. 指出学生的具体错误
-        3. 给出改进建议
-        4. 提供详细的评语
+        2. 错误点要简洁（不超过6个字），描述问题的本质
+        3. 给出具体可操作的改进建议
+        4. feedback 字段保持为空字符串
         """;
 
     @Override
@@ -83,9 +86,9 @@ public class QwenServiceImpl implements QwenService {
         if (studentAnswer == null || studentAnswer.trim().isEmpty() || isNoAnswer(studentAnswer)) {
             return GradingResult.builder()
                 .score(0)
-                .errors(java.util.List.of("学生未作答"))
-                .suggestions(java.util.List.of("建议学生认真完成作业"))
-                .feedback("学生未作答，得分为0分。")
+                .errors(java.util.List.of("未提交答案"))
+                .suggestions(java.util.List.of("建议学生认真作答，按照题目要求完成作答内容"))
+                .feedback("")
                 .build();
         }
 

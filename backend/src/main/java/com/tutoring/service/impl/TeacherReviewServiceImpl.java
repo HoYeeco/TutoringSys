@@ -383,7 +383,6 @@ public class TeacherReviewServiceImpl implements TeacherReviewService {
                 return "客观题";
             case "SUBJECTIVE":
             case "ESSAY":
-            case "ESSAY":
                 return "主观题";
             default:
                 return "综合题";
@@ -452,11 +451,15 @@ public class TeacherReviewServiceImpl implements TeacherReviewService {
             maxScore
         );
 
+        log.info("Qwen AI 返回结果：score={}, errors={}, suggestions={}", 
+            result.getScore(), result.getErrors(), result.getSuggestions());
+
         int aiScore = result.getScore() != null ? result.getScore() : 0;
         aiScore = Math.min(aiScore, maxScore);
         aiScore = Math.max(aiScore, 0);
 
         String aiFeedback = buildAiFeedback(result);
+        log.info("生成的 AI 反馈：{}", aiFeedback);
 
         answer.setAiScore(aiScore);
         answer.setScore(aiScore);
@@ -486,17 +489,18 @@ public class TeacherReviewServiceImpl implements TeacherReviewService {
 
     private String buildAiFeedback(GradingResult result) {
         StringBuilder feedback = new StringBuilder();
-        
-        // 错误点 - 使用 ||| 分隔多个错误，每个错误不超过6个字
+
+        // 错误点 - 多个错误用顿号分隔，每个错误不超过6个字
         if (result.getErrors() != null && !result.getErrors().isEmpty()) {
             feedback.append("【错误点】");
             List<String> truncatedErrors = result.getErrors().stream()
                 .map(e -> e.length() > 6 ? e.substring(0, 6) : e)
+                .distinct()
                 .collect(Collectors.toList());
-            String errorsStr = String.join("|||", truncatedErrors);
+            String errorsStr = String.join("、", truncatedErrors);
             feedback.append(errorsStr);
         }
-        
+
         // 改进建议 - 合并为一段文本
         if (result.getSuggestions() != null && !result.getSuggestions().isEmpty()) {
             if (feedback.length() > 0) {
@@ -506,7 +510,7 @@ public class TeacherReviewServiceImpl implements TeacherReviewService {
             String suggestionsStr = String.join("；", result.getSuggestions());
             feedback.append(suggestionsStr);
         }
-        
+
         return feedback.toString().trim();
     }
 

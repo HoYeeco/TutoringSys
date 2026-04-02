@@ -170,12 +170,6 @@ const routes = [
     meta: { requiresAuth: true, role: 'TEACHER' },
   },
   {
-    path: '/teacher/grading/batch',
-    name: 'TeacherGradingBatch',
-    component: () => import('@/views/teacher/grading/batch.vue'),
-    meta: { requiresAuth: true, role: 'TEACHER' },
-  },
-  {
     path: '/teacher/analysis',
     name: 'TeacherAnalysis',
     component: () => import('@/views/teacher/analysis/index.vue'),
