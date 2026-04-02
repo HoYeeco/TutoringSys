@@ -575,37 +575,87 @@ public class TeacherAssignmentServiceImpl implements TeacherAssignmentService {
             throw new BusinessException("提交记录不存在");
         }
 
-        // 验证作业是否属于该教师
         Assignment assignment = assignmentMapper.selectById(submission.getAssignmentId());
         if (assignment == null || !assignment.getTeacherId().equals(teacherId)) {
             throw new BusinessException("无权访问该提交记录");
         }
 
-        // 更新每个题目的分数和评语
+        List<StudentAnswer> allAnswers = studentAnswerMapper.selectList(
+            new LambdaQueryWrapper<StudentAnswer>()
+                .eq(StudentAnswer::getSubmissionId, submissionId)
+                .eq(StudentAnswer::getIsDraft, 0));
+
+        Map<Long, StudentAnswer> answerMap = allAnswers.stream()
+            .collect(Collectors.toMap(StudentAnswer::getQuestionId, Function.identity(), (a, b) -> a));
+
+        LocalDateTime now = LocalDateTime.now();
+        int computedTotalScore = 0;
+        boolean allReviewed = true;
+
         if (request.getQuestions() != null) {
             for (ReviewSubmissionRequest.QuestionReview questionReview : request.getQuestions()) {
-                StudentAnswer answer = studentAnswerMapper.selectOne(
-                        new LambdaQueryWrapper<StudentAnswer>()
-                                .eq(StudentAnswer::getSubmissionId, submissionId)
-                                .eq(StudentAnswer::getQuestionId, questionReview.getQuestionId()));
+                StudentAnswer answer = answerMap.get(questionReview.getQuestionId());
+                if (answer == null) {
+                    log.warn("批改时未找到题目答案: questionId={}", questionReview.getQuestionId());
+                    continue;
+                }
 
-                if (answer != null) {
-                    answer.setScore(questionReview.getScore());
-                    answer.setTeacherFeedback(questionReview.getFeedback());
-                    answer.setFinalScore(questionReview.getScore());
-                    answer.setReviewStatus(1); // 已批改
-                    answer.setReviewTime(java.time.LocalDateTime.now());
-                    studentAnswerMapper.updateById(answer);
+                Integer newScore = questionReview.getScore();
+                String feedback = questionReview.getFeedback();
+
+                Question question = questionMapper.selectById(answer.getQuestionId());
+                int maxScore = question != null ? question.getScore() : 100;
+                if (newScore != null && newScore > maxScore) {
+                    throw new BusinessException("第" + (question != null ? question.getSortOrder() : "") + "题分数超过满分: " + maxScore);
+                }
+
+                String originalGraderType = answer.getGraderType();
+                Integer originalAiScore = answer.getAiScore();
+
+                if ("AI".equals(originalGraderType) && originalAiScore != null && originalAiScore.equals(newScore)) {
+                    answer.setFinalScore(newScore);
+                    answer.setTeacherFeedback(feedback);
+                    answer.setGraderType("AI");
+                    answer.setReviewStatus(2);
+                } else if ("AUTO".equals(originalGraderType)) {
+                    answer.setScore(newScore);
+                    answer.setFinalScore(newScore);
+                    answer.setTeacherFeedback(feedback);
+                    answer.setGraderType("TEACHER");
+                    answer.setReviewStatus(2);
+                } else {
+                    answer.setScore(newScore);
+                    answer.setFinalScore(newScore);
+                    answer.setTeacherFeedback(feedback);
+                    answer.setGraderType("TEACHER");
+                    answer.setReviewStatus(2);
+                }
+
+                answer.setReviewerId(teacherId);
+                answer.setReviewTime(now);
+                studentAnswerMapper.updateById(answer);
+
+                if (newScore != null) {
+                    computedTotalScore += newScore;
                 }
             }
         }
 
-        // 更新提交记录的总分和批改状态
-        submission.setFinalTotalScore(request.getScore());
-        submission.setReviewStatus(1); // 已批改
+        for (StudentAnswer ans : allAnswers) {
+            if (ans.getReviewStatus() == null || ans.getReviewStatus() == 1) {
+                allReviewed = false;
+                break;
+            }
+        }
+
+        submission.setFinalTotalScore(computedTotalScore);
+        submission.setReviewStatus(allReviewed ? 2 : 1);
         submission.setReviewerId(teacherId);
-        submission.setReviewTime(java.time.LocalDateTime.now());
+        submission.setReviewTime(now);
         submissionMapper.updateById(submission);
+
+        log.info("教师批改完成: submissionId={}, finalTotalScore={}, reviewStatus={}, allReviewed={}", 
+            submissionId, computedTotalScore, submission.getReviewStatus(), allReviewed);
     }
 
     @Override

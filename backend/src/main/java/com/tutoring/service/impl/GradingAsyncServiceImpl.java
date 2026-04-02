@@ -33,6 +33,9 @@ public class GradingAsyncServiceImpl implements GradingAsyncService {
     private static final String SUBJECTIVE_TYPE = "SUBJECTIVE";
     private static final String ESSAY_TYPE = "ESSAY";
 
+    private static final List<String> OBJECTIVE_TYPES = List.of("SINGLE", "MULTIPLE", "JUDGMENT", "JUDGE");
+    private static final List<String> SUBJECTIVE_TYPES = List.of(SUBJECTIVE_TYPE, ESSAY_TYPE, "ESSAY");
+
     @Override
     @Async("taskExecutor")
     @Transactional
@@ -82,41 +85,75 @@ public class GradingAsyncServiceImpl implements GradingAsyncService {
 
             boolean hasSubjectiveQuestion = false;
             int totalAiScore = 0;
+            int processedCount = 0;
+            int subjectiveCount = 0;
+            int objectiveCount = 0;
 
             for (StudentAnswer answer : answers) {
                 Question question = questionMap.get(answer.getQuestionId());
                 if (question == null) {
-                    log.warn("题目不存在: questionId={}", answer.getQuestionId());
+                    log.warn("题目不存在: questionId={}, answerId={}, 跳过该答案", 
+                        answer.getQuestionId(), answer.getId());
                     continue;
                 }
 
-                String questionType = question.getType() != null ? question.getType().toUpperCase() : "";
-                if (SUBJECTIVE_TYPE.equals(questionType) || ESSAY_TYPE.equals(questionType)) {
+                String rawType = question.getType();
+                String questionType = rawType != null ? rawType.toUpperCase() : "";
+                
+                log.debug("处理题目: answerId={}, questionId={}, type='{}', normalized='{}'", 
+                    answer.getId(), question.getId(), rawType, questionType);
+
+                if (isSubjectiveType(questionType)) {
                     hasSubjectiveQuestion = true;
-                    int aiScore = gradeSubjectiveQuestion(answer, question);
-                    totalAiScore += aiScore;
+                    subjectiveCount++;
+                    log.info("发现主观题: questionId={}, type={}, 开始AI评分", question.getId(), rawType);
+                    try {
+                        int aiScore = gradeSubjectiveQuestion(answer, question);
+                        totalAiScore += aiScore;
+                        processedCount++;
+                    } catch (Exception ex) {
+                        log.error("主观题评分异常: questionId={}, 使用默认0分", question.getId(), ex);
+                        safeSetDefaultScore(answer, 0);
+                    }
                 } else {
-                    int score = gradeObjectiveQuestion(answer, question);
-                    totalAiScore += score;
+                    objectiveCount++;
+                    if (!OBJECTIVE_TYPES.contains(questionType) && !questionType.isEmpty()) {
+                        log.warn("未知题型 '{}' 被当作客观题处理: questionId={}", rawType, question.getId());
+                    }
+                    try {
+                        int score = gradeObjectiveQuestion(answer, question);
+                        totalAiScore += score;
+                        processedCount++;
+                    } catch (Exception ex) {
+                        log.error("客观题评分异常: questionId={}, 使用默认0分", question.getId(), ex);
+                        safeSetDefaultScore(answer, score);
+                    }
                 }
             }
+
+            log.info("批改统计: submissionId={}, 总题数={}, 主观题={}, 客观题={}, 已处理={}, 总分={}", 
+                submissionId, answers.size(), subjectiveCount, objectiveCount, processedCount, totalAiScore);
 
             submission.setAiTotalScore(totalAiScore);
             
             if (hasSubjectiveQuestion) {
                 submission.setReviewStatus(1);
+                log.info("作业包含主观题，AI已预评分，待教师复核: submissionId={}, aiTotalScore={}", 
+                    submissionId, totalAiScore);
             } else {
                 submission.setReviewStatus(0);
                 submission.setFinalTotalScore(totalAiScore);
+                log.info("全客观题作业，自动批改完成: submissionId={}, finalTotalScore={}", 
+                    submissionId, totalAiScore);
             }
             
             submission.setStatus(3);
             submissionMapper.updateById(submission);
 
-            log.info("批改完成: submissionId={}, aiTotalScore={}, reviewStatus={}", 
-                submissionId, totalAiScore, submission.getReviewStatus());
+            log.info("批改完成: submissionId={}, aiTotalScore={}, reviewStatus={}, hasSubjective={}", 
+                submissionId, totalAiScore, submission.getReviewStatus(), hasSubjectiveQuestion);
 
-            sendNotification(studentId, assignmentId, totalAiScore);
+            sendNotification(studentId, assignmentId, totalAiScore, hasSubjectiveQuestion);
 
         } catch (Exception e) {
             log.error("批改任务执行失败: submissionId={}", submissionId, e);
@@ -130,6 +167,26 @@ public class GradingAsyncServiceImpl implements GradingAsyncService {
             } catch (Exception ex) {
                 log.error("更新失败状态异常", ex);
             }
+        }
+    }
+
+    private boolean isSubjectiveType(String questionType) {
+        return SUBJECTIVE_TYPES.contains(questionType);
+    }
+
+    private void safeSetDefaultScore(StudentAnswer answer, int defaultScore) {
+        try {
+            answer.setScore(defaultScore);
+            answer.setAiScore(defaultScore);
+            answer.setFinalScore(defaultScore);
+            if (answer.getGraderType() == null || "PENDING".equals(answer.getGraderType())) {
+                answer.setGraderType("AUTO");
+                answer.setReviewStatus(0);
+            }
+            studentAnswerMapper.updateById(answer);
+            log.info("安全设置默认分: answerId={}, score={}", answer.getId(), defaultScore);
+        } catch (Exception e) {
+            log.error("安全设置默认分也失败: answerId={}", answer.getId(), e);
         }
     }
 
@@ -228,22 +285,28 @@ public class GradingAsyncServiceImpl implements GradingAsyncService {
         return feedback.toString();
     }
 
-    private void sendNotification(Long studentId, Long assignmentId, Integer score) {
+    private void sendNotification(Long studentId, Long assignmentId, Integer score, boolean hasSubjective) {
         try {
             Assignment assignment = assignmentMapper.selectById(assignmentId);
             String assignmentTitle = assignment != null ? assignment.getTitle() : "作业";
 
             Message message = new Message();
-            message.setTitle("作业批改完成");
-            message.setContent(String.format("您的作业「%s」已完成AI批改，得分：%d分。%s", 
-                assignmentTitle, score, 
-                score >= 60 ? "表现不错，继续保持！" : "请查看详细反馈，继续努力！"));
+            if (hasSubjective) {
+                message.setTitle("作业AI预批改完成");
+                message.setContent(String.format("您的作业「%s」已完成AI预批改（%s），AI预评分：%d分。主观题部分待教师复核后确定最终得分。", 
+                    assignmentTitle, score >= 60 ? "表现不错" : "请查看详细反馈", score));
+            } else {
+                message.setTitle("作业批改完成");
+                message.setContent(String.format("您的作业「%s」已自动批改完成，得分：%d分。%s", 
+                    assignmentTitle, score, 
+                    score >= 60 ? "表现不错，继续保持！" : "请查看详细反馈，继续努力！"));
+            }
             message.setType("GRADING");
             message.setRelatedId(studentId);
             message.setRelatedType("STUDENT");
 
             messageMapper.insert(message);
-            log.info("发送批改完成通知: studentId={}, assignmentId={}", studentId, assignmentId);
+            log.info("发送批改完成通知: studentId={}, assignmentId={}, hasSubjective={}", studentId, assignmentId, hasSubjective);
 
         } catch (Exception e) {
             log.error("发送通知失败", e);

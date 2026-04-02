@@ -180,14 +180,15 @@
         <el-table-column prop="status" label="批改状态" width="150" align="center">
           <template #default="scope">
             <el-tag 
-              :type="scope.row.status === 'graded' ? 'success' : 'warning'" 
+              :type="getStatusTagType(scope.row.status)" 
               size="small"
               effect="light"
               class="status-tag"
             >
               <el-icon v-if="scope.row.status === 'graded'"><CircleCheck /></el-icon>
+              <el-icon v-else-if="scope.row.status === 'ai_pending'"><Clock /></el-icon>
               <el-icon v-else><Warning /></el-icon>
-              {{ scope.row.status === 'graded' ? '已批改' : '待批改' }}
+              {{ getStatusText(scope.row.status) }}
             </el-tag>
           </template>
         </el-table-column>
@@ -276,6 +277,15 @@
               <el-tag size="small" :type="getQuestionTypeTag(question.type)" effect="light">
                 {{ getQuestionTypeText(question.type) }}
               </el-tag>
+              <el-tag 
+                v-if="question.graderType" 
+                size="small" 
+                :type="getGraderTagType(question.graderType)" 
+                effect="plain"
+                class="grader-tag"
+              >
+                {{ getGraderText(question.graderType) }}
+              </el-tag>
             </div>
             <div class="question-score-input">
               <span class="score-label-text">得分：</span>
@@ -289,6 +299,11 @@
                 class="score-input"
               />
               <span class="max-score"> / {{ question.maxScore }} 分</span>
+              <span v-if="question.aiScore !== null && question.aiScore !== undefined" class="ai-score-hint">
+                <el-tooltip :content="'AI预评分: ' + question.aiScore + '分'" placement="top">
+                  <span class="ai-score-badge">AI: {{ question.aiScore }}</span>
+                </el-tooltip>
+              </span>
             </div>
           </div>
           
@@ -307,13 +322,13 @@
             </div>
             <div class="answer-text" v-html="question.studentAnswer || '<span class=\'no-answer\'>未作答</span>'"></div>
           </div>
-          
-          <div class="answer-box correct-answer">
+
+          <div v-if="question.aiFeedback" class="answer-box ai-feedback-box">
             <div class="answer-label">
-              <el-icon><Check /></el-icon>
-              参考答案
+              <el-icon><ChatDotRound /></el-icon>
+              AI评语
             </div>
-            <div class="answer-text" v-html="question.correctAnswer"></div>
+            <div class="answer-text ai-feedback-text">{{ question.aiFeedback }}</div>
           </div>
           
           <div class="feedback-box">
@@ -434,6 +449,31 @@ const getScoreClass = (score: number | null) => {
   return 'score-fail';
 };
 
+const mapReviewStatus = (reviewStatus: number | null): string => {
+  if (reviewStatus === 0) return 'graded';
+  if (reviewStatus === 1) return 'ai_pending';
+  if (reviewStatus === 2) return 'graded';
+  return 'pending';
+};
+
+const getStatusText = (status: string): string => {
+  const statusMap: Record<string, string> = {
+    graded: '已批改',
+    ai_pending: '待复核',
+    pending: '待批改'
+  };
+  return statusMap[status] || status;
+};
+
+const getStatusTagType = (status: string): string => {
+  const typeMap: Record<string, string> = {
+    graded: 'success',
+    ai_pending: 'warning',
+    pending: 'danger'
+  };
+  return typeMap[status] || 'info';
+};
+
 const getSubmissions = async () => {
   loading.value = true;
   try {
@@ -464,7 +504,9 @@ const getSubmissions = async () => {
         avatar: record.studentAvatar,
         submitTime: record.submitTime,
         score: record.finalTotalScore,
-        status: record.reviewStatus === 1 ? 'graded' : 'pending'
+        aiScore: record.aiTotalScore,
+        status: mapReviewStatus(record.reviewStatus),
+        reviewStatus: record.reviewStatus
       }));
     }
   } catch (error) {
@@ -488,6 +530,8 @@ const getSubmissionDetail = async (submissionId: number) => {
         avatar: data.studentAvatar,
         submitTime: data.submitTime,
         totalScore: data.finalTotalScore,
+        aiTotalScore: data.aiTotalScore,
+        reviewStatus: data.reviewStatus,
         questions: (data.answers || []).map((answer: any, index: number) => ({
           questionId: answer.questionId,
           type: answer.questionType,
@@ -495,8 +539,13 @@ const getSubmissionDetail = async (submissionId: number) => {
           maxScore: answer.questionScore,
           studentAnswer: answer.answerContent || answer.answer,
           correctAnswer: '',
-          score: answer.finalScore,
-          feedback: answer.teacherFeedback || ''
+          referenceAnswer: '',
+          score: answer.finalScore ?? answer.score ?? null,
+          aiScore: answer.aiScore ?? null,
+          aiFeedback: answer.aiFeedback || '',
+          feedback: answer.teacherFeedback || '',
+          graderType: answer.graderType || 'PENDING',
+          reviewStatus: answer.reviewStatus
         }))
       };
     }
@@ -615,6 +664,26 @@ const getQuestionTypeTag = (type: string) => {
     essay: 'danger'
   };
   return typeMap[type] || '';
+};
+
+const getGraderTagType = (graderType: string): string => {
+  const typeMap: Record<string, string> = {
+    AUTO: 'success',
+    AI: 'warning',
+    TEACHER: '',
+    PENDING: 'info'
+  };
+  return typeMap[graderType] || 'info';
+};
+
+const getGraderText = (graderType: string): string => {
+  const textMap: Record<string, string> = {
+    AUTO: '自动批改',
+    AI: 'AI预评分',
+    TEACHER: '人工批改',
+    PENDING: '待批改'
+  };
+  return textMap[graderType] || graderType;
 };
 
 const handleSizeChange = (size: number) => {
@@ -1072,6 +1141,41 @@ onMounted(() => {
 .action-btn {
   border-radius: 8px;
   font-weight: 500;
+}
+
+/* 评分来源标签 */
+.grader-tag {
+  margin-left: 4px;
+  font-size: 11px;
+}
+
+/* AI预评分提示 */
+.ai-score-hint {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 8px;
+}
+
+.ai-score-badge {
+  font-size: 12px;
+  color: #e6a23c;
+  font-weight: 600;
+  background: #fdf6ec;
+  padding: 2px 8px;
+  border-radius: 10px;
+  border: 1px solid #f5dab1;
+}
+
+/* AI评语区域 */
+.ai-feedback-box .answer-text {
+  background: #fff8e6;
+  border: 1px solid #ffe58f;
+  color: #ad6800;
+}
+
+.ai-feedback-text {
+  white-space: pre-wrap;
+  line-height: 1.7;
 }
 
 /* 分页 */

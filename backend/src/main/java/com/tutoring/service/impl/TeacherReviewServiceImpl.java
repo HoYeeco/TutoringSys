@@ -38,6 +38,8 @@ public class TeacherReviewServiceImpl implements TeacherReviewService {
     @Override
     public Page<ReviewListVO> getReviewList(Long teacherId, Integer page, Integer size,
             Long courseId, Long assignmentId, String keyword) {
+        log.info("教师获取待复核列表: teacherId={}, page={}, size={}, courseId={}, assignmentId={}", 
+            teacherId, page, size, courseId, assignmentId);
 
         List<Course> courses = courseMapper.selectList(
             new LambdaQueryWrapper<Course>()
@@ -82,16 +84,41 @@ public class TeacherReviewServiceImpl implements TeacherReviewService {
             ? Collections.singletonList(assignmentId) 
             : assignmentIds;
 
+        List<Submission> pendingSubmissions = submissionMapper.selectList(
+            new LambdaQueryWrapper<Submission>()
+                .in(Submission::getAssignmentId, filteredAssignmentIds)
+                .and(wrapper -> wrapper
+                    .eq(Submission::getReviewStatus, 1)
+                    .or()
+                    .in(Submission::getStatus, Arrays.asList(0, 1, 2))
+                )
+                .orderByDesc(Submission::getSubmitTime)
+        );
+
+        log.info("查询到待处理提交记录数: {}", pendingSubmissions.size());
+        for (Submission sub : pendingSubmissions) {
+            log.debug("待处理提交: id={}, assignmentId={}, studentId={}, status={}, reviewStatus={}", 
+                sub.getId(), sub.getAssignmentId(), sub.getStudentId(), sub.getStatus(), sub.getReviewStatus());
+        }
+
+        if (pendingSubmissions.isEmpty()) {
+            return new Page<>(page, size, 0);
+        }
+
+        List<Long> submissionIds = pendingSubmissions.stream()
+            .map(Submission::getId)
+            .collect(Collectors.toList());
+
         LambdaQueryWrapper<StudentAnswer> queryWrapper = new LambdaQueryWrapper<StudentAnswer>()
-            .in(StudentAnswer::getAssignmentId, filteredAssignmentIds)
-            .eq(StudentAnswer::getGraderType, "AI")
-            .eq(StudentAnswer::getReviewStatus, 1)
+            .in(StudentAnswer::getSubmissionId, submissionIds)
             .eq(StudentAnswer::getIsDraft, 0)
             .orderByDesc(StudentAnswer::getUpdateTime);
 
-        Page<StudentAnswer> answerPage = studentAnswerMapper.selectPage(new Page<>(page, size), queryWrapper);
+        List<StudentAnswer> allAnswers = studentAnswerMapper.selectList(queryWrapper);
+        
+        log.info("查询到学生答案记录数: {}", allAnswers.size());
 
-        if (answerPage.getRecords().isEmpty()) {
+        if (allAnswers.isEmpty()) {
             return new Page<>(page, size, 0);
         }
 
@@ -101,7 +128,10 @@ public class TeacherReviewServiceImpl implements TeacherReviewService {
         Map<Long, Course> courseMap = courses.stream()
             .collect(Collectors.toMap(Course::getId, Function.identity()));
 
-        List<Long> studentIds = answerPage.getRecords().stream()
+        Map<Long, Submission> submissionMap = pendingSubmissions.stream()
+            .collect(Collectors.toMap(Submission::getId, Function.identity()));
+
+        List<Long> studentIds = allAnswers.stream()
             .map(StudentAnswer::getStudentId)
             .distinct()
             .collect(Collectors.toList());
@@ -110,26 +140,35 @@ public class TeacherReviewServiceImpl implements TeacherReviewService {
             .stream()
             .collect(Collectors.toMap(User::getId, Function.identity()));
 
-        List<Long> questionIds = answerPage.getRecords().stream()
+        List<Long> questionIds = allAnswers.stream()
             .map(StudentAnswer::getQuestionId)
             .distinct()
             .collect(Collectors.toList());
 
-        Map<Long, Question> questionMap = questionMapper.selectBatchIds(questionIds)
-            .stream()
-            .collect(Collectors.toMap(Question::getId, Function.identity()));
+        Map<Long, Question> questionMap = questionIds.isEmpty() ? Map.of()
+            : questionMapper.selectBatchIds(questionIds).stream()
+                .collect(Collectors.toMap(Question::getId, Function.identity()));
 
-        List<ReviewListVO> voList = answerPage.getRecords().stream()
-            .map(answer -> {
-                Assignment assignment = assignmentMap.get(answer.getAssignmentId());
-                Course course = assignment != null ? courseMap.get(assignment.getCourseId()) : null;
-                User student = studentMap.get(answer.getStudentId());
-                Question question = questionMap.get(answer.getQuestionId());
+        Map<String, ReviewListVO> uniqueKeyMap = new LinkedHashMap<>();
+        
+        for (StudentAnswer answer : allAnswers) {
+            Submission submission = submissionMap.get(answer.getSubmissionId());
+            if (submission == null) continue;
+            
+            Assignment assignment = assignmentMap.get(answer.getAssignmentId());
+            Course course = assignment != null ? courseMap.get(assignment.getCourseId()) : null;
+            User student = studentMap.get(answer.getStudentId());
+            Question question = questionMap.get(answer.getQuestionId());
 
-                String questionType = question != null ? question.getType() : "未知";
-                String questionTypeCategory = categorizeQuestionType(questionType);
-
-                return ReviewListVO.builder()
+            String questionType = question != null ? question.getType() : "未知";
+            String questionTypeCategory = categorizeQuestionType(questionType);
+            
+            boolean isSubjectiveAnswer = isSubjectiveQuestionType(questionType);
+            
+            String uniqueKey = answer.getStudentId() + "_" + answer.getAssignmentId();
+            
+            if (!uniqueKeyMap.containsKey(uniqueKey) || isSubjectiveAnswer) {
+                ReviewListVO vo = ReviewListVO.builder()
                     .answerId(answer.getId())
                     .studentId(answer.getStudentId())
                     .studentName(student != null ? student.getRealName() : "未知")
@@ -142,25 +181,43 @@ public class TeacherReviewServiceImpl implements TeacherReviewService {
                     .questionTypeCategory(questionTypeCategory)
                     .questionContent(question != null ? question.getContent() : "")
                     .aiScore(answer.getAiScore())
-                    .finalScore(answer.getFinalScore())
+                    .finalScore(submission.getFinalTotalScore())
                     .reviewStatus(answer.getReviewStatus())
                     .graderType(answer.getGraderType())
-                    .submitTime(answer.getSubmitTime())
+                    .submitTime(submission.getSubmitTime())
                     .aiGradeTime(answer.getUpdateTime())
+                    .submissionStatus(submission.getStatus())
+                    .submissionReviewStatus(submission.getReviewStatus())
                     .build();
-            })
-            .filter(vo -> {
-                if (!StringUtils.hasText(keyword)) {
-                    return true;
-                }
-                return vo.getStudentName().contains(keyword) ||
-                       vo.getAssignmentTitle().contains(keyword) ||
-                       vo.getCourseName().contains(keyword);
-            })
-            .collect(Collectors.toList());
+                
+                uniqueKeyMap.put(uniqueKey, vo);
+            }
+        }
 
-        Page<ReviewListVO> resultPage = new Page<>(page, size, answerPage.getTotal());
-        resultPage.setRecords(voList);
+        List<ReviewListVO> voList = new ArrayList<>(uniqueKeyMap.values());
+        
+        if (StringUtils.hasText(keyword)) {
+            String kw = keyword.toLowerCase();
+            voList = voList.stream()
+                .filter(vo -> 
+                    (vo.getStudentName() != null && vo.getStudentName().toLowerCase().contains(kw)) ||
+                    (vo.getAssignmentTitle() != null && vo.getAssignmentTitle().toLowerCase().contains(kw)) ||
+                    (vo.getCourseName() != null && vo.getCourseName().toLowerCase().contains(kw)))
+                .collect(Collectors.toList());
+        }
+
+        int total = voList.size();
+        int fromIndex = (page - 1) * size;
+        int toIndex = Math.min(fromIndex + size, total);
+        
+        List<ReviewListVO> pagedData = fromIndex < total 
+            ? voList.subList(fromIndex, toIndex) 
+            : new ArrayList<>();
+
+        Page<ReviewListVO> resultPage = new Page<>(page, size, total);
+        resultPage.setRecords(pagedData);
+        
+        log.info("返回复核列表: 总数={}, 当前页数据量={}", total, pagedData.size());
         return resultPage;
     }
 
@@ -322,12 +379,25 @@ public class TeacherReviewServiceImpl implements TeacherReviewService {
             case "SINGLE":
             case "MULTIPLE":
             case "JUDGE":
+            case "JUDGMENT":
                 return "客观题";
             case "SUBJECTIVE":
+            case "ESSAY":
+            case "ESSAY":
                 return "主观题";
             default:
                 return "综合题";
         }
+    }
+
+    private boolean isSubjectiveQuestionType(String type) {
+        if (type == null) {
+            return false;
+        }
+        String upperType = type.toUpperCase();
+        return upperType.equals("SUBJECTIVE") || 
+               upperType.equals("ESSAY") || 
+               upperType.equals("ESSAY");
     }
 
     @Override

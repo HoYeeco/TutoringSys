@@ -8,6 +8,7 @@ import com.tutoring.dto.ReviewListVO;
 import com.tutoring.entity.User;
 import com.tutoring.service.TeacherReviewService;
 import com.tutoring.service.UserService;
+import com.tutoring.service.impl.GradingCompensateService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -27,6 +28,7 @@ public class TeacherReviewController {
 
     private final TeacherReviewService teacherReviewService;
     private final UserService userService;
+    private final GradingCompensateService gradingCompensateService;
 
     @Operation(summary = "获取待复核列表")
     @GetMapping("/list")
@@ -99,6 +101,22 @@ public class TeacherReviewController {
         Long teacherId = getCurrentUserId();
         ReviewDetailVO result = teacherReviewService.regradeWithAi(teacherId, answerId);
         return Result.success(result);
+    }
+
+    @Operation(summary = "手动触发作业批改（用于处理卡住的提交）")
+    @PostMapping("/submissions/{submissionId}/trigger-grading")
+    public Result<Void> triggerGrading(@PathVariable Long submissionId) {
+        Long teacherId = getCurrentUserId();
+        
+        User user = userService.lambdaQuery()
+            .eq(User::getId, teacherId)
+            .one();
+        if (user == null || (!"TEACHER".equals(user.getRole()) && !"ADMIN".equals(user.getRole()))) {
+            return Result.error(403, "无权操作");
+        }
+
+        gradingCompensateService.triggerGradingImmediately(submissionId);
+        return Result.success(null);
     }
 
     private Long getCurrentUserId() {

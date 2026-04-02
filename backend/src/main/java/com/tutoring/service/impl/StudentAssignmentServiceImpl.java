@@ -483,6 +483,8 @@ public class StudentAssignmentServiceImpl implements StudentAssignmentService {
                 existingDraft.setStatus(1);
                 existingDraft.setSubmitTime(LocalDateTime.now());
                 existingDraft.setUpdateTime(LocalDateTime.now());
+                existingDraft.setGraderType("PENDING");
+                existingDraft.setReviewStatus(1);
                 studentAnswerMapper.updateById(existingDraft);
             } else {
                 StudentAnswer newAnswer = new StudentAnswer();
@@ -494,6 +496,8 @@ public class StudentAssignmentServiceImpl implements StudentAssignmentService {
                 newAnswer.setIsDraft(0);
                 newAnswer.setStatus(1);
                 newAnswer.setSubmitTime(LocalDateTime.now());
+                newAnswer.setGraderType("PENDING");
+                newAnswer.setReviewStatus(1);
                 studentAnswerMapper.insert(newAnswer);
             }
         }

@@ -30,4 +30,6 @@ public class ReviewListVO {
     private String graderType;
     private LocalDateTime submitTime;
     private LocalDateTime aiGradeTime;
+    private Integer submissionStatus;
+    private Integer submissionReviewStatus;
 }

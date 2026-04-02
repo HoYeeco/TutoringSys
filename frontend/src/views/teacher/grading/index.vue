@@ -69,10 +69,13 @@
             {{ formatDateTime(scope.row.submitTime) }}
           </template>
         </el-table-column>
-        <el-table-column prop="reviewStatus" label="复核状态" width="100">
+        <el-table-column prop="reviewStatus" label="复核状态" width="120">
           <template #default="scope">
-            <el-tag :type="scope.row.reviewStatus === 2 ? 'success' : 'warning'" size="small">
-              {{ scope.row.reviewStatus === 2 ? '已复核' : '待复核' }}
+            <el-tag 
+              :type="getReviewStatusType(scope.row)" 
+              size="small"
+            >
+              {{ getReviewStatusText(scope.row) }}
             </el-tag>
           </template>
         </el-table-column>
@@ -244,6 +247,29 @@ const categorizeQuestionType = (type: string): string => {
   return '综合题';
 };
 
+const getReviewStatusType = (row: any): string => {
+  const submissionStatus = row.submissionStatus;
+  const answerReviewStatus = row.reviewStatus;
+  
+  if (answerReviewStatus === 2) return 'success';
+  if (submissionStatus === 0 || submissionStatus === 1) return 'danger';
+  if (submissionStatus === 2) return 'warning';
+  if (row.submissionReviewStatus === 0) return 'info';
+  return 'warning';
+};
+
+const getReviewStatusText = (row: any): string => {
+  const submissionStatus = row.submissionStatus;
+  const answerReviewStatus = row.reviewStatus;
+  
+  if (answerReviewStatus === 2) return '已复核';
+  if (submissionStatus === 0 || submissionStatus === 1) return '待批改';
+  if (submissionStatus === 2) return '批改中';
+  if (row.submissionReviewStatus === 0) return '已自动批改';
+  if (row.graderType === 'AI') return '待复核(AI)';
+  return '待复核';
+};
+
 const handleSelectionChange = (rows: any[]) => {
   selectedRows.value = rows;
 };
@@ -331,7 +357,7 @@ const handleCurrentChange = (current: number) => {
 };
 
 const viewReviewDetail = (answerId: number) => {
-  router.push(`/teacher/review/${answerId}`);
+  router.push(`/teacher/grading/${answerId}`);
 };
 
 onMounted(() => {
