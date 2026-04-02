@@ -1,12 +1,9 @@
 package com.tutoring.service.impl;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tutoring.dto.GradingResult;
-import com.tutoring.dto.QwenRequest;
 import com.tutoring.dto.QwenResponse;
-import com.tutoring.entity.LlmCallLog;
-import com.tutoring.mapper.LlmCallLogMapper;
 import com.tutoring.service.QwenService;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
@@ -16,25 +13,20 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
-import java.time.LocalDateTime;
-import java.util.UUID;
+import java.util.List;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class QwenServiceImpl implements QwenService {
 
     private final RestTemplate restTemplate;
-    private final LlmCallLogMapper llmCallLogMapper;
+    private final ObjectMapper objectMapper;
 
     @Value("${llm.api-key}")
     private String apiKey;
 
-    @Value("${llm.model}")
+    @Value("${llm.model:qwen-max}")
     private String model;
-
-    @Value("${llm.timeout:30000}")
-    private int timeout;
 
     @Value("${llm.retry:3}")
     private int maxRetries;
@@ -45,26 +37,36 @@ public class QwenServiceImpl implements QwenService {
         你是一个专业的作业批改助手。请根据题目、参考答案和学生答案进行评分。
 
         重要规则：
-        1. 如果学生答案为空、空白、或只有无意义字符（如"无"、"不知道"、"略"等），必须给0分，errors写"未提交答案"
-        2. 如果学生答案与题目完全不相关，errors写"不相关答案"
-        3. 如果学生答案是无效内容（如乱码、无意义字符组合），errors写"无效答案"
+        1. 如果学生答案为空、空白、或只有无意义字符（如"无"、"不知道"、"略"等），必须给 0 分，errors 写"未提交答案"
+        2. 如果学生答案与题目完全不相关，errors 写"不相关答案"
+        3. 如果学生答案是无效内容（如乱码、无意义字符组合），errors 写"无效答案"
         4. 错误点应该简洁描述问题类型，如："未提交答案"、"不相关答案"、"无效答案"、"内容不完整"、"理解偏差"等
         5. 不要出现"|||"或其他格式标记符号
+        6. 必须始终返回 errors 和 suggestions 数组，即使学生答案得满分：
+           - 如果答案完美（得满分），errors 数组必须包含一个元素："无"
+           - suggestions 数组不能为空，可以提供进一步提升的建议或鼓励
+        7. errors 数组和 suggestions 数组都不能为空
 
-        请以JSON格式返回评分结果，格式如下：
+        请以 JSON 格式返回评分结果，格式如下：
         {
             "score": <得分，整数>,
-            "errors": [<错误点1>, <错误点2>],
-            "suggestions": [<改进建议1>, <改进建议2>],
+            "errors": [<错误点 1>, <错误点 2>],
+            "suggestions": ["<改进建议 1>", "<改进建议 2>"],
             "feedback": ""
         }
 
         评分要求：
         1. 严格按照参考答案评分
-        2. 错误点要简洁（不超过6个字），描述问题的本质
+        2. 错误点要简洁（不超过 6 个字），描述问题的本质
         3. 给出具体可操作的改进建议
         4. feedback 字段保持为空字符串
+        5. 满分答案示例：{"score": 10, "errors": ["无"], "suggestions": ["答案完美，继续保持！"], "feedback": ""}
         """;
+
+    public QwenServiceImpl() {
+        this.restTemplate = new RestTemplate();
+        this.objectMapper = new ObjectMapper();
+    }
 
     @Override
     public QwenResponse chat(String systemPrompt, String userMessage) {
@@ -83,11 +85,13 @@ public class QwenServiceImpl implements QwenService {
 
     @Override
     public GradingResult gradeAnswer(String questionContent, String referenceAnswer, String studentAnswer, Integer maxScore) {
+        System.out.println("=== DEBUG: gradeAnswer 被调用 ===");
         if (studentAnswer == null || studentAnswer.trim().isEmpty() || isNoAnswer(studentAnswer)) {
+            System.out.println("=== DEBUG: 学生未作答 ===");
             return GradingResult.builder()
                 .score(0)
-                .errors(java.util.List.of("未提交答案"))
-                .suggestions(java.util.List.of("建议学生认真作答，按照题目要求完成作答内容"))
+                .errors(List.of("未提交答案"))
+                .suggestions(List.of("建议学生认真作答，按照题目要求完成作答内容"))
                 .feedback("")
                 .build();
         }
@@ -101,128 +105,128 @@ public class QwenServiceImpl implements QwenService {
             
             满分：%d分
             
-            请对学生的答案进行评分，返回JSON格式的结果。
-            注意：如果学生答案明显不完整或答非所问，应酌情扣分。
+            请对学生的答案进行评分，返回 JSON 格式的结果。
+            注意：如果学生答案明显的不完整或答非所问，应酌情扣分。
             """, questionContent, referenceAnswer, studentAnswer, maxScore);
 
+        System.out.println("=== DEBUG: 准备调用 Qwen API ===");
+        log.info("调用 Qwen API: question={}, maxScore={}", questionContent.substring(0, Math.min(50, questionContent.length())), maxScore);
         QwenResponse response = chatWithRetry(GRADING_SYSTEM_PROMPT, userMessage, maxRetries);
+        
+        System.out.println("=== DEBUG: Qwen API 返回，code=" + (response != null ? response.getCode() : "null"));
+        log.info("Qwen API 响应：code={}, message={}, isSuccess={}", 
+            response != null ? response.getCode() : "null",
+            response != null ? response.getMessage() : "null",
+            response != null ? response.isSuccess() : "false");
         
         if (response != null && response.isSuccess()) {
             String content = extractContent(response);
+            System.out.println("=== DEBUG: AI 返回的 JSON: " + content);
+            log.info("AI 返回的 JSON 内容：{}", content);
             return GradingResult.parseFromJson(content);
         }
 
+        System.out.println("=== DEBUG: AI 评分失败 ===");
+        log.error("AI 评分失败，返回默认结果。response={}", response);
         return GradingResult.builder()
             .score(0)
-            .errors(java.util.List.of("AI评分失败: " + (response != null ? response.getMessage() : "未知错误")))
-            .suggestions(java.util.List.of())
+            .errors(List.of("AI 评分失败：" + (response != null ? response.getMessage() : "未知错误")))
+            .suggestions(List.of())
             .feedback("评分服务暂时不可用，请稍后重试")
             .build();
     }
 
-    @Override
-    public String extractContent(QwenResponse response) {
-        if (response == null) {
-            return null;
-        }
-        return response.getContent();
-    }
-
-    private boolean isNoAnswer(String answer) {
-        if (answer == null) return true;
-        String trimmed = answer.trim().toLowerCase();
-        if (trimmed.isEmpty()) return true;
-        
-        String[] noAnswerKeywords = {"无", "不知道", "略", "不会", "没做", "未答", "空", "none", "n/a", "null", "未作答"};
-        for (String keyword : noAnswerKeywords) {
-            if (trimmed.equals(keyword)) {
-                return true;
-            }
-        }
-        
-        return trimmed.length() < 3 && !trimmed.matches(".*[\\u4e00-\\u9fa5a-zA-Z0-9].*");
-    }
-
     private QwenResponse doChat(String systemPrompt, String userMessage) {
-        String requestId = "req_" + UUID.randomUUID().toString().replace("-", "").substring(0, 16);
-        LocalDateTime requestTime = LocalDateTime.now();
-
         try {
-            QwenRequest request = QwenRequest.createChatRequest(model, systemPrompt, userMessage);
-
+            String requestBody = buildRequestBody(systemPrompt, userMessage);
+            
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
             headers.set("Authorization", "Bearer " + apiKey);
-
-            HttpEntity<QwenRequest> entity = new HttpEntity<>(request, headers);
-
-            log.debug("Calling Qwen API with model: {}, requestId: {}", model, requestId);
-
-            ResponseEntity<String> rawResponse = restTemplate.exchange(
+            
+            HttpEntity<String> entity = new HttpEntity<>(requestBody, headers);
+            
+            ResponseEntity<String> response = restTemplate.exchange(
                 QWEN_API_URL,
                 HttpMethod.POST,
                 entity,
                 String.class
             );
-
-            log.debug("Qwen API raw response: {}", rawResponse.getBody());
-
-            com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
-            QwenResponse qwenResponse = mapper.readValue(rawResponse.getBody(), QwenResponse.class);
-            log.info("Qwen API parsed response - code: {}, output: {}", 
-                qwenResponse != null ? qwenResponse.getCode() : "null",
-                qwenResponse != null ? qwenResponse.getMessage() : "null");
-            log.info("Qwen API output: {}", qwenResponse != null ? qwenResponse.getOutput() : null);
-            LocalDateTime responseTime = LocalDateTime.now();
-
-            if (qwenResponse != null) {
-                qwenResponse.setRequestId(requestId);
-            }
-
-            saveCallLog(requestId, null, model, request, qwenResponse, null, requestTime, responseTime);
-
-            return qwenResponse;
-
-        } catch (Exception e) {
-            log.error("Failed to call Qwen API: {}", e.getMessage(), e);
             
-            LocalDateTime responseTime = LocalDateTime.now();
-            saveCallLog(requestId, null, model, null, null, e.getMessage(), requestTime, responseTime);
-
+            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
+                QwenResponse qwenResponse = objectMapper.readValue(response.getBody(), QwenResponse.class);
+                log.debug("Qwen API response: {}", qwenResponse);
+                return qwenResponse;
+            } else {
+                log.error("Qwen API request failed with status: {}", response.getStatusCode());
+                return QwenResponse.builder()
+                    .message("API 请求失败：" + response.getStatusCode())
+                    .code(String.valueOf(response.getStatusCode().value()))
+                    .build();
+            }
+        } catch (Exception e) {
+            log.error("调用 Qwen API 失败", e);
             return QwenResponse.builder()
-                .requestId(requestId)
+                .message("调用 AI 服务失败：" + e.getMessage())
                 .code("ERROR")
-                .message(e.getMessage())
                 .build();
         }
     }
 
-    private void saveCallLog(String requestId, Long userId, String modelName,
-            QwenRequest request, QwenResponse response, String errorMessage,
-            LocalDateTime requestTime, LocalDateTime responseTime) {
-        try {
-            LlmCallLog log = new LlmCallLog();
-            log.setRequestId(requestId);
-            log.setUserId(userId);
-            log.setModelName(modelName);
-            log.setRequestTime(requestTime);
-            log.setResponseTime(responseTime);
-            log.setErrorMessage(errorMessage);
-
-            if (response != null && response.isSuccess()) {
-                log.setStatus(1);
-                if (response.getUsage() != null) {
-                    log.setPromptTokens(response.getUsage().getPromptTokens());
-                    log.setCompletionTokens(response.getUsage().getCompletionTokens());
-                    log.setTotalTokens(response.getUsage().getTotalTokens());
+    private String buildRequestBody(String systemPrompt, String userMessage) {
+        return String.format("""
+            {
+                "model": "%s",
+                "input": {
+                    "messages": [
+                        {
+                            "role": "system",
+                            "content": "%s"
+                        },
+                        {
+                            "role": "user",
+                            "content": "%s"
+                        }
+                    ]
+                },
+                "parameters": {
+                    "result_format": "json"
                 }
-            } else {
-                log.setStatus(0);
             }
+            """, model, escapeJson(systemPrompt), escapeJson(userMessage));
+    }
 
-            llmCallLogMapper.insert(log);
+    private String escapeJson(String text) {
+        if (text == null) return "";
+        return text.replace("\\", "\\\\")
+                   .replace("\"", "\\\"")
+                   .replace("\n", "\\n")
+                   .replace("\r", "\\r")
+                   .replace("\t", "\\t");
+    }
+
+    @Override
+    public String extractContent(QwenResponse response) {
+        try {
+            if (response.getOutput() != null && response.getOutput().getChoices() != null && 
+                !response.getOutput().getChoices().isEmpty()) {
+                return response.getOutput().getChoices().get(0).getMessage().getContent();
+            }
         } catch (Exception e) {
-            log.error("Failed to save LLM call log: {}", e.getMessage());
+            log.error("提取 Qwen 响应内容失败", e);
         }
+        return "";
+    }
+
+    private boolean isNoAnswer(String answer) {
+        if (answer == null) return true;
+        
+        String trimmed = answer.trim().toLowerCase();
+        return trimmed.isEmpty() || 
+               trimmed.equals("无") || 
+               trimmed.equals("不知道") || 
+               trimmed.equals("略") ||
+               trimmed.equals("暂无") ||
+               trimmed.equals("不会");
     }
 }

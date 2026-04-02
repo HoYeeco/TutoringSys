@@ -67,7 +67,7 @@
               </div>
               <div class="box-content">
                 <div class="answer-text" :class="{ 'empty': !reviewDetail.studentAnswer }">
-                  {{ stripHtml(reviewDetail.studentAnswer) || '学生未作答' }}
+                  <pre class="formatted-answer">{{ htmlToFormattedText(reviewDetail.studentAnswer) || '学生未作答' }}</pre>
                 </div>
                 <div v-if="isObjectiveQuestion && reviewDetail.correctAnswer" class="correct-answer">
                   正确答案：{{ reviewDetail.correctAnswer }}
@@ -100,8 +100,8 @@
                   <el-tag v-if="regraded" type="success" size="small">已重新评分</el-tag>
                 </div>
 
-                <div v-if="parsedFeedback.errors.length > 0 || parsedFeedback.suggestions" class="ai-feedback">
-                  <!-- 错误点 - Tag形式 -->
+                <div v-if="reviewDetail.aiFeedback" class="ai-feedback">
+                  <!-- 错误点 - Tag 形式 -->
                   <div v-if="parsedFeedback.errors.length > 0" class="error-section">
                     <div class="section-label">
                       <el-icon><Warning /></el-icon>
@@ -111,7 +111,7 @@
                       <el-tag
                         v-for="(error, idx) in parsedFeedback.errors"
                         :key="idx"
-                        type="danger"
+                        :type="error === '无' ? 'success' : 'danger'"
                         size="small"
                         effect="light"
                         class="error-tag"
@@ -398,10 +398,10 @@ const getScoreClass = (score: number, maxScore: number): string => {
   return 'score-low';
 };
 
-// 去除HTML标签
+// 去除 HTML 标签（完全去除，用于纯文本显示）
 const stripHtml = (html: string | null | undefined): string => {
   if (!html) return '';
-  // 先替换常见的HTML实体
+  // 先替换常见的 HTML 实体
   let text = html
     .replace(/&nbsp;/g, ' ')
     .replace(/&lt;/g, '<')
@@ -409,11 +409,87 @@ const stripHtml = (html: string | null | undefined): string => {
     .replace(/&amp;/g, '&')
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'");
-  // 去除HTML标签
+  // 去除 HTML 标签
   text = text.replace(/<[^>]+>/g, '');
   // 去除多余空格
   text = text.replace(/\s+/g, ' ').trim();
   return text;
+};
+
+// 保留格式的 HTML 转文本（保留换行、段落等格式）
+const htmlToFormattedText = (html: string | null | undefined): string => {
+  if (!html) return '';
+  
+  let text = html;
+  
+  // 先处理无序列表 - 在<ul>内的<li>前添加标记
+  text = text.replace(/<ul[^>]*>/gi, '\n<UL_START>\n');
+  text = text.replace(/<\/ul>/gi, '\n<UL_END>\n');
+  text = text.replace(/<li[^>]*>/gi, '<LI_START>');
+  text = text.replace(/<\/li>/gi, '<LI_END>\n');
+  
+  // 处理段落标签，转换为双换行
+  text = text.replace(/<p[^>]*>/gi, '\n');
+  text = text.replace(/<\/p>/gi, '\n\n');
+  text = text.replace(/<br\s*\/?>/gi, '\n');
+  text = text.replace(/<div[^>]*>/gi, '\n');
+  text = text.replace(/<\/div>/gi, '\n');
+  
+  // 替换 HTML 实体
+  text = text
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'");
+  
+  // 去除所有 HTML 标签（除了我们的标记）
+  text = text.replace(/<(?!UL_START|UL_END|LI_START|LI_END)[^>]+>/g, '');
+  
+  // 处理列表标记
+  let inUnorderedList = false;
+  const lines = text.split('\n');
+  const processedLines: string[] = [];
+  
+  for (let line of lines) {
+    const trimmedLine = line.trim();
+    
+    if (trimmedLine.includes('<UL_START>')) {
+      inUnorderedList = true;
+      const cleanLine = trimmedLine.replace(/<UL_START>/g, '').trim();
+      if (cleanLine) processedLines.push(cleanLine);
+    } else if (trimmedLine.includes('<UL_END>')) {
+      inUnorderedList = false;
+      const cleanLine = trimmedLine.replace(/<UL_END>/g, '').trim();
+      if (cleanLine) processedLines.push(cleanLine);
+    } else if (trimmedLine.includes('<LI_START>')) {
+      // 处理<li>内容
+      let liContent = trimmedLine
+        .replace(/<LI_START>/g, '')
+        .replace(/<LI_END>/g, '')
+        .trim();
+      
+      if (liContent) {
+        if (inUnorderedList) {
+          processedLines.push('• ' + liContent);
+        } else {
+          processedLines.push(liContent);
+        }
+      }
+    } else if (trimmedLine) {
+      // 普通行，清理可能残留的 LI_END 标记
+      const cleanLine = trimmedLine.replace(/<LI_END>/g, '').trim();
+      if (cleanLine) processedLines.push(cleanLine);
+    }
+  }
+  
+  text = processedLines.join('\n');
+  
+  // 清理多余空行（最多保留 2 个连续换行）
+  text = text.replace(/\n{3,}/g, '\n\n');
+  
+  return text.trim();
 };
 
 const formatDateTime = (date: string | number[] | null): string => {
@@ -648,8 +724,14 @@ onMounted(() => {
 
 .back-btn {
   color: rgba(255, 255, 255, 0.9);
+  background-color: transparent !important;
+  
   &:hover {
-    background-color: #022aa1;
+    background-color: #022aa1 !important;
+  }
+  
+  &:active {
+    background-color: #022aa1 !important;
   }
 }
 
@@ -817,6 +899,25 @@ onMounted(() => {
   background: #fafafa;
   border-radius: 6px;
   min-height: 60px;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+}
+
+.formatted-answer {
+  font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
+  color: inherit;
+  background: transparent;
+  border: none;
+  padding: 0;
+  margin: 0;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  width: 100%;
+  max-width: 600px;
+  text-align: left;
 }
 
 .answer-text.empty {

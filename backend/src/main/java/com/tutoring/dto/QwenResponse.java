@@ -45,9 +45,13 @@ public class QwenResponse {
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public static class Choice {
         private Message message;
         private Integer index;
+        
+        @JsonProperty("finish_reason")
+        private String finishReason;
     }
 
     @Data
@@ -94,9 +98,23 @@ public class QwenResponse {
         if (code != null && !"Success".equals(code) && !"200".equals(code)) {
             return false;
         }
-        if (output != null && "stop".equals(output.getFinishReason())) {
-            return true;
+        if (output != null) {
+            // 检查 choices 数组中的 finishReason
+            if (output.getChoices() != null && !output.getChoices().isEmpty()) {
+                String finishReason = output.getChoices().get(0).getFinishReason();
+                if ("stop".equals(finishReason)) {
+                    return true;
+                }
+            }
+            // 兼容旧版本：检查 output 的 finishReason
+            if ("stop".equals(output.getFinishReason())) {
+                return true;
+            }
+            // 如果有文本内容，也认为成功
+            if (output.getText() != null) {
+                return true;
+            }
         }
-        return output != null && output.getText() != null;
+        return false;
     }
 }
