@@ -64,7 +64,7 @@
               </div>
               <div class="box-content">
                 <div class="answer-text" :class="{ 'empty': !reviewDetail.studentAnswer }">
-                  {{ reviewDetail.studentAnswer || '学生未作答' }}
+                  {{ stripHtml(reviewDetail.studentAnswer) || '学生未作答' }}
                 </div>
                 <div v-if="isObjectiveQuestion && reviewDetail.correctAnswer" class="correct-answer">
                   正确答案：{{ reviewDetail.correctAnswer }}
@@ -76,7 +76,7 @@
           <div v-if="!isObjectiveQuestion" class="right-section">
             <div class="ai-box">
               <div class="box-header">
-                <span class="box-title">AI批改</span>
+                <span class="box-title">AI 批改结果</span>
                 <el-button 
                   type="primary" 
                   size="small" 
@@ -84,7 +84,7 @@
                   @click="handleRegrade"
                   plain
                 >
-                  智辅批改
+                  重新生成
                 </el-button>
               </div>
               <div class="box-content">
@@ -98,29 +98,39 @@
                 </div>
 
                 <div v-if="parsedFeedback.errors.length > 0 || parsedFeedback.suggestions" class="ai-feedback">
-                  <div v-if="parsedFeedback.errors.length > 0" class="error-tags">
-                    <span class="feedback-label">核心错误点</span>
+                  <!-- 错误点 - Tag形式 -->
+                  <div v-if="parsedFeedback.errors.length > 0" class="error-section">
+                    <div class="section-label">
+                      <el-icon><Warning /></el-icon>
+                      <span>错误点</span>
+                    </div>
                     <div class="tag-list">
-                      <el-tag 
-                        v-for="(error, idx) in parsedFeedback.errors" 
-                        :key="idx" 
-                        type="danger" 
+                      <el-tag
+                        v-for="(error, idx) in parsedFeedback.errors"
+                        :key="idx"
+                        type="danger"
                         size="small"
-                        effect="plain"
+                        effect="light"
+                        class="error-tag"
                       >
                         {{ error }}
                       </el-tag>
                     </div>
                   </div>
-                  <div v-if="parsedFeedback.suggestions" class="suggestion-text">
-                    <span class="feedback-label">修正建议</span>
+
+                  <!-- 改进建议 - 文本形式 -->
+                  <div v-if="parsedFeedback.suggestions" class="suggestion-section">
+                    <div class="section-label">
+                      <el-icon><InfoFilled /></el-icon>
+                      <span>改进建议</span>
+                    </div>
                     <p class="suggestion-content" :class="{ 'is-truncated': shouldTruncateSuggestion }">
                       {{ parsedFeedback.suggestions }}
                     </p>
-                    <el-button 
-                      v-if="shouldTruncateSuggestion" 
-                      type="primary" 
-                      text 
+                    <el-button
+                      v-if="shouldTruncateSuggestion"
+                      type="primary"
+                      text
                       size="small"
                       @click="showFullFeedback"
                     >
@@ -144,7 +154,7 @@
                 </div>
                 <div v-else class="empty-feedback">
                   <span>暂无AI批改结果</span>
-                  <span class="hint">点击"智辅批改"获取评分建议</span>
+                  <span class="hint">点击"重新生成"获取AI批改结果</span>
                 </div>
               </div>
             </div>
@@ -159,9 +169,10 @@
                 <el-button
                   :type="feedbackAction === 'adopt' ? 'primary' : 'default'"
                   @click="feedbackAction = 'adopt'"
+                  plain
                 >
                   <el-icon><Check /></el-icon>
-                  采用AI评分
+                  采用 AI 批改结果
                 </el-button>
                 <el-button
                   :type="feedbackAction === 'modify' ? 'warning' : 'default'"
@@ -228,7 +239,7 @@
 import { ref, onMounted, computed } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { ElMessage } from 'element-plus';
-import { ArrowLeft, User, Document, Clock, Check, Edit } from '@element-plus/icons-vue';
+import { ArrowLeft, User, Document, Clock, Check, Edit, Warning, InfoFilled } from '@element-plus/icons-vue';
 import request from '@/utils/request';
 
 interface ReviewDetail {
@@ -313,29 +324,25 @@ const parsedFeedback = computed(() => {
   const feedback = reviewDetail.value.aiFeedback || '';
   const errors: string[] = [];
   let suggestions = '';
-  
-  if (feedback.includes('【核心错误点】')) {
-    const parts = feedback.split('|||');
-    for (const part of parts) {
-      if (part.includes('【核心错误点】')) {
-        const errorStr = part.replace('【核心错误点】', '').trim();
-        if (errorStr) {
-          errors.push(...errorStr.split('|||').map(e => e.trim()).filter(e => e));
-        }
-      }
-      if (part.includes('【修正建议】')) {
-        suggestions = part.replace('【修正建议】', '').trim();
-      }
+
+  // 提取错误点
+  const errorMatch = feedback.match(/【错误点】([^【]+)/);
+  if (errorMatch) {
+    const errorStr = errorMatch[1].trim();
+    if (errorStr) {
+      errors.push(...errorStr.split('|||').map(e => {
+        // 去除格式符号（如 -、•、* 等）
+        return e.trim().replace(/^[\s\-•*·]+/, '').trim();
+      }).filter(e => e));
     }
   }
-  
-  if (feedback.includes('【修正建议】') && !suggestions) {
-    const suggestionMatch = feedback.match(/【修正建议】(.+)$/);
-    if (suggestionMatch) {
-      suggestions = suggestionMatch[1].trim();
-    }
+
+  // 提取改进建议
+  const suggestionMatch = feedback.match(/【改进建议】(.+)$/);
+  if (suggestionMatch) {
+    suggestions = suggestionMatch[1].trim();
   }
-  
+
   return { errors, suggestions };
 });
 
@@ -367,6 +374,24 @@ const getScoreClass = (score: number, maxScore: number): string => {
   if (percent >= 80) return 'score-high';
   if (percent >= 60) return 'score-medium';
   return 'score-low';
+};
+
+// 去除HTML标签
+const stripHtml = (html: string | null | undefined): string => {
+  if (!html) return '';
+  // 先替换常见的HTML实体
+  let text = html
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'");
+  // 去除HTML标签
+  text = text.replace(/<[^>]+>/g, '');
+  // 去除多余空格
+  text = text.replace(/\s+/g, ' ').trim();
+  return text;
 };
 
 const formatDateTime = (date: string | number[] | null): string => {
@@ -466,9 +491,9 @@ const handleRegrade = async () => {
     };
     manualScore.value = data.aiScore || 0;
     regraded.value = true;
-    ElMessage.success('智辅批改完成');
+    ElMessage.success('AI 批改完成');
   } catch (error) {
-    ElMessage.error('智辅批改失败，请稍后重试');
+    ElMessage.error('AI 批改失败，请稍后重试');
   } finally {
     regrading.value = false;
   }
@@ -729,32 +754,72 @@ onMounted(() => {
 .ai-feedback {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 16px;
 }
 
-.feedback-label {
-  font-size: 13px;
-  color: #909399;
-  margin-bottom: 6px;
-  display: block;
+.feedback-summary {
+  padding: 12px;
+  background: #f5f7fa;
+  border-radius: 6px;
+  border-left: 3px solid #409eff;
 }
 
-.error-tags .tag-list {
+.summary-content {
+  font-size: 14px;
+  line-height: 1.7;
+  color: #303133;
+  margin: 0;
+}
+
+.error-section,
+.suggestion-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.section-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #606266;
+}
+
+.section-label .el-icon {
+  font-size: 16px;
+}
+
+.error-section .section-label {
+  color: #f56c6c;
+}
+
+.suggestion-section .section-label {
+  color: #409eff;
+}
+
+.tag-list {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
   align-items: center;
 }
 
-.suggestion-text {
-  margin-top: 8px;
+.error-tag {
+  font-size: 13px;
+  padding: 4px 10px;
 }
 
 .suggestion-content {
   font-size: 14px;
-  line-height: 1.6;
+  line-height: 1.7;
   color: #303133;
   margin: 0;
+  padding: 12px;
+  background: #f0f9ff;
+  border-radius: 6px;
+  border-left: 3px solid #409eff;
 }
 
 .suggestion-content.is-truncated {

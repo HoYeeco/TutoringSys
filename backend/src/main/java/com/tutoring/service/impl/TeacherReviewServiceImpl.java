@@ -438,7 +438,7 @@ public class TeacherReviewServiceImpl implements TeacherReviewService {
             
             answer.setAiScore(0);
             answer.setScore(0);
-            answer.setAiFeedback("学生未作答，得分为0分。");
+            answer.setAiFeedback("【错误点】未提交答案\n\n【改进建议】建议学生认真作答，按照题目要求完成作答内容。");
             answer.setUpdateTime(LocalDateTime.now());
             studentAnswerMapper.updateById(answer);
             
@@ -487,30 +487,27 @@ public class TeacherReviewServiceImpl implements TeacherReviewService {
     private String buildAiFeedback(GradingResult result) {
         StringBuilder feedback = new StringBuilder();
         
+        // 错误点 - 使用 ||| 分隔多个错误，每个错误不超过6个字
         if (result.getErrors() != null && !result.getErrors().isEmpty()) {
-            feedback.append("【核心错误点】");
-            for (int i = 0; i < result.getErrors().size(); i++) {
-                feedback.append(result.getErrors().get(i));
-                if (i < result.getErrors().size() - 1) {
-                    feedback.append("|||");
-                }
-            }
+            feedback.append("【错误点】");
+            List<String> truncatedErrors = result.getErrors().stream()
+                .map(e -> e.length() > 6 ? e.substring(0, 6) : e)
+                .collect(Collectors.toList());
+            String errorsStr = String.join("|||", truncatedErrors);
+            feedback.append(errorsStr);
         }
         
+        // 改进建议 - 合并为一段文本
         if (result.getSuggestions() != null && !result.getSuggestions().isEmpty()) {
             if (feedback.length() > 0) {
-                feedback.append("|||");
+                feedback.append("\n\n");
             }
-            feedback.append("【修正建议】");
-            for (int i = 0; i < result.getSuggestions().size(); i++) {
-                feedback.append(result.getSuggestions().get(i));
-                if (i < result.getSuggestions().size() - 1) {
-                    feedback.append("；");
-                }
-            }
+            feedback.append("【改进建议】");
+            String suggestionsStr = String.join("；", result.getSuggestions());
+            feedback.append(suggestionsStr);
         }
         
-        return feedback.toString();
+        return feedback.toString().trim();
     }
 
 }

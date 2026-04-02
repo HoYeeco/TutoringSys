@@ -18,6 +18,13 @@
                 :value="course.id"
               />
             </el-select>
+            <el-select v-model="filterForm.status" placeholder="复核状态" class="filter-item" clearable @change="handleFilterChange">
+              <el-option label="待批改" value="pending" />
+              <el-option label="批改中" value="grading" />
+              <el-option label="待复核" value="review_pending" />
+              <el-option label="已自动批改" value="auto_graded" />
+              <el-option label="已复核" value="reviewed" />
+            </el-select>
             <el-input
               v-model="filterForm.keyword"
               placeholder="按作业名、学生姓名搜索"
@@ -135,6 +142,7 @@ const tableRef = ref();
 
 const filterForm = ref({
   courseId: '',
+  status: '',
   keyword: ''
 });
 
@@ -217,15 +225,26 @@ const getSubmissions = async () => {
     if (filterForm.value.courseId) {
       params.courseId = filterForm.value.courseId;
     }
+    if (filterForm.value.status) {
+      params.status = filterForm.value.status;
+    }
     if (filterForm.value.keyword) {
       params.keyword = filterForm.value.keyword;
     }
     const response = await request.get('/teacher/review/list', { params });
-    submissions.value = (response.data?.records || []).map((item: any) => ({
+    let records = (response.data?.records || []).map((item: any) => ({
       ...item,
-      questionTypeCategory: categorizeQuestionType(item.questionType)
+      questionTypeCategory: categorizeQuestionType(item.questionType),
+      displayStatus: calculateDisplayStatus(item)
     }));
-    total.value = response.data?.total || 0;
+    
+    // 前端状态过滤
+    if (filterForm.value.status) {
+      records = records.filter((item: any) => item.displayStatus === filterForm.value.status);
+    }
+    
+    submissions.value = records;
+    total.value = filterForm.value.status ? records.length : (response.data?.total || 0);
   } catch (error) {
     ElMessage.error('获取待复核列表失败');
     submissions.value = [];
@@ -233,6 +252,19 @@ const getSubmissions = async () => {
   } finally {
     loading.value = false;
   }
+};
+
+const calculateDisplayStatus = (item: any): string => {
+  const submissionStatus = item.submissionStatus;
+  const answerReviewStatus = item.reviewStatus;
+  const submissionReviewStatus = item.submissionReviewStatus;
+  
+  if (answerReviewStatus === 2) return 'reviewed';
+  if (submissionStatus === 0 || submissionStatus === 1) return 'pending';
+  if (submissionStatus === 2) return 'grading';
+  if (submissionReviewStatus === 0) return 'auto_graded';
+  if (item.graderType === 'AI') return 'review_pending';
+  return 'review_pending';
 };
 
 const categorizeQuestionType = (type: string): string => {
@@ -247,27 +279,22 @@ const categorizeQuestionType = (type: string): string => {
   return '综合题';
 };
 
+const statusConfig: Record<string, { type: string; text: string }> = {
+  pending: { type: 'danger', text: '待批改' },
+  grading: { type: 'warning', text: '批改中' },
+  review_pending: { type: 'primary', text: '待复核' },
+  auto_graded: { type: 'info', text: '已自动批改' },
+  reviewed: { type: 'success', text: '已复核' }
+};
+
 const getReviewStatusType = (row: any): string => {
-  const submissionStatus = row.submissionStatus;
-  const answerReviewStatus = row.reviewStatus;
-  
-  if (answerReviewStatus === 2) return 'success';
-  if (submissionStatus === 0 || submissionStatus === 1) return 'danger';
-  if (submissionStatus === 2) return 'warning';
-  if (row.submissionReviewStatus === 0) return 'info';
-  return 'warning';
+  const status = row.displayStatus || calculateDisplayStatus(row);
+  return statusConfig[status]?.type || 'warning';
 };
 
 const getReviewStatusText = (row: any): string => {
-  const submissionStatus = row.submissionStatus;
-  const answerReviewStatus = row.reviewStatus;
-  
-  if (answerReviewStatus === 2) return '已复核';
-  if (submissionStatus === 0 || submissionStatus === 1) return '待批改';
-  if (submissionStatus === 2) return '批改中';
-  if (row.submissionReviewStatus === 0) return '已自动批改';
-  if (row.graderType === 'AI') return '待复核(AI)';
-  return '待复核';
+  const status = row.displayStatus || calculateDisplayStatus(row);
+  return statusConfig[status]?.text || '待复核';
 };
 
 const handleSelectionChange = (rows: any[]) => {

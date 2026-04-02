@@ -264,25 +264,27 @@ public class GradingAsyncServiceImpl implements GradingAsyncService {
     private String buildAiFeedback(GradingResult result) {
         StringBuilder feedback = new StringBuilder();
         
-        if (result.getFeedback() != null) {
-            feedback.append(result.getFeedback());
-        }
-        
+        // 错误点 - 使用 ||| 分隔多个错误，每个错误不超过6个字
         if (result.getErrors() != null && !result.getErrors().isEmpty()) {
-            feedback.append("\n\n【错误点】\n");
-            for (String error : result.getErrors()) {
-                feedback.append("- ").append(error).append("\n");
-            }
+            feedback.append("【错误点】");
+            List<String> truncatedErrors = result.getErrors().stream()
+                .map(e -> e.length() > 6 ? e.substring(0, 6) : e)
+                .collect(Collectors.toList());
+            String errorsStr = String.join("|||", truncatedErrors);
+            feedback.append(errorsStr);
         }
         
+        // 改进建议 - 合并为一段文本
         if (result.getSuggestions() != null && !result.getSuggestions().isEmpty()) {
-            feedback.append("\n【改进建议】\n");
-            for (String suggestion : result.getSuggestions()) {
-                feedback.append("- ").append(suggestion).append("\n");
+            if (feedback.length() > 0) {
+                feedback.append("\n\n");
             }
+            feedback.append("【改进建议】");
+            String suggestionsStr = String.join("；", result.getSuggestions());
+            feedback.append(suggestionsStr);
         }
         
-        return feedback.toString();
+        return feedback.toString().trim();
     }
 
     private void sendNotification(Long studentId, Long assignmentId, Integer score, boolean hasSubjective) {
