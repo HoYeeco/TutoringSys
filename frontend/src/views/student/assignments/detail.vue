@@ -11,7 +11,7 @@
           </div>
           <el-button class="back-btn" @click="goBack">
             <el-icon><ArrowLeft /></el-icon>
-            返回
+            返回列表
           </el-button>
         </div>
       </template>
@@ -50,7 +50,7 @@
           </div>
           <el-button
             v-if="hasWrongQuestions"
-            type="warning"
+            type="primary"
             size="small"
             @click="addAllToWrongBook"
           >
@@ -64,7 +64,7 @@
           v-for="(question, index) in questions"
           :key="question.id"
           class="question-card"
-          :class="{ correct: question.type !== 'essay' && question.isCorrect, incorrect: question.type !== 'essay' && !question.isCorrect }"
+          :class="getQuestionCardClass(question)"
         >
           <div class="question-header">
             <div class="question-info">
@@ -72,20 +72,10 @@
               <el-tag size="small" :type="getQuestionTypeTag(question.type)">
                 {{ getQuestionTypeText(question.type) }}
               </el-tag>
-              <span class="question-score">({{ question.score }}分)</span>
             </div>
             <div class="question-result">
-              <!-- 主观题不显示正确/错误标签 -->
-              <el-tag
-                v-if="question.type !== 'essay'"
-                :type="question.isCorrect ? 'success' : 'danger'"
-                effect="dark"
-                size="small"
-              >
-                {{ question.isCorrect ? '正确' : '错误' }}
-              </el-tag>
               <span class="earned-score">
-                得分：<strong>{{ question.earnedScore || 0 }}</strong> 分
+                得分：<strong>{{ question.earnedScore || 0 }}</strong> / {{ question.score }} 分
               </span>
             </div>
           </div>
@@ -93,30 +83,32 @@
           <div class="question-content" v-html="question.content"></div>
 
           <div class="answer-section">
-            <div class="answer-row">
-              <span class="answer-label">你的答案：</span>
-              <div
-                class="answer-value"
-                :class="question.type !== 'essay' ? (question.isCorrect ? 'correct' : 'incorrect') : ''"
-              >
-                <template v-if="question.type === 'essay'">
-                  <div class="essay-content readonly-editor" v-html="question.studentAnswer"></div>
-                </template>
-                <template v-else>
-                  {{ formatAnswer(question.studentAnswer, question.type) }}
-                </template>
+            <div class="answer-row-two-col">
+              <div class="answer-col">
+                <span class="answer-label">你的答案：</span>
+                <div
+                  class="answer-value"
+                  :class="getAnswerClass(question)"
+                >
+                  <template v-if="question.type === 'essay'">
+                    <div class="essay-content readonly-editor" v-html="question.studentAnswer"></div>
+                  </template>
+                  <template v-else>
+                    {{ formatAnswer(question.studentAnswer, question.type) }}
+                  </template>
+                </div>
               </div>
-            </div>
 
-            <div class="answer-row" v-if="question.correctAnswer">
-              <span class="answer-label">标准答案：</span>
-              <div class="answer-value correct">
-                <template v-if="question.type === 'essay'">
-                  <div class="essay-content readonly-editor" v-html="question.correctAnswer"></div>
-                </template>
-                <template v-else>
-                  {{ formatAnswer(question.correctAnswer, question.type) }}
-                </template>
+              <div class="answer-col">
+                <span class="answer-label">参考答案：</span>
+                <div class="answer-value reference-answer">
+                  <template v-if="question.type === 'essay'">
+                    <div class="essay-content readonly-editor" v-html="question.correctAnswer || '暂无参考答案'"></div>
+                  </template>
+                  <template v-else>
+                    {{ formatAnswer(question.correctAnswer, question.type) || '暂无参考答案' }}
+                  </template>
+                </div>
               </div>
             </div>
 
@@ -166,12 +158,13 @@
             </div>
           </div>
 
-          <div class="question-footer" v-if="question.type !== 'essay' && !question.isCorrect">
+          <div class="question-footer" v-if="question.type !== 'essay' && (question.earnedScore || 0) < (question.score || 0)">
             <el-button
-              type="warning"
+              type="primary"
               size="small"
               :loading="question.addingToWrongBook"
               @click="addToWrongBook(question)"
+              plain
             >
               <el-icon><Collection /></el-icon> 加入错题本
             </el-button>
@@ -213,8 +206,8 @@ const assignment = ref({
 const questions = ref<any[]>([]);
 
 const hasWrongQuestions = computed(() => {
-  // 只有客观题才有错题概念
-  return questions.value.some(q => q.type !== 'essay' && !q.isCorrect);
+  // 非满分的题目算错题
+  return questions.value.some(q => q.type !== 'essay' && (q.earnedScore || 0) < (q.score || 0));
 });
 
 const getGradingDetail = async () => {
@@ -345,14 +338,14 @@ const getQuestionTypeText = (type: string) => {
 const getQuestionTypeTag = (type: string) => {
   const map: Record<string, string> = {
     single: '',
-    multiple: 'success',
-    judgment: 'warning',
-    essay: 'danger',
+    multiple: '',
+    judgment: '',
+    essay: '',
     // 后端返回的大写类型
     SINGLE: '',
-    MULTIPLE: 'success',
-    JUDGE: 'warning',
-    ESSAY: 'danger',
+    MULTIPLE: '',
+    JUDGE: '',
+    ESSAY: '',
   };
   return map[type] || '';
 };
@@ -411,6 +404,36 @@ const getStatusText = (status: string) => {
   }
 };
 
+// 获取题目卡片样式类：满分绿色、零分红色、其他橙色
+const getQuestionCardClass = (question: any) => {
+  const earned = question.earnedScore || 0;
+  const total = question.score || 0;
+
+  if (earned === total && total > 0) {
+    return 'full-score';
+  } else if (earned === 0) {
+    return 'zero-score';
+  } else {
+    return 'partial-score';
+  }
+};
+
+// 获取答案区域样式类
+const getAnswerClass = (question: any) => {
+  if (question.type === 'essay') return '';
+
+  const earned = question.earnedScore || 0;
+  const total = question.score || 0;
+
+  if (earned === total && total > 0) {
+    return 'full-score';
+  } else if (earned === 0) {
+    return 'zero-score';
+  } else {
+    return 'partial-score';
+  }
+};
+
 const copyText = async (text: string) => {
   try {
     await navigator.clipboard.writeText(text);
@@ -437,8 +460,14 @@ const addToWrongBook = async (question: any) => {
 };
 
 const addAllToWrongBook = async () => {
-  // 只筛选客观题的错题
-  const wrongQuestions = questions.value.filter(q => q.type !== 'essay' && !q.isCorrect);
+  // 只筛选客观题的非满分题目（错题）
+  const wrongQuestions = questions.value.filter(q => {
+    if (q.type === 'essay') return false;
+    const earned = q.earnedScore || 0;
+    const total = q.score || 0;
+    return earned < total; // 非满分即为错题
+  });
+  
   if (wrongQuestions.length === 0) {
     ElMessage.info('没有错题需要加入');
     return;
@@ -634,7 +663,6 @@ onMounted(() => {
   padding: 16px;
   background: linear-gradient(135deg, #fafafa 0%, #f5f7fa 100%);
   border-radius: 12px;
-  border-left: 4px solid #409eff;
 }
 
 .answer-section {
@@ -647,6 +675,21 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+/* 双列布局：学生答案和参考答案并排 */
+.answer-row-two-col {
+  display: flex;
+  gap: 16px;
+  width: 100%;
+}
+
+.answer-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
 }
 
 .answer-label {
@@ -662,14 +705,24 @@ onMounted(() => {
   background: #f5f7fa;
 }
 
-.answer-value.correct {
+.answer-value.full-score {
   background: linear-gradient(135deg, #f0f9eb 0%, #e1f3d8 100%);
   color: #67c23a;
 }
 
-.answer-value.incorrect {
+.answer-value.zero-score {
   background: linear-gradient(135deg, #fef0f0 0%, #fde2e2 100%);
   color: #f56c6c;
+}
+
+.answer-value.partial-score {
+  background: linear-gradient(135deg, #fdf6ec 0%, #faecd8 100%);
+  color: #e6a23c;
+}
+
+.answer-value.reference-answer {
+  background: linear-gradient(135deg, #fafafa 0%, #f5f7fa 100%);
+  color: #303133;
 }
 
 .essay-content {

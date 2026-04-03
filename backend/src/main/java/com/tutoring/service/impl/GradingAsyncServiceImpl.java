@@ -136,6 +136,8 @@ public class GradingAsyncServiceImpl implements GradingAsyncService {
 
             submission.setAiTotalScore(totalAiScore);
             
+            LocalDateTime now = LocalDateTime.now();
+            
             if (hasSubjectiveQuestion) {
                 submission.setReviewStatus(1);
                 log.info("作业包含主观题，AI已预评分，待教师复核: submissionId={}, aiTotalScore={}", 
@@ -143,6 +145,7 @@ public class GradingAsyncServiceImpl implements GradingAsyncService {
             } else {
                 submission.setReviewStatus(0);
                 submission.setFinalTotalScore(totalAiScore);
+                submission.setReviewTime(now);
                 log.info("全客观题作业，自动批改完成: submissionId={}, finalTotalScore={}", 
                     submissionId, totalAiScore);
             }

@@ -202,11 +202,11 @@ public class StudentGradingServiceImpl implements StudentGradingService {
                     .options(question.getOptions())
                     .maxScore(question.getScore())
                     .studentAnswer(sa.getAnswer())
-                    .correctAnswer(isObjective ? question.getAnswer() : null)
+                    .correctAnswer(question.getAnswer())
                     .isCorrect(isCorrect)
                     .score(sa.getScore())
                     .finalScore(sa.getFinalScore())
-                    .analysis(isObjective ? question.getAnalysis() : null)
+                    .analysis(question.getAnalysis())
                     .aiFeedback(sa.getAiFeedback())
                     .teacherFeedback(sa.getTeacherFeedback())
                     .build();
