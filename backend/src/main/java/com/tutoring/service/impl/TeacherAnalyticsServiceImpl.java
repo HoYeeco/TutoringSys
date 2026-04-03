@@ -6,15 +6,14 @@ import com.tutoring.dto.*;
 import com.tutoring.entity.*;
 import com.tutoring.mapper.*;
 import com.tutoring.service.TeacherAnalyticsService;
-import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.stereotype.Service;
 
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -447,19 +446,16 @@ public class TeacherAnalyticsServiceImpl implements TeacherAnalyticsService {
     }
 
     @Override
-    public void exportFrequentErrors(Long teacherId, Long courseId, HttpServletResponse response) {
-        System.out.println("=== DEBUG: exportFrequentErrors called, teacherId=" + teacherId + ", courseId=" + courseId);
+    public byte[] exportFrequentErrors(Long teacherId, Long courseId) {
+        File tempFile = null;
         try {
             Page<FrequentErrorVO> page = getFrequentErrors(teacherId, 1, 10000, courseId);
-            System.out.println("=== DEBUG: getFrequentErrors completed, records=" + (page != null ? page.getRecords().size() : "null"));
             List<FrequentErrorVO> list = page.getRecords();
 
             if (list == null) {
-                System.out.println("=== DEBUG: list is null, creating empty list");
                 list = new ArrayList<>();
             }
 
-            System.out.println("=== DEBUG: creating workbook");
             Workbook workbook = new XSSFWorkbook();
             try {
                 Sheet sheet = workbook.createSheet("高频错题");
@@ -480,10 +476,10 @@ public class TeacherAnalyticsServiceImpl implements TeacherAnalyticsService {
                 for (FrequentErrorVO vo : list) {
                     Row row = sheet.createRow(rowNum);
                     row.createCell(0).setCellValue(rowNum);
-                    row.createCell(1).setCellValue(vo.getCourseName());
-                    row.createCell(2).setCellValue(vo.getAssignmentTitle());
+                    row.createCell(1).setCellValue(vo.getCourseName() != null ? vo.getCourseName() : "");
+                    row.createCell(2).setCellValue(vo.getAssignmentTitle() != null ? vo.getAssignmentTitle() : "");
                     row.createCell(3).setCellValue(getTypeName(vo.getQuestionType()));
-                    row.createCell(4).setCellValue(vo.getQuestionContent());
+                    row.createCell(4).setCellValue(vo.getQuestionContent() != null ? vo.getQuestionContent() : "");
                     row.createCell(5).setCellValue(vo.getErrorCount());
                     row.createCell(6).setCellValue(vo.getTotalCount());
                     row.createCell(7).setCellValue(vo.getErrorRate() + "%");
@@ -494,18 +490,22 @@ public class TeacherAnalyticsServiceImpl implements TeacherAnalyticsService {
                     sheet.autoSizeColumn(i);
                 }
 
-                response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-                String fileName = URLEncoder.encode("高频错题分析.xlsx", StandardCharsets.UTF_8);
-                response.setHeader("Content-Disposition", "attachment;filename=\"" + fileName + "\"");
-
-                workbook.write(response.getOutputStream());
+                tempFile = File.createTempFile("frequent_errors_", ".xlsx");
+                try (FileOutputStream fos = new FileOutputStream(tempFile)) {
+                    workbook.write(fos);
+                }
+                return java.nio.file.Files.readAllBytes(tempFile.toPath());
             } finally {
                 if (workbook != null) {
                     workbook.close();
                 }
             }
         } catch (Exception e) {
-            throw new RuntimeException("导出Excel失败: " + e.getMessage());
+            throw new RuntimeException("导出Excel失败: " + e.getMessage(), e);
+        } finally {
+            if (tempFile != null && tempFile.exists()) {
+                tempFile.delete();
+            }
         }
     }
 

@@ -12,8 +12,11 @@ import com.tutoring.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.core.io.ByteArrayResource;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
@@ -58,19 +61,17 @@ public class TeacherAnalyticsController {
 
     @Operation(summary = "导出高频错题")
     @GetMapping("/frequent-errors/export")
-    public void exportFrequentErrors(
-            @RequestParam(required = false) Long courseId,
-            HttpServletResponse response) {
+    public ResponseEntity<ByteArrayResource> exportFrequentErrors(
+            @RequestParam(required = false) Long courseId) {
         Long teacherId = getCurrentUserId();
-        System.out.println("=== CONTROLLER: exportFrequentErrors called, teacherId=" + teacherId + ", courseId=" + courseId);
-        try {
-            teacherAnalyticsService.exportFrequentErrors(teacherId, courseId, response);
-            System.out.println("=== CONTROLLER: exportFrequentErrors completed");
-        } catch (Exception e) {
-            System.out.println("=== CONTROLLER ERROR: " + e.getClass().getName() + " - " + e.getMessage());
-            e.printStackTrace();
-            throw new RuntimeException("导出失败: " + e.getMessage());
-        }
+        byte[] data = teacherAnalyticsService.exportFrequentErrors(teacherId, courseId);
+        ByteArrayResource resource = new ByteArrayResource(data);
+        String fileName = "错题分析_" + System.currentTimeMillis() + ".xlsx";
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileName + "\"")
+                .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .contentLength(data.length)
+                .body(resource);
     }
 
     @Operation(summary = "获取学生个体分析")
