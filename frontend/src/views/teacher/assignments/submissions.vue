@@ -15,15 +15,9 @@
           </div>
               <!-- 返回按钮 -->
           <div class="back-nav">
-            <el-button 
-              type="primary" 
-              text 
-              size="large"
-              @click="goBack"
-              class="back-btn"
-            >
-              返回作业列表
-            </el-button>
+            <el-button type="primary" @click="goBack" class="back-btn" plain>
+            <el-icon><ArrowLeft /></el-icon> 返回列表
+          </el-button>
           </div>
         </div>
       </template>
@@ -329,20 +323,20 @@
             <div class="content-text" v-html="question.questionContent"></div>
           </div>
           
-          <div class="answer-box student-answer">
+          <div class="answer-box student-answer" :class="getAnswerBoxClass(question)">
             <div class="answer-label">
               <el-icon><EditPen /></el-icon>
               学生答案
             </div>
-            <div class="answer-text" v-html="question.studentAnswer || '<span class=\'no-answer\'>未作答</span>'"></div>
+            <div class="answer-text" v-html="formatStudentAnswer(question)"></div>
           </div>
 
-          <div v-if="question.aiFeedback && !isObjectiveQuestion(question.type)" class="answer-box ai-feedback-box">
-            <div class="answer-label">
+          <div v-if="question.aiFeedback && !isObjectiveQuestion(question.type)" class="answer-box ai-feedback-box" style="background: #f8f9fc; border: 1px solid #e8ecf4;">
+            <div class="answer-label" style="color: #606266;">
               <el-icon><ChatDotRound /></el-icon>
               AI评语
             </div>
-            <div class="answer-text ai-feedback-text">{{ question.aiFeedback }}</div>
+            <div class="answer-text ai-feedback-text" style="background: transparent; border: none; color: #303133;">{{ question.aiFeedback }}</div>
           </div>
         </div>
       </div>
@@ -438,10 +432,46 @@ const handleSearch = () => {
 // 根据分数获取样式类
 const getScoreClass = (score: number | null) => {
   if (score === null) return 'score-null';
-  if (score >= 90) return 'score-excellent';
-  if (score >= 80) return 'score-good';
-  if (score >= 60) return 'score-pass';
-  return 'score-fail';
+  return 'score';
+};
+
+// 根据题目得分获取学生答案框样式类
+const getAnswerBoxClass = (question: any) => {
+  const score = question.score || 0;
+  const maxScore = question.maxScore || 1;
+  if (score >= maxScore) return 'answer-full-score';
+  if (score === 0) return 'answer-zero-score';
+  return 'answer-partial-score';
+};
+
+// 格式化学生答案
+const formatStudentAnswer = (question: any) => {
+  const answer = question.studentAnswer;
+  if (!answer) return '<span class="no-answer">未作答</span>';
+  
+  const type = question.type;
+  const score = question.score || 0;
+  const maxScore = question.maxScore || 1;
+  
+  // 选择题：只显示字母
+  if (type === 'single' || type === 'multiple') {
+    const letters = answer.match(/[A-Z]/g);
+    if (letters) return letters.join('');
+    return answer;
+  }
+  
+  // 判断题：转换为文字
+  if (type === 'judgment') {
+    const lowerAnswer = answer.toLowerCase();
+    if (lowerAnswer === 'true') {
+      return '正确';
+    } else if (lowerAnswer === 'false') {
+      return '错误';
+    }
+    return answer;
+  }
+  
+  return answer;
 };
 
 const mapReviewStatus = (reviewStatus: number | null): string => {
@@ -627,9 +657,9 @@ const getQuestionTypeText = (type: string) => {
 const getQuestionTypeTag = (type: string) => {
   const typeMap: Record<string, string> = {
     single: '',
-    multiple: 'success',
-    judgment: 'warning',
-    essay: 'danger'
+    multiple: '',
+    judgment: '',
+    essay: ''
   };
   return typeMap[type] || '';
 };
@@ -637,8 +667,8 @@ const getQuestionTypeTag = (type: string) => {
 const getGraderTagType = (graderType: string): string => {
   const typeMap: Record<string, string> = {
     AUTO: 'success',
-    AI: 'warning',
-    TEACHER: '',
+    AI: 'primary',
+    TEACHER: 'warning',
     PENDING: 'info'
   };
   return typeMap[graderType] || 'info';
@@ -712,16 +742,7 @@ onMounted(() => {
   min-height: calc(100vh - 84px);
 }
 
-/* ========== 返回导航 ========== */
-.back-btn {
-  font-size: 16px;
-  padding: 8px 16px;
-  border-radius: 8px;
-  transition: all 0.3s ease;
-}
-
 .back-btn:hover {
-  background: rgba(64, 158, 255, 0.1);
   transform: translateX(-4px);
 }
 
@@ -1076,25 +1097,12 @@ onMounted(() => {
 }
 
 .score-null {
-  color: #c0c4cc;
-  font-weight: 500;
+  color: #ff0000;
 }
 
-.score-excellent {
-  color: #67c23a;
-}
-
-.score-good {
-  color: #409eff;
-}
-
-.score-pass {
-  color: #e6a23c;
-}
-
-.score-fail {
-  color: #f56c6c;
-}
+.score {
+  color: #17a900;
+}rgb(30, 255, 0)rgb(23, 200, 0)
 
 /* 状态标签 */
 :deep(.status-tag) {
@@ -1242,17 +1250,17 @@ onMounted(() => {
 .score-display {
   text-align: center;
   padding: 16px 28px;
-  background: linear-gradient(135deg, rgb(15, 38, 70) 0%, rgb(58, 97, 156) 50%, rgb(11, 17, 27) 100%);
   border-radius: 16px;
   color: #fff;
-  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+  box-shadow: 0 2px 10px #e1e1e1;
 }
 
 .score-display .score-label {
-  font-size: 12px;
+  font-size: 14px;
   opacity: 0.9;
   margin-bottom: 4px;
   font-weight: 500;
+  color: #000;
 }
 
 .score-value-large {
@@ -1385,6 +1393,24 @@ onMounted(() => {
 }
 
 .answer-box.student-answer .answer-text {
+  background: #fff8f0;
+  border: 1px solid #ffe4cc;
+  color: #5c3d00;
+}
+
+.answer-box.student-answer.answer-full-score .answer-text {
+  background: #f0f9eb;
+  border: 1px solid #c2e7b0;
+  color: #2e5c1d;
+}
+
+.answer-box.student-answer.answer-zero-score .answer-text {
+  background: #fef0f0;
+  border: 1px solid #fbc4c4;
+  color: #c41e3a;
+}
+
+.answer-box.student-answer.answer-partial-score .answer-text {
   background: #fff8f0;
   border: 1px solid #ffe4cc;
   color: #5c3d00;
