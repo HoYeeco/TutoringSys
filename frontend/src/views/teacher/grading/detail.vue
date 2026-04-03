@@ -67,10 +67,10 @@
               </div>
               <div class="box-content">
                 <div class="answer-text" :class="{ 'empty': !reviewDetail.studentAnswer }">
-                  <pre class="formatted-answer">{{ htmlToFormattedText(reviewDetail.studentAnswer) || '学生未作答' }}</pre>
+                  <pre class="formatted-answer">{{ htmlToFormattedText(getFormattedStudentAnswer(reviewDetail.studentAnswer, reviewDetail.questionType)) || '学生未作答' }}</pre>
                 </div>
                 <div v-if="isObjectiveQuestion && reviewDetail.correctAnswer" class="correct-answer">
-                  正确答案：{{ reviewDetail.correctAnswer }}
+                  正确答案：{{ getFormattedCorrectAnswer(reviewDetail.correctAnswer, reviewDetail.questionType) }}
                 </div>
               </div>
             </div>
@@ -388,6 +388,58 @@ const getQuestionTypeLabel = (type: string): string => {
     essay: '主观题'
   };
   return typeMap[type] || '未知题型';
+};
+
+// 格式化多选题答案：去除符号，只显示字母
+const formatMultipleChoiceAnswer = (answer: string | null | undefined): string => {
+  if (!answer) return '';
+  const trimmed = answer.trim();
+  if (trimmed.startsWith('[')) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (Array.isArray(parsed)) {
+        return parsed.join('');
+      }
+    } catch {
+      return answer.toUpperCase().replace(/[^A-Z]/g, '');
+    }
+  }
+  return answer.toUpperCase().replace(/[^A-Z]/g, '');
+};
+
+// 格式化判断题答案：true/false -> 正确/错误
+const formatJudgmentAnswer = (answer: string | null | undefined): string => {
+  if (!answer) return '';
+  const trimmed = answer.trim().toLowerCase();
+  if (trimmed === 'true') return '正确';
+  if (trimmed === 'false') return '错误';
+  return answer;
+};
+
+// 获取格式化后的学生答案
+const getFormattedStudentAnswer = (answer: string | null | undefined, type: string): string => {
+  if (!answer) return '';
+  const upperType = type?.toUpperCase();
+  if (upperType === 'MULTIPLE') {
+    return formatMultipleChoiceAnswer(answer);
+  }
+  if (upperType === 'JUDGE') {
+    return formatJudgmentAnswer(answer);
+  }
+  return answer;
+};
+
+// 获取格式化后的正确答案
+const getFormattedCorrectAnswer = (answer: string | null | undefined, type: string): string => {
+  if (!answer) return '';
+  const upperType = type?.toUpperCase();
+  if (upperType === 'MULTIPLE') {
+    return formatMultipleChoiceAnswer(answer);
+  }
+  if (upperType === 'JUDGE') {
+    return formatJudgmentAnswer(answer);
+  }
+  return answer;
 };
 
 const getScoreClass = (score: number, maxScore: number): string => {

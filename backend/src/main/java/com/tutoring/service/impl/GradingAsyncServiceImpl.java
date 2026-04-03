@@ -1,5 +1,7 @@
 package com.tutoring.service.impl;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.tutoring.dto.GradingResult;
 import com.tutoring.entity.*;
@@ -223,7 +225,8 @@ public class GradingAsyncServiceImpl implements GradingAsyncService {
         answer.setReviewStatus(0);
         studentAnswerMapper.updateById(answer);
 
-        log.debug("客观题评分: questionId={}, score={}", question.getId(), score);
+        log.info("客观题评分: questionId={}, type={}, studentAnswer={}, correctAnswer={}, score={}", 
+            question.getId(), question.getType(), studentAnswer, correctAnswer, score);
         return score;
     }
     
@@ -235,6 +238,9 @@ public class GradingAsyncServiceImpl implements GradingAsyncService {
         String studentOptions = normalizeMultipleChoiceAnswer(studentAnswer);
         String correctOptions = normalizeMultipleChoiceAnswer(correctAnswer);
         
+        log.info("多选题比较: studentOptions={}, correctOptions={}, equals={}", 
+            studentOptions, correctOptions, studentOptions.equals(correctOptions));
+        
         return studentOptions.equals(correctOptions);
     }
     
@@ -243,8 +249,28 @@ public class GradingAsyncServiceImpl implements GradingAsyncService {
             return "";
         }
         
+        String trimmed = answer.trim();
+        
+        if (trimmed.startsWith("[")) {
+            try {
+                com.fasterxml.jackson.databind.JsonNode node = new com.fasterxml.jackson.databind.ObjectMapper().readTree(trimmed);
+                if (node.isArray()) {
+                    StringBuilder sb = new StringBuilder();
+                    for (com.fasterxml.jackson.databind.JsonNode item : node) {
+                        String text = item.asText().trim().toUpperCase();
+                        if (!text.isEmpty()) {
+                            sb.append(text);
+                        }
+                    }
+                    return sb.toString();
+                }
+            } catch (Exception e) {
+                log.warn("JSON解析失败，使用备用方案: {}", answer);
+            }
+        }
+        
         StringBuilder result = new StringBuilder();
-        char[] chars = answer.toUpperCase().toCharArray();
+        char[] chars = trimmed.toUpperCase().toCharArray();
         
         for (char c : chars) {
             if (c >= 'A' && c <= 'Z') {

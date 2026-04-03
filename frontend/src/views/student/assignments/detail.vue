@@ -365,7 +365,10 @@ const formatAnswer = (answer: string, type: string) => {
     return answer.toUpperCase().replace(/[^A-Z]/g, '');
   }
   if (lowerType === 'judgment' || lowerType === 'judge') {
-    return answer === 'true' ? '正确' : '错误';
+    const trimmed = answer.trim().toLowerCase();
+    if (trimmed === 'true') return '正确';
+    if (trimmed === 'false') return '错误';
+    return answer;
   }
   return answer;
 };
