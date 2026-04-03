@@ -21,6 +21,8 @@ public class OverviewStatsVO {
     private Double completionRate;
     private Double averageScore;
     private Double excellentRate;
+    private Double overdueRate;
+    private Integer overdueCount;
     private List<ScoreDistribution> scoreDistribution;
     private List<CourseStats> courseStats;
 
