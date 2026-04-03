@@ -352,15 +352,17 @@ const getQuestionTypeTag = (type: string) => {
 
 const formatAnswer = (answer: string, type: string) => {
   if (!answer) return '-';
-  // 支持大小写类型
   const lowerType = type?.toLowerCase();
   if (lowerType === 'multiple') {
     try {
       const parsed = JSON.parse(answer);
-      return Array.isArray(parsed) ? parsed.join(', ') : answer;
+      if (Array.isArray(parsed)) {
+        return parsed.join('');
+      }
     } catch {
-      return answer;
+      return answer.toUpperCase().replace(/[^A-Z]/g, '');
     }
+    return answer.toUpperCase().replace(/[^A-Z]/g, '');
   }
   if (lowerType === 'judgment' || lowerType === 'judge') {
     return answer === 'true' ? '正确' : '错误';

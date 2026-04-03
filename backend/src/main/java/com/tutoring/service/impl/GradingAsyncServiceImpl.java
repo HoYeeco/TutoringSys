@@ -200,11 +200,19 @@ public class GradingAsyncServiceImpl implements GradingAsyncService {
         int score = 0;
         
         if (correctAnswer != null && studentAnswer != null) {
-            String normalizedCorrect = correctAnswer.trim().toUpperCase();
-            String normalizedStudent = studentAnswer.trim().toUpperCase();
+            String questionType = question.getType() != null ? question.getType().toUpperCase() : "";
             
-            if (normalizedCorrect.equals(normalizedStudent)) {
-                score = question.getScore();
+            if ("MULTIPLE".equals(questionType)) {
+                if (isMultipleChoiceCorrect(studentAnswer, correctAnswer)) {
+                    score = question.getScore();
+                }
+            } else {
+                String normalizedCorrect = correctAnswer.trim().toUpperCase();
+                String normalizedStudent = studentAnswer.trim().toUpperCase();
+                
+                if (normalizedCorrect.equals(normalizedStudent)) {
+                    score = question.getScore();
+                }
             }
         }
 
@@ -217,6 +225,37 @@ public class GradingAsyncServiceImpl implements GradingAsyncService {
 
         log.debug("客观题评分: questionId={}, score={}", question.getId(), score);
         return score;
+    }
+    
+    private boolean isMultipleChoiceCorrect(String studentAnswer, String correctAnswer) {
+        if (studentAnswer == null || correctAnswer == null) {
+            return false;
+        }
+        
+        String studentOptions = normalizeMultipleChoiceAnswer(studentAnswer);
+        String correctOptions = normalizeMultipleChoiceAnswer(correctAnswer);
+        
+        return studentOptions.equals(correctOptions);
+    }
+    
+    private String normalizeMultipleChoiceAnswer(String answer) {
+        if (answer == null || answer.isEmpty()) {
+            return "";
+        }
+        
+        StringBuilder result = new StringBuilder();
+        char[] chars = answer.toUpperCase().toCharArray();
+        
+        for (char c : chars) {
+            if (c >= 'A' && c <= 'Z') {
+                result.append(c);
+            }
+        }
+        
+        char[] sortedChars = result.toString().toCharArray();
+        java.util.Arrays.sort(sortedChars);
+        
+        return new String(sortedChars);
     }
 
     private int gradeSubjectiveQuestion(StudentAnswer answer, Question question) {
