@@ -9,6 +9,9 @@
             </div>
             <span>{{ isEdit ? '编辑作业' : '发布作业' }}</span>
           </div>
+          <el-button type="primary" @click="goBackToList" plain>
+            <el-icon><ArrowLeft /></el-icon> 返回列表
+          </el-button>
         </div>
       </template>
       <el-form :model="assignment" label-width="100px" :rules="assignmentRules" ref="assignmentFormRef">
@@ -346,7 +349,7 @@ import { useRoute, useRouter } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { 
   Plus, Delete, Close, View, Promotion, 
-  InfoFilled, Check, Edit, List, Notebook
+  InfoFilled, Check, Edit, List, Notebook, ArrowLeft
 } from '@element-plus/icons-vue';
 import Quill from 'quill';
 import 'quill/dist/quill.snow.css';
@@ -485,6 +488,10 @@ const handleCourseChange = (courseId: number) => {
   if (course) {
     assignment.value.courseName = course.name;
   }
+};
+
+const goBackToList = () => {
+  router.back();
 };
 
 const openQuestionTypeDialog = () => {
