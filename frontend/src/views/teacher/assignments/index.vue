@@ -88,7 +88,7 @@
         <el-table-column prop="description" label="作业描述" min-width="150">
           <template #default="scope">
             <span
-              v-if="!scope.row.description"
+              v-if="!scope.row.description || !scope.row.description.trim() || scope.row.description === 'null'"
               class="no-description"
             >
               暂无描述
@@ -209,7 +209,7 @@
             {{ formatDeadline(currentAssignment.deadline) }}
           </el-descriptions-item>
           <el-descriptions-item label="作业描述">
-            {{ currentAssignment.description || '暂无描述' }}
+            {{ !currentAssignment.description || !currentAssignment.description.trim() || currentAssignment.description === 'null' ? '暂无描述' : currentAssignment.description }}
           </el-descriptions-item>
         </el-descriptions>
 

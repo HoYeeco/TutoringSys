@@ -98,16 +98,21 @@
           </template>
         </el-table-column>
         <el-table-column prop="totalScore" label="总分值" width="100" />
-        <el-table-column prop="description" label="描述" min-width="180">
+        <el-table-column prop="description" label="作业描述" min-width="180">
           <template #default="scope">
+            <span
+              v-if="!scope.row.description || !scope.row.description.trim() || scope.row.description === 'null'"
+              class="no-description"
+            >
+              暂无描述
+            </span>
             <el-tooltip
+              v-else
               :content="scope.row.description"
               placement="top"
               :disabled="!isOverflow(scope.row.description, 20)"
             >
-              <span class="ellipsis-text">{{
-                scope.row.description || '-'
-              }}</span>
+              <span class="ellipsis-text">{{ scope.row.description }}</span>
             </el-tooltip>
           </template>
         </el-table-column>
