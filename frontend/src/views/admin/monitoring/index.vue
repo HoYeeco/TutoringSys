@@ -478,11 +478,16 @@ const initApiStatsChart = async () => {
       }
       apiStatsChart = echarts.init(apiStatsChartRef.value);
       
+      // 获取最近 30 天的所有审计日志
       const response = await request.get('/admin/monitor/audit-logs', {
-        params: { page: 1, size: 1000 },
+        params: { page: 1, size: 10000 },
       });
       
       const logs = response.data?.records || [];
+      console.log('获取到的审计日志数量:', logs.length);
+      if (logs.length > 0) {
+        console.log('第一条日志的 operationTime:', logs[0].operationTime);
+      }
       
       const last10Days: string[] = [];
       const callCounts: number[] = [];
@@ -499,12 +504,27 @@ const initApiStatsChart = async () => {
         dayEnd.setHours(23, 59, 59, 999);
         
         const count = logs.filter((log: any) => {
-          const logTime = new Date(log.operationTime);
+          if (!log.operationTime) return false;
+          // 尝试多种日期格式解析
+          let logTime: Date;
+          if (typeof log.operationTime === 'string') {
+            // 如果是字符串，直接解析
+            logTime = new Date(log.operationTime);
+          } else if (Array.isArray(log.operationTime)) {
+            // 如果是数组 [year, month, day, hour, minute, second]
+            const [year, month, day, hour = 0, minute = 0, second = 0] = log.operationTime;
+            logTime = new Date(year, month - 1, day, hour, minute, second);
+          } else {
+            // 其他情况
+            logTime = new Date(log.operationTime);
+          }
           return logTime >= dayStart && logTime <= dayEnd;
         }).length;
         
         callCounts.push(count);
       }
+      
+      console.log('最近 10 天统计:', last10Days, callCounts);
       
       const option = {
         tooltip: {

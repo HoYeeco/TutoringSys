@@ -1,6 +1,7 @@
 package com.tutoring.controller;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.tutoring.annotation.Log;
 import com.tutoring.common.Result;
 import com.tutoring.dto.AssignmentSubmissionStatusVO;
 import com.tutoring.dto.CreateAssignmentRequest;
@@ -56,6 +57,7 @@ public class TeacherAssignmentController {
 
     @Operation(summary = "创建作业")
     @PostMapping
+    @Log(module = "作业管理", operation = "创建作业", value = "创建新作业", saveRequestData = true)
     public Result<Long> createAssignment(@Valid @RequestBody CreateAssignmentRequest request) {
         Long teacherId = getCurrentUserId();
         Long assignmentId = teacherAssignmentService.createAssignment(teacherId, request);
@@ -64,6 +66,7 @@ public class TeacherAssignmentController {
 
     @Operation(summary = "更新作业")
     @PutMapping
+    @Log(module = "作业管理", operation = "更新作业", value = "更新作业信息", saveRequestData = true)
     public Result<Void> updateAssignment(@Valid @RequestBody UpdateAssignmentRequest request) {
         Long teacherId = getCurrentUserId();
         teacherAssignmentService.updateAssignment(teacherId, request);
@@ -72,6 +75,7 @@ public class TeacherAssignmentController {
 
     @Operation(summary = "发布作业")
     @PostMapping("/{assignmentId}/publish")
+    @Log(module = "作业管理", operation = "发布作业", value = "发布作业给学生", saveRequestData = true)
     public Result<Void> publishAssignment(@PathVariable Long assignmentId) {
         Long teacherId = getCurrentUserId();
         teacherAssignmentService.publishAssignment(teacherId, assignmentId);
@@ -119,6 +123,7 @@ public class TeacherAssignmentController {
 
     @Operation(summary = "批改提交")
     @PutMapping("/submissions/{submissionId}/review")
+    @Log(module = "作业批改", operation = "批改作业", value = "教师批改学生作业", saveRequestData = true)
     public Result<Void> reviewSubmission(
             @PathVariable Long submissionId,
             @Valid @RequestBody ReviewSubmissionRequest request) {
