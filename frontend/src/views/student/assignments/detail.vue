@@ -160,6 +160,7 @@
 
           <div class="question-footer" v-if="question.type !== 'essay' && (question.earnedScore || 0) < (question.score || 0)">
             <el-button
+              v-if="!question.inWrongBook"
               type="primary"
               size="small"
               :loading="question.addingToWrongBook"
@@ -168,6 +169,9 @@
             >
               <el-icon><Collection /></el-icon> 加入错题本
             </el-button>
+            <el-tag v-else type="success" effect="plain" size="small">
+              <el-icon><Collection /></el-icon> 已加入错题本
+            </el-tag>
           </div>
         </div>
       </div>
@@ -259,6 +263,7 @@ const getGradingDetail = async () => {
       aiFeedback: parseAiFeedback(a.aiFeedback),
       teacherComment: a.teacherFeedback,
       addingToWrongBook: false,
+      inWrongBook: false,
     }));
   } catch (error) {
     console.error('获取批改详情失败:', error);
@@ -357,12 +362,12 @@ const formatAnswer = (answer: string, type: string) => {
     try {
       const parsed = JSON.parse(answer);
       if (Array.isArray(parsed)) {
-        return parsed.join('');
+        return parsed.map((s: string) => s.toUpperCase()).sort().join('');
       }
     } catch {
-      return answer.toUpperCase().replace(/[^A-Z]/g, '');
+      return answer.toUpperCase().replace(/[^A-Z]/g, '').split('').sort().join('');
     }
-    return answer.toUpperCase().replace(/[^A-Z]/g, '');
+    return answer.toUpperCase().replace(/[^A-Z]/g, '').split('').sort().join('');
   }
   if (lowerType === 'judgment' || lowerType === 'judge') {
     const trimmed = answer.trim().toLowerCase();
@@ -451,44 +456,55 @@ const copyText = async (text: string) => {
 const addToWrongBook = async (question: any) => {
   question.addingToWrongBook = true;
   try {
-    await request.post('/student/wrong-book/add', {
+    await request.post('/student/error-book/add', {
       questionId: question.id,
       assignmentId: assignmentId.value,
     });
+    question.inWrongBook = true;
     ElMessage.success('已加入错题本');
-  } catch (error) {
+  } catch (error: any) {
     console.error('加入错题本失败:', error);
-    ElMessage.error('加入错题本失败');
+    const msg = error.response?.data?.msg || error.message || '加入错题本失败';
+    ElMessage.error(msg);
   } finally {
     question.addingToWrongBook = false;
   }
 };
 
 const addAllToWrongBook = async () => {
-  // 只筛选客观题的非满分题目（错题）
   const wrongQuestions = questions.value.filter(q => {
     if (q.type === 'essay') return false;
+    if (q.inWrongBook) return false;
     const earned = q.earnedScore || 0;
     const total = q.score || 0;
-    return earned < total; // 非满分即为错题
+    return earned < total;
   });
-  
+
   if (wrongQuestions.length === 0) {
-    ElMessage.info('没有错题需要加入');
+    ElMessage.info('没有新的错题需要加入');
     return;
   }
 
   try {
-    await request.post('/student/wrong-book/add-batch', {
+    const res = await request.post('/student/error-book/add-batch', {
       questions: wrongQuestions.map(q => ({
         questionId: q.id,
         assignmentId: assignmentId.value,
       })),
     });
-    ElMessage.success(`已将 ${wrongQuestions.length} 道错题加入错题本`);
-  } catch (error) {
+    const data = res.data || {};
+    const added = data.added ?? wrongQuestions.length;
+    const skipped = data.skipped ?? 0;
+
+    wrongQuestions.forEach((q: any) => { q.inWrongBook = true; });
+
+    let msg = `已将 ${added} 道错题加入错题本`;
+    if (skipped > 0) msg += `，跳过 ${skipped} 道（已在错题本中）`;
+    ElMessage.success(msg);
+  } catch (error: any) {
     console.error('批量加入错题本失败:', error);
-    ElMessage.error('批量加入错题本失败');
+    const msg = error.response?.data?.msg || error.message || '批量加入错题本失败';
+    ElMessage.error(msg);
   }
 };
 
