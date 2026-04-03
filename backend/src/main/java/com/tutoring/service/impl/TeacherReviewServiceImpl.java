@@ -13,6 +13,7 @@ import com.tutoring.service.QwenService;
 import com.tutoring.service.TeacherReviewService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -269,6 +270,7 @@ public class TeacherReviewServiceImpl implements TeacherReviewService {
 
     @Override
     @Transactional
+    @CacheEvict(value = "teacherAssignments", allEntries = true)
     public void acceptAiScore(Long teacherId, Long answerId, String teacherFeedback) {
         StudentAnswer answer = validateAndGetAnswer(teacherId, answerId);
 
@@ -286,6 +288,7 @@ public class TeacherReviewServiceImpl implements TeacherReviewService {
 
     @Override
     @Transactional
+    @CacheEvict(value = "teacherAssignments", allEntries = true)
     public void modifyScore(Long teacherId, Long answerId, Integer newScore, String teacherFeedback) {
         StudentAnswer answer = validateAndGetAnswer(teacherId, answerId);
 
@@ -308,6 +311,7 @@ public class TeacherReviewServiceImpl implements TeacherReviewService {
 
     @Override
     @Transactional
+    @CacheEvict(value = "teacherAssignments", allEntries = true)
     public void batchAccept(Long teacherId, List<Long> answerIds, String teacherFeedback) {
         for (Long answerId : answerIds) {
             acceptAiScore(teacherId, answerId, teacherFeedback);
@@ -316,6 +320,7 @@ public class TeacherReviewServiceImpl implements TeacherReviewService {
 
     @Override
     @Transactional
+    @CacheEvict(value = "teacherAssignments", allEntries = true)
     public void batchModify(Long teacherId, List<Long> answerIds, Integer newScore, String teacherFeedback) {
         for (Long answerId : answerIds) {
             modifyScore(teacherId, answerId, newScore, teacherFeedback);
@@ -410,6 +415,7 @@ public class TeacherReviewServiceImpl implements TeacherReviewService {
 
     @Override
     @Transactional
+    @CacheEvict(value = "teacherAssignments", allEntries = true)
     public ReviewDetailVO regradeWithAi(Long teacherId, Long answerId) {
         StudentAnswer answer = studentAnswerMapper.selectById(answerId);
         if (answer == null) {

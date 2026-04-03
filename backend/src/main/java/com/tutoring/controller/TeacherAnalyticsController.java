@@ -62,7 +62,15 @@ public class TeacherAnalyticsController {
             @RequestParam(required = false) Long courseId,
             HttpServletResponse response) {
         Long teacherId = getCurrentUserId();
-        teacherAnalyticsService.exportFrequentErrors(teacherId, courseId, response);
+        System.out.println("=== CONTROLLER: exportFrequentErrors called, teacherId=" + teacherId + ", courseId=" + courseId);
+        try {
+            teacherAnalyticsService.exportFrequentErrors(teacherId, courseId, response);
+            System.out.println("=== CONTROLLER: exportFrequentErrors completed");
+        } catch (Exception e) {
+            System.out.println("=== CONTROLLER ERROR: " + e.getClass().getName() + " - " + e.getMessage());
+            e.printStackTrace();
+            throw new RuntimeException("导出失败: " + e.getMessage());
+        }
     }
 
     @Operation(summary = "获取学生个体分析")

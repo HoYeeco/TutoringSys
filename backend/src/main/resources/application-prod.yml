@@ -87,5 +87,9 @@ management:
       enabled: true
 
 logging:
+  level:
+    root: INFO
+    com.tutoring: DEBUG
+    org.springframework.security: DEBUG
   file:
     path: ${LOG_PATH:/data/logs}

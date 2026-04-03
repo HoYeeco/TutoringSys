@@ -47,6 +47,8 @@ public class TeacherAnalyticsServiceImpl implements TeacherAnalyticsService {
                 .completionRate(0.0)
                 .averageScore(0.0)
                 .excellentRate(0.0)
+                .overdueRate(0.0)
+                .overdueCount(0)
                 .scoreDistribution(new ArrayList<>())
                 .courseStats(new ArrayList<>())
                 .build();
@@ -87,6 +89,23 @@ public class TeacherAnalyticsServiceImpl implements TeacherAnalyticsService {
             );
 
         Integer totalSubmissions = submissions.size();
+
+        Map<Long, Assignment> assignmentMap = assignments.stream()
+            .collect(Collectors.toMap(Assignment::getId, Function.identity()));
+
+        double overdueCount = 0;
+        for (Submission submission : submissions) {
+            Assignment assignment = assignmentMap.get(submission.getAssignmentId());
+            if (assignment != null && assignment.getDeadline() != null 
+                && submission.getSubmitTime() != null 
+                && submission.getSubmitTime().isAfter(assignment.getDeadline())) {
+                overdueCount++;
+            }
+        }
+
+        Double overdueRate = totalSubmissions > 0 
+            ? Math.round(overdueCount * 100.0 / totalSubmissions * 100) / 100.0 
+            : 0.0;
 
         Integer totalPossible = assignments.size() * totalStudents;
         Double completionRate = totalPossible > 0 
@@ -195,6 +214,8 @@ public class TeacherAnalyticsServiceImpl implements TeacherAnalyticsService {
             .completionRate(completionRate)
             .averageScore(averageScore)
             .excellentRate(excellentRate)
+            .overdueRate(overdueRate)
+            .overdueCount((int) overdueCount)
             .scoreDistribution(scoreDistribution)
             .courseStats(courseStats)
             .build();
@@ -427,48 +448,63 @@ public class TeacherAnalyticsServiceImpl implements TeacherAnalyticsService {
 
     @Override
     public void exportFrequentErrors(Long teacherId, Long courseId, HttpServletResponse response) {
-        Page<FrequentErrorVO> page = getFrequentErrors(teacherId, 1, Integer.MAX_VALUE, courseId);
-        List<FrequentErrorVO> list = page.getRecords();
+        System.out.println("=== DEBUG: exportFrequentErrors called, teacherId=" + teacherId + ", courseId=" + courseId);
+        try {
+            Page<FrequentErrorVO> page = getFrequentErrors(teacherId, 1, 10000, courseId);
+            System.out.println("=== DEBUG: getFrequentErrors completed, records=" + (page != null ? page.getRecords().size() : "null"));
+            List<FrequentErrorVO> list = page.getRecords();
 
-        try (Workbook workbook = new XSSFWorkbook()) {
-            Sheet sheet = workbook.createSheet("高频错题");
-
-            Row headerRow = sheet.createRow(0);
-            String[] headers = {"序号", "课程", "作业", "题型", "题目内容", "错误次数", "总答题数", "错误率"};
-            for (int i = 0; i < headers.length; i++) {
-                Cell cell = headerRow.createCell(i);
-                cell.setCellValue(headers[i]);
-                CellStyle style = workbook.createCellStyle();
-                Font font = workbook.createFont();
-                font.setBold(true);
-                style.setFont(font);
-                cell.setCellStyle(style);
+            if (list == null) {
+                System.out.println("=== DEBUG: list is null, creating empty list");
+                list = new ArrayList<>();
             }
 
-            int rowNum = 1;
-            for (FrequentErrorVO vo : list) {
-                Row row = sheet.createRow(rowNum);
-                row.createCell(0).setCellValue(rowNum);
-                row.createCell(1).setCellValue(vo.getCourseName());
-                row.createCell(2).setCellValue(vo.getAssignmentTitle());
-                row.createCell(3).setCellValue(getTypeName(vo.getQuestionType()));
-                row.createCell(4).setCellValue(vo.getQuestionContent());
-                row.createCell(5).setCellValue(vo.getErrorCount());
-                row.createCell(6).setCellValue(vo.getTotalCount());
-                row.createCell(7).setCellValue(vo.getErrorRate() + "%");
-                rowNum++;
+            System.out.println("=== DEBUG: creating workbook");
+            Workbook workbook = new XSSFWorkbook();
+            try {
+                Sheet sheet = workbook.createSheet("高频错题");
+
+                Row headerRow = sheet.createRow(0);
+                String[] headers = {"序号", "课程", "作业", "题型", "题目内容", "错误次数", "总答题数", "错误率"};
+                for (int i = 0; i < headers.length; i++) {
+                    Cell cell = headerRow.createCell(i);
+                    cell.setCellValue(headers[i]);
+                    CellStyle style = workbook.createCellStyle();
+                    Font font = workbook.createFont();
+                    font.setBold(true);
+                    style.setFont(font);
+                    cell.setCellStyle(style);
+                }
+
+                int rowNum = 1;
+                for (FrequentErrorVO vo : list) {
+                    Row row = sheet.createRow(rowNum);
+                    row.createCell(0).setCellValue(rowNum);
+                    row.createCell(1).setCellValue(vo.getCourseName());
+                    row.createCell(2).setCellValue(vo.getAssignmentTitle());
+                    row.createCell(3).setCellValue(getTypeName(vo.getQuestionType()));
+                    row.createCell(4).setCellValue(vo.getQuestionContent());
+                    row.createCell(5).setCellValue(vo.getErrorCount());
+                    row.createCell(6).setCellValue(vo.getTotalCount());
+                    row.createCell(7).setCellValue(vo.getErrorRate() + "%");
+                    rowNum++;
+                }
+
+                for (int i = 0; i < headers.length; i++) {
+                    sheet.autoSizeColumn(i);
+                }
+
+                response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+                String fileName = URLEncoder.encode("高频错题分析.xlsx", StandardCharsets.UTF_8);
+                response.setHeader("Content-Disposition", "attachment;filename=\"" + fileName + "\"");
+
+                workbook.write(response.getOutputStream());
+            } finally {
+                if (workbook != null) {
+                    workbook.close();
+                }
             }
-
-            for (int i = 0; i < headers.length; i++) {
-                sheet.autoSizeColumn(i);
-            }
-
-            response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-            String fileName = URLEncoder.encode("高频错题分析.xlsx", StandardCharsets.UTF_8);
-            response.setHeader("Content-Disposition", "attachment;filename=\"" + fileName + "\"");
-
-            workbook.write(response.getOutputStream());
-        } catch (IOException e) {
+        } catch (Exception e) {
             throw new RuntimeException("导出Excel失败: " + e.getMessage());
         }
     }

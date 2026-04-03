@@ -142,10 +142,8 @@
               clearable
               @keyup.enter="loadHighFrequencyErrors"
             >
-              <template #suffix>
-                <el-button type="primary" @click="loadHighFrequencyErrors">
-                  <el-icon><Search /></el-icon>
-                </el-button>
+              <template #append>
+                <el-button :icon="Search" @click="loadHighFrequencyErrors" />
               </template>
             </el-input>
             <el-button type="primary" @click="exportErrorData">导出数据</el-button>
@@ -153,8 +151,8 @@
         </div>
       </template>
 
-      <div class="charts-row charts-row--three">
-        <el-card shadow="never" class="chart-card">
+      <div class="charts-row">
+        <el-card shadow="never" class="chart-card chart-card--full">
           <template #header>
             <div class="card-title">
               <div class="card-title__icon">
@@ -165,8 +163,10 @@
           </template>
           <div ref="errorDistributionChartRef" class="chart" style="height: 320px"></div>
         </el-card>
+      </div>
 
-        <el-card shadow="never" class="chart-card chart-card--double">
+      <div class="charts-row">
+        <el-card shadow="never" class="chart-card chart-card--full">
           <template #header>
             <div class="card-title">
               <div class="card-title__icon">
@@ -199,7 +199,11 @@
 
         <el-table :data="highFrequencyErrors" style="width: 100%" class="modern-table" @row-click="viewErrorDetail">
           <el-table-column prop="courseName" label="所属课程" min-width="150" show-overflow-tooltip />
-          <el-table-column prop="questionContent" label="题目" min-width="300" show-overflow-tooltip />
+          <el-table-column prop="questionContent" label="题目" min-width="300" show-overflow-tooltip>
+            <template #default="scope">
+              <span>{{ formatQuestionContent(scope.row.questionContent) }}</span>
+            </template>
+          </el-table-column>
           <el-table-column prop="errorCount" label="错误次数" width="100" align="center">
             <template #default="scope">
               <span class="error-count">{{ scope.row.errorCount }}</span>
@@ -266,7 +270,7 @@
         <div class="student-info">
           <div class="student-info__header">
             <div class="student-info__content">
-              <el-avatar :size="48" class="student-avatar">
+              <el-avatar :size="48" :src="selectedStudent.studentAvatar || undefined">
                 {{ selectedStudent.studentName?.charAt(0) }}
               </el-avatar>
               <div class="student-detail">
@@ -402,10 +406,10 @@ const classStats = ref({
   highestScore: 0,
   lowestScore: 0,
   completionRate: 0,
-  onTimeRate: 0,
+  overdueRate: 0,
   totalStudents: 0,
   submittedCount: 0,
-  onTimeCount: 0,
+  overdueCount: 0,
   averageScore: 0,
   totalCourses: 0,
   totalAssignments: 0
@@ -466,6 +470,7 @@ const loadCourses = async () => {
                 id: student.id,
                 username: student.username,
                 realName: student.realName,
+                avatar: student.avatar,
                 courseIds: [course.id]
               });
             } else {
@@ -545,10 +550,10 @@ const loadClassOverview = async () => {
       highestScore: calculateHighestScore(distribution),
       lowestScore: calculateLowestScore(distribution),
       completionRate: data.completionRate || 0,
-      onTimeRate: data.onTimeRate || 0,
+      overdueRate: data.overdueRate || 0,
       totalStudents: data.totalStudents || 0,
       submittedCount: data.totalSubmissions || 0,
-      onTimeCount: data.onTimeCount || 0,
+      overdueCount: data.overdueCount || 0,
       averageScore: data.averageScore || 0,
       totalCourses: data.totalCourses || 0,
       totalAssignments: data.totalAssignments || 0
@@ -689,7 +694,7 @@ const loadAllStats = async () => {
   
   const errorData = await loadErrorDistribution();
   nextTick(() => {
-    initErrorDistributionChart(errorData.errorByType || []);
+    initErrorDistributionChart(errorData.errorByAssignment || errorData.errorByType || []);
   });
   
   await loadHighFrequencyErrors();
@@ -777,7 +782,7 @@ const initOnTimeChart = () => {
       onTimeChart.dispose();
     }
     onTimeChart = echarts.init(onTimeChartRef.value);
-    const onTimePercent = Math.round(classStats.value.onTimeRate || 0);
+    const overduePercent = Math.round(classStats.value.overdueRate || 0);
     const option = {
       tooltip: {
         trigger: 'item',
@@ -789,7 +794,7 @@ const initOnTimeChart = () => {
       },
       series: [
         {
-          name: '按时情况',
+          name: '提交情况',
           type: 'pie',
           radius: ['45%', '65%'],
           center: ['50%', '45%'],
@@ -802,7 +807,7 @@ const initOnTimeChart = () => {
           label: {
             show: true,
             position: 'center',
-            formatter: `{a|${onTimePercent}%}\n{b|按时率}`,
+            formatter: `{a|${overduePercent}%}\n{b|逾期率}`,
             rich: {
               a: {
                 fontSize: 24,
@@ -826,14 +831,14 @@ const initOnTimeChart = () => {
           },
           data: [
             { 
-              value: onTimePercent, 
-              name: '按时提交',
-              itemStyle: { color: '#409eff' }
-            },
-            { 
-              value: 100 - onTimePercent, 
+              value: overduePercent, 
               name: '逾期提交',
               itemStyle: { color: '#e6a23c' }
+            },
+            { 
+              value: 100 - overduePercent, 
+              name: '按时提交',
+              itemStyle: { color: '#e4e7ed' }
             }
           ]
         }
@@ -957,8 +962,13 @@ const initErrorDistributionChart = (errorDistribution: any[]) => {
     }
     
     const sortedData = [...errorDistribution]
-      .sort((a, b) => b.value - a.value)
+      .sort((a, b) => (b.value || 0) - (a.value || 0))
       .slice(0, 10);
+    
+    const stripHtml = (html: string) => {
+      if (!html) return '';
+      return html.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim();
+    };
     
     const option = {
       tooltip: {
@@ -976,13 +986,15 @@ const initErrorDistributionChart = (errorDistribution: any[]) => {
       },
       xAxis: {
         type: 'category',
-        data: sortedData.map(item => item.name || ''),
+        data: sortedData.map(item => stripHtml(item.name) || ''),
         axisLabel: {
           interval: 0,
-          rotate: 30,
+          rotate: 0,
           fontSize: 11,
+          width: 150,
+          overflow: 'truncate',
           formatter: (value: string) => {
-            return value.length > 6 ? value.substring(0, 6) + '...' : value;
+            return value;
           }
         }
       },
@@ -1046,8 +1058,14 @@ const initHeatmapChart = (heatmapData: any[], frequentErrors: any[] = []) => {
     });
     
     const students = Array.from(allStudents).slice(0, 15);
+    
+    const stripHtml = (html: string) => {
+      if (!html) return '';
+      return html.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim();
+    };
+    
     const questions = topErrors.map((e: any, idx: number) => {
-      const content = e.questionContent || `题目${idx + 1}`;
+      const content = stripHtml(e.questionContent) || `题目${idx + 1}`;
       return content.length > 8 ? content.substring(0, 8) + '...' : content;
     });
     
@@ -1084,7 +1102,7 @@ const initHeatmapChart = (heatmapData: any[], frequentErrors: any[] = []) => {
         position: 'top',
         formatter: (params: any) => {
           const errorInfo = topErrors[params.value[0]];
-          const fullQuestion = errorInfo?.questionContent || questions[params.value[0]];
+          const fullQuestion = stripHtml(errorInfo?.questionContent) || questions[params.value[0]];
           const masteryLevel = params.value[2] >= 80 ? '掌握良好' : 
                                params.value[2] >= 60 ? '基本掌握' : 
                                params.value[2] >= 40 ? '掌握较差' : '未掌握';
@@ -1112,7 +1130,7 @@ const initHeatmapChart = (heatmapData: any[], frequentErrors: any[] = []) => {
           show: true
         },
         axisLabel: {
-          rotate: 45,
+          rotate: 0,
           fontSize: 10,
           interval: 0
         }
@@ -1133,7 +1151,7 @@ const initHeatmapChart = (heatmapData: any[], frequentErrors: any[] = []) => {
         calculable: true,
         orient: 'horizontal',
         left: 'center',
-        bottom: '2%',
+        bottom: '-5%', // 与水平轴数据作业名称保持距离
         inRange: {
           color: ['#f56c6c', '#e6a23c', '#409eff', '#67c23a']
         },
@@ -1206,7 +1224,7 @@ const initStudentTrendChart = (trends: any[]) => {
         data: trends.map(item => item.assignmentTitle || '未知作业'),
         axisLabel: {
           interval: 0,
-          rotate: 30,
+          rotate: 0,
           formatter: (value: string) => {
             return value.length > 8 ? value.substring(0, 8) + '...' : value;
           }
@@ -1277,6 +1295,7 @@ const searchStudent = async () => {
       studentId: found.id,
       studentName: found.realName || found.username,
       studentAccount: found.username,
+      studentAvatar: found.avatar || '',
       courseIds: found.courseIds || []
     };
     
@@ -1454,8 +1473,43 @@ const getErrorRateClass = (rate: number): string => {
   return 'low';
 };
 
+const formatQuestionContent = (content: string): string => {
+  if (!content) return '';
+  return content.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim();
+};
+
 const exportOverviewData = async () => {
-  ElMessage.info('功能开发中，暂不支持导出总览数据');
+  try {
+    const data = classStats.value;
+    
+    const csvContent = [
+      ['指标', '数值'],
+      ['学生总数', data.totalStudents || 0],
+      ['作业总数', data.totalAssignments || 0],
+      ['提交人数', data.submittedCount || 0],
+      ['逾期人数', data.overdueCount || 0],
+      ['提交率', ((data.completionRate || 0) * 100).toFixed(2) + '%'],
+      ['逾期率', ((data.overdueRate || 0) * 100).toFixed(2) + '%'],
+      ['平均分', (data.averageScore || 0).toFixed(2)],
+      ['最高分', data.highestScore || 0],
+      ['最低分', data.lowestScore || 0],
+      ['及格率', ((data.passRate || 0) * 100).toFixed(2) + '%'],
+      ['优秀率', ((data.excellentRate || 0) * 100).toFixed(2) + '%']
+    ].map(row => row.join(',')).join('\n');
+
+    const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `班级总览_${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    window.URL.revokeObjectURL(url);
+    
+    ElMessage.success('数据导出成功');
+  } catch (error) {
+    console.error('导出数据失败:', error);
+    ElMessage.error('数据导出失败');
+  }
 };
 
 const exportErrorData = async () => {
@@ -1479,9 +1533,18 @@ const exportErrorData = async () => {
     window.URL.revokeObjectURL(url);
     
     ElMessage.success('数据导出成功');
-  } catch (error) {
+  } catch (error: any) {
     console.error('导出数据失败:', error);
-    ElMessage.error('数据导出失败');
+    let errorMsg = '数据导出失败';
+    if (error.response?.data) {
+      try {
+        const text = await error.response.data.text();
+        errorMsg = text.substring(0, 200);
+      } catch {
+        errorMsg = error.response.data.message || errorMsg;
+      }
+    }
+    ElMessage.error(errorMsg);
   }
 };
 
@@ -1491,7 +1554,44 @@ const exportStudentData = async () => {
     return;
   }
   
-  ElMessage.info('功能开发中，暂不支持导出学生数据');
+  try {
+    const student = selectedStudent.value;
+    const trends = studentTrendData.value || [];
+    
+    const csvContent = [
+      ['学生姓名', student.studentName || ''],
+      ['学生账号', student.studentAccount || ''],
+      [''],
+      ['作业名称', '得分', '总分', '正确率', '提交时间']
+    ];
+    
+    trends.forEach((trend: any) => {
+      const correctRate = trend.totalQuestions > 0 
+        ? ((trend.correctCount || 0) / trend.totalQuestions * 100).toFixed(2) + '%' 
+        : '0%';
+      csvContent.push([
+        trend.assignmentTitle || '',
+        trend.score || 0,
+        trend.totalScore || 0,
+        correctRate,
+        trend.submitTime || ''
+      ]);
+    });
+
+    const csv = csvContent.map(row => row.join(',')).join('\n');
+    const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${student.studentName || '学生'}_成绩_${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    window.URL.revokeObjectURL(url);
+    
+    ElMessage.success('数据导出成功');
+  } catch (error) {
+    console.error('导出数据失败:', error);
+    ElMessage.error('数据导出失败');
+  }
 };
 
 onMounted(async () => {
@@ -1575,11 +1675,24 @@ onMounted(async () => {
 }
 
 .filter-item {
-  width: 180px;
+  width: 200px;
+  margin: auto 0;
 }
 
 .search-input {
   width: 240px;
+}
+
+.search-input :deep(.el-input__wrapper) {
+  padding-right: 4px;
+}
+
+.search-input :deep(.el-input__suffix) {
+  right: 4px;
+}
+
+.search-input :deep(.el-button) {
+  padding: 8px 12px;
 }
 
 .stats-container {
@@ -1591,13 +1704,18 @@ onMounted(async () => {
 }
 
 .stat-card {
+  margin: 10px;
   padding: 20px !important;
   border: none;
   border-radius: 12px;
   transition: all 0.3s ease;
-  min-height: 120px;
+  height: auto;
   background: #ffffff;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  min-height: 100px;
 }
 
 .stat-card:hover {
@@ -1623,8 +1741,8 @@ onMounted(async () => {
 }
 
 .stat-card__icon--excellent {
-  background: #fff7ed;
-  color: #f97316;
+  background: rgb(255, 247, 186);
+  color: #feae00;
 }
 
 .stat-card__icon--pass {
