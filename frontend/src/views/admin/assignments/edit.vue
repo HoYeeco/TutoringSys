@@ -29,12 +29,12 @@
           <el-input v-model="totalScoreDisplay" disabled style="width: 120px" />
           <span class="score-hint">（自动累加题目分值）</span>
         </el-form-item>
-        <el-form-item label="补充说明" prop="description">
+        <el-form-item label="作业描述" prop="description">
           <el-input
             v-model="assignment.description"
             type="textarea"
             rows="4"
-            placeholder="请输入补充说明（可选）"
+            placeholder="请输入作业相关补充说明（可选）"
             maxlength="2000"
             show-word-limit
           />
