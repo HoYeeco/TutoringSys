@@ -606,11 +606,17 @@ const goBack = () => {
 };
 
 const completeReview = async () => {
+  // 检查答案是否已复核
+  if (reviewDetail.value.reviewStatus !== 1) {
+    ElMessage.warning('该答案已复核，无法再次提交');
+    return;
+  }
+  
   submitting.value = true;
   try {
     if (feedbackAction.value === 'adopt') {
-      await request.post(`/teacher/review/${currentAnswerId.value}/accept`, null, {
-        params: { teacherFeedback: teacherFeedbackText.value }
+      await request.post(`/teacher/review/${currentAnswerId.value}/accept`, {
+        teacherFeedback: teacherFeedbackText.value || ''
       });
     } else {
       await request.post(`/teacher/review/${currentAnswerId.value}/modify`, null, {
@@ -652,13 +658,19 @@ const goToNext = () => {
 };
 
 const batchAdopt = async () => {
+  // 检查答案是否已复核
+  if (reviewDetail.value.reviewStatus !== 1) {
+    ElMessage.warning('该答案已复核，无法再次提交');
+    return;
+  }
+  
   batchSubmitting.value = true;
   try {
-    // 采用当前AI评分
-    await request.post(`/teacher/review/${currentAnswerId.value}/accept`, null, {
-      params: { teacherFeedback: teacherFeedbackText.value }
+    // 采用当前 AI 评分
+    await request.post(`/teacher/review/${currentAnswerId.value}/accept`, {
+      teacherFeedback: teacherFeedbackText.value || ''
     });
-    ElMessage.success('已采用AI评分');
+    ElMessage.success('已采用 AI 评分');
 
     // 自动跳到下一个
     if (currentIndex.value < answerIds.value.length - 1) {

@@ -18,6 +18,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @Tag(name = "教师批改复核", description = "教师批改复核相关接口")
 @RestController
@@ -53,12 +54,13 @@ public class TeacherReviewController {
         return Result.success(detail);
     }
 
-    @Operation(summary = "采用AI评分")
+    @Operation(summary = "采用 AI 评分")
     @PostMapping("/{answerId}/accept")
     public Result<Void> acceptAiScore(
             @PathVariable Long answerId,
-            @RequestParam(required = false) String teacherFeedback) {
+            @RequestBody(required = false) Map<String, String> requestBody) {
         Long teacherId = getCurrentUserId();
+        String teacherFeedback = requestBody != null ? requestBody.get("teacherFeedback") : null;
         teacherReviewService.acceptAiScore(teacherId, answerId, teacherFeedback);
         return Result.success(null);
     }
