@@ -287,23 +287,37 @@
                 {{ getGraderText(question.graderType) }}
               </el-tag>
             </div>
-            <div class="question-score-input">
+            <!-- 客观题直接显示系统分数，不可修改 -->
+            <div v-if="isObjectiveQuestion(question.type)" class="question-score-display">
               <span class="score-label-text">得分：</span>
-              <el-input-number
-                v-model="question.score"
-                :min="0"
-                :max="question.maxScore"
-                :precision="0"
-                controls-position="right"
-                size="small"
-                class="score-input"
-              />
+              <span class="score-value" :class="getScoreClass(question.score)">{{ question.score ?? '-' }}</span>
               <span class="max-score"> / {{ question.maxScore }} 分</span>
-              <span v-if="question.aiScore !== null && question.aiScore !== undefined" class="ai-score-hint">
-                <el-tooltip :content="'AI预评分: ' + question.aiScore + '分'" placement="top">
-                  <span class="ai-score-badge">AI: {{ question.aiScore }}</span>
-                </el-tooltip>
+              <el-tag size="small" type="success" effect="plain">系统自动批改</el-tag>
+            </div>
+            <!-- 主观题显示分数来源 -->
+            <div v-else class="question-score-display">
+              <span class="score-label-text">得分：</span>
+              <span class="score-value" :class="getScoreClass(getSubjectiveQuestionScore(question))">
+                {{ getSubjectiveQuestionScore(question) ?? '-' }}
               </span>
+              <span class="max-score"> / {{ question.maxScore }} 分</span>
+              <el-tag 
+                v-if="question.reviewStatus === 2" 
+                size="small" 
+                type="success" 
+                effect="plain"
+              >
+                已复核
+              </el-tag>
+              <el-tag 
+                v-else-if="question.aiScore !== null && question.aiScore !== undefined" 
+                size="small" 
+                type="warning" 
+                effect="plain"
+              >
+                AI评分: {{ question.aiScore }}分
+              </el-tag>
+              <el-tag v-else size="small" type="info" effect="plain">待评分</el-tag>
             </div>
           </div>
           
@@ -323,26 +337,12 @@
             <div class="answer-text" v-html="question.studentAnswer || '<span class=\'no-answer\'>未作答</span>'"></div>
           </div>
 
-          <div v-if="question.aiFeedback" class="answer-box ai-feedback-box">
+          <div v-if="question.aiFeedback && !isObjectiveQuestion(question.type)" class="answer-box ai-feedback-box">
             <div class="answer-label">
               <el-icon><ChatDotRound /></el-icon>
               AI评语
             </div>
             <div class="answer-text ai-feedback-text">{{ question.aiFeedback }}</div>
-          </div>
-          
-          <div class="feedback-box">
-            <div class="feedback-label">
-              <el-icon><ChatDotRound /></el-icon>
-              教师评语
-            </div>
-            <el-input
-              v-model="question.feedback"
-              type="textarea"
-              :rows="2"
-              placeholder="请输入评语（可选）..."
-              class="feedback-input"
-            />
           </div>
         </div>
       </div>
@@ -355,11 +355,7 @@
           </el-button>
           <el-button @click="submissionDialogVisible = false" size="large">
             <el-icon><Close /></el-icon>
-            取消
-          </el-button>
-          <el-button type="primary" @click="confirmReview" :loading="submitting" size="large">
-            <el-icon><CircleCheck /></el-icon>
-            提交评分
+            关闭
           </el-button>
         </div>
       </template>
@@ -373,7 +369,7 @@ import { useRoute, useRouter } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { 
   Document, Reading, Clock, User, CircleCheck, 
-  View, Check, ArrowLeft, TrendCharts, List, Search, 
+  View, ArrowLeft, List, Search, 
   DocumentDelete, Warning, Close, QuestionFilled, EditPen, ChatDotRound, Delete, RefreshLeft
 } from '@element-plus/icons-vue';
 import request from '@/utils/request';
@@ -395,7 +391,6 @@ const deadline = ref('');
 const totalSubmissions = ref(0);
 const totalStudents = ref(0);
 const loading = ref(false);
-const submitting = ref(false);
 const deleting = ref(false);
 
 const submissions = ref<any[]>([]);
@@ -484,7 +479,7 @@ const getSubmissions = async () => {
       assignmentTitle.value = assignmentResponse.data.title || '';
       courseName.value = assignmentResponse.data.courseName || '';
       deadline.value = assignmentResponse.data.deadline || '';
-      totalStudents.value = assignmentResponse.data.totalStudents || 0;
+      totalStudents.value = assignmentResponse.data.totalStudents ?? 0;
     }
 
     const response = await request.get(`${baseUrl}/${assignmentId.value}/submissions`, {
@@ -561,33 +556,6 @@ const viewSubmission = async (row: any) => {
   if (data) {
     currentSubmission.value = data;
     submissionDialogVisible.value = true;
-  }
-};
-
-const confirmReview = async () => {
-  if (isAdmin.value) {
-    ElMessage.warning('管理员无权批改作业');
-    return;
-  }
-  submitting.value = true;
-  try {
-    const totalScore = currentSubmission.value.questions.reduce((sum: number, q: any) => sum + (q.score || 0), 0);
-
-    await request.put(`/teacher/assignments/submissions/${currentSubmission.value.id}/review`, {
-      score: totalScore,
-      questions: currentSubmission.value.questions.map((q: any) => ({
-        questionId: q.questionId,
-        score: q.score,
-        feedback: q.feedback
-      }))
-    });
-    ElMessage.success('评分提交成功');
-    submissionDialogVisible.value = false;
-    getSubmissions();
-  } catch (error) {
-    ElMessage.error('评分提交失败');
-  } finally {
-    submitting.value = false;
   }
 };
 
@@ -684,6 +652,22 @@ const getGraderText = (graderType: string): string => {
     PENDING: '待批改'
   };
   return textMap[graderType] || graderType;
+};
+
+// 判断是否为客观题
+const isObjectiveQuestion = (type: string): boolean => {
+  return ['single', 'multiple', 'judgment'].includes(type);
+};
+
+// 获取主观题分数（已复核显示最终分数，未复核显示AI分数）
+const getSubjectiveQuestionScore = (question: any): number | null => {
+  if (question.reviewStatus === 2) {
+    // 已复核，显示最终分数
+    return question.finalScore ?? question.score ?? question.aiScore ?? null;
+  } else {
+    // 未复核，显示AI分数
+    return question.aiScore ?? question.score ?? null;
+  }
 };
 
 const handleSizeChange = (size: number) => {

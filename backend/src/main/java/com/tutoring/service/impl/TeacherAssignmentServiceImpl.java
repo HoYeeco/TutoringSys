@@ -146,9 +146,9 @@ public class TeacherAssignmentServiceImpl implements TeacherAssignmentService {
     }
 
     @Override
-    @Cacheable(value = "teacherAssignments", key = "'detail:' + #teacherId + ':' + #assignmentId")
+    @CacheEvict(value = "teacherAssignments", key = "'detail:' + #teacherId + ':' + #assignmentId")
     public TeacherAssignmentVO getAssignmentDetail(Long teacherId, Long assignmentId) {
-        log.info("从数据库查询作业详情: teacherId={}, assignmentId={}", teacherId, assignmentId);
+        log.info("从数据库查询作业详情: teacherId={}, assignmentId={}, time={}", teacherId, assignmentId, System.currentTimeMillis());
 
         Assignment assignment = assignmentMapper.selectById(assignmentId);
         if (assignment == null || !assignment.getTeacherId().equals(teacherId)) {
@@ -188,6 +188,12 @@ public class TeacherAssignmentServiceImpl implements TeacherAssignmentService {
                         .isNotNull(Submission::getFinalTotalScore))
                 .intValue();
 
+        // 计算应交人数（课程选课人数）
+        Integer totalStudents = course != null ? courseSelectionMapper.selectCount(
+                new LambdaQueryWrapper<CourseSelection>()
+                        .eq(CourseSelection::getCourseId, course.getId()))
+                .intValue() : 0;
+
         return TeacherAssignmentVO.builder()
                 .id(assignment.getId())
                 .title(assignment.getTitle())
@@ -201,6 +207,7 @@ public class TeacherAssignmentServiceImpl implements TeacherAssignmentService {
                 .questionCount(questions.size())
                 .submissionCount(submissionCount)
                 .gradedCount(gradedCount)
+                .totalStudents(totalStudents)
                 .createTime(assignment.getCreateTime())
                 .updateTime(assignment.getUpdateTime())
                 .questions(questionDTOs)
