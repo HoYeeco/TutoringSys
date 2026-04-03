@@ -459,6 +459,8 @@ public class TeacherReviewServiceImpl implements TeacherReviewService {
             studentAnswerContent, 
             maxScore
         );
+        
+        log.info("调用 qwenService.gradeAnswer 完成，referenceAnswer={}", referenceAnswer);
 
         log.info("Qwen AI 返回结果：score={}, errors={}, suggestions={}", 
             result.getScore(), result.getErrors(), result.getSuggestions());

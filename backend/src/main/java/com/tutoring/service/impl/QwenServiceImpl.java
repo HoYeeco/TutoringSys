@@ -86,6 +86,12 @@ public class QwenServiceImpl implements QwenService {
     @Override
     public GradingResult gradeAnswer(String questionContent, String referenceAnswer, String studentAnswer, Integer maxScore) {
         System.out.println("=== DEBUG: gradeAnswer 被调用 ===");
+        System.out.println("=== questionContent: " + questionContent);
+        System.out.println("=== referenceAnswer: " + referenceAnswer);
+        System.out.println("=== studentAnswer: " + studentAnswer);
+        System.out.println("=== maxScore: " + maxScore);
+        System.out.println("=== API Key 是否存在: " + (apiKey != null && !apiKey.isEmpty()));
+        
         if (studentAnswer == null || studentAnswer.trim().isEmpty() || isNoAnswer(studentAnswer)) {
             System.out.println("=== DEBUG: 学生未作答 ===");
             return GradingResult.builder()
@@ -156,16 +162,18 @@ public class QwenServiceImpl implements QwenService {
             if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
                 QwenResponse qwenResponse = objectMapper.readValue(response.getBody(), QwenResponse.class);
                 log.debug("Qwen API response: {}", qwenResponse);
+                System.out.println("=== Qwen API 原始响应: " + response.getBody() + " ===");
                 return qwenResponse;
             } else {
-                log.error("Qwen API request failed with status: {}", response.getStatusCode());
+                log.error("Qwen API request failed with status: {}, body: {}", response.getStatusCode(), response.getBody());
                 return QwenResponse.builder()
-                    .message("API 请求失败：" + response.getStatusCode())
+                    .message("API 请求失败：" + response.getStatusCode() + " | " + response.getBody())
                     .code(String.valueOf(response.getStatusCode().value()))
                     .build();
             }
         } catch (Exception e) {
             log.error("调用 Qwen API 失败", e);
+            System.out.println("=== Qwen API 异常: " + e.getMessage() + " ===");
             return QwenResponse.builder()
                 .message("调用 AI 服务失败：" + e.getMessage())
                 .code("ERROR")
