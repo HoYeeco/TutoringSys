@@ -205,7 +205,11 @@ public class GradingAsyncServiceImpl implements GradingAsyncService {
             String questionType = question.getType() != null ? question.getType().toUpperCase() : "";
             
             if ("MULTIPLE".equals(questionType)) {
-                if (isMultipleChoiceCorrect(studentAnswer, correctAnswer)) {
+                String normalizedStudent = normalizeMultipleChoiceAnswer(studentAnswer);
+                String normalizedCorrect = normalizeMultipleChoiceAnswer(correctAnswer);
+                log.info("多选题批改: questionId={}, studentAnswer={}, correctAnswer={}, normalizedStudent={}, normalizedCorrect={}, match={}",
+                    question.getId(), studentAnswer, correctAnswer, normalizedStudent, normalizedCorrect, normalizedStudent.equals(normalizedCorrect));
+                if (normalizedStudent.equals(normalizedCorrect)) {
                     score = question.getScore();
                 }
             } else {
