@@ -265,8 +265,11 @@ public class TeacherReviewServiceImpl implements TeacherReviewService {
     @Transactional
     @CacheEvict(value = "teacherAssignments", allEntries = true)
     public void acceptAiScore(Long teacherId, Long answerId, String teacherFeedback) {
+        log.info("acceptAiScore 开始: teacherId={}, answerId={}", teacherId, answerId);
         StudentAnswer answer = validateAndGetAnswer(teacherId, answerId);
 
+        log.info("acceptAiScore: answer.submissionId={}, answer.aiScore={}", answer.getSubmissionId(), answer.getAiScore());
+        
         answer.setFinalScore(answer.getAiScore());
         answer.setTeacherFeedback(teacherFeedback);
         answer.setGraderType("AI");
@@ -276,14 +279,19 @@ public class TeacherReviewServiceImpl implements TeacherReviewService {
         answer.setUpdateTime(LocalDateTime.now());
         studentAnswerMapper.updateById(answer);
 
+        log.info("acceptAiScore: 答案更新完成，准备更新提交总分");
         updateSubmissionTotalScore(answer.getSubmissionId());
+        log.info("acceptAiScore 完成");
     }
 
     @Override
     @Transactional
     @CacheEvict(value = "teacherAssignments", allEntries = true)
     public void modifyScore(Long teacherId, Long answerId, Integer newScore, String teacherFeedback) {
+        log.info("modifyScore 开始: teacherId={}, answerId={}, newScore={}", teacherId, answerId, newScore);
         StudentAnswer answer = validateAndGetAnswer(teacherId, answerId);
+
+        log.info("modifyScore: answer.submissionId={}", answer.getSubmissionId());
 
         Question question = questionMapper.selectById(answer.getQuestionId());
         if (question != null && newScore > question.getScore()) {
@@ -299,25 +307,53 @@ public class TeacherReviewServiceImpl implements TeacherReviewService {
         answer.setUpdateTime(LocalDateTime.now());
         studentAnswerMapper.updateById(answer);
 
+        log.info("modifyScore: 答案更新完成，准备更新提交总分");
         updateSubmissionTotalScore(answer.getSubmissionId());
+        log.info("modifyScore 完成");
     }
 
     @Override
     @Transactional
     @CacheEvict(value = "teacherAssignments", allEntries = true)
     public void batchAccept(Long teacherId, List<Long> answerIds, String teacherFeedback) {
+        int successCount = 0;
+        int skipCount = 0;
         for (Long answerId : answerIds) {
-            acceptAiScore(teacherId, answerId, teacherFeedback);
+            try {
+                acceptAiScore(teacherId, answerId, teacherFeedback);
+                successCount++;
+            } catch (BusinessException e) {
+                if ("该答案已复核".equals(e.getMessage())) {
+                    skipCount++;
+                    log.info("批量采用: 跳过已复核的答案 answerId={}", answerId);
+                } else {
+                    throw e;
+                }
+            }
         }
+        log.info("批量采用完成: 成功={}, 跳过={}", successCount, skipCount);
     }
 
     @Override
     @Transactional
     @CacheEvict(value = "teacherAssignments", allEntries = true)
     public void batchModify(Long teacherId, List<Long> answerIds, Integer newScore, String teacherFeedback) {
+        int successCount = 0;
+        int skipCount = 0;
         for (Long answerId : answerIds) {
-            modifyScore(teacherId, answerId, newScore, teacherFeedback);
+            try {
+                modifyScore(teacherId, answerId, newScore, teacherFeedback);
+                successCount++;
+            } catch (BusinessException e) {
+                if ("该答案已复核".equals(e.getMessage())) {
+                    skipCount++;
+                    log.info("批量修改: 跳过已复核的答案 answerId={}", answerId);
+                } else {
+                    throw e;
+                }
+            }
         }
+        log.info("批量修改完成: 成功={}, 跳过={}", successCount, skipCount);
     }
 
     private StudentAnswer validateAndGetAnswer(Long teacherId, Long answerId) {
@@ -345,6 +381,7 @@ public class TeacherReviewServiceImpl implements TeacherReviewService {
 
     private void updateSubmissionTotalScore(Long submissionId) {
         if (submissionId == null) {
+            log.warn("updateSubmissionTotalScore: submissionId is null");
             return;
         }
 
@@ -354,6 +391,11 @@ public class TeacherReviewServiceImpl implements TeacherReviewService {
                 .eq(StudentAnswer::getIsDraft, 0)
         );
 
+        log.info("updateSubmissionTotalScore: submissionId={}, 答案数量={}", submissionId, answers.size());
+        for (StudentAnswer a : answers) {
+            log.info("  答案详情: answerId={}, reviewStatus={}, finalScore={}", a.getId(), a.getReviewStatus(), a.getFinalScore());
+        }
+
         int totalScore = answers.stream()
             .filter(a -> a.getFinalScore() != null)
             .mapToInt(StudentAnswer::getFinalScore)
@@ -361,20 +403,26 @@ public class TeacherReviewServiceImpl implements TeacherReviewService {
 
         Submission submission = submissionMapper.selectById(submissionId);
         if (submission != null) {
+            log.info("更新前 submission: id={}, reviewStatus={}, finalTotalScore={}", submission.getId(), submission.getReviewStatus(), submission.getFinalTotalScore());
+            
             submission.setFinalTotalScore(totalScore);
             submission.setReviewTime(LocalDateTime.now());
             
             boolean allAnsweredReviewed = answers.stream()
-                .allMatch(a -> a.getReviewStatus() != null && a.getReviewStatus() == 2);
+                .allMatch(a -> a.getReviewStatus() != null && (a.getReviewStatus() == 0 || a.getReviewStatus() == 2));
+            
+            log.info("allAnsweredReviewed={}, 答案总数={}", allAnsweredReviewed, answers.size());
             
             if (allAnsweredReviewed) {
                 if (submission.getStatus() != 3) {
                     submission.setStatus(3);
                 }
                 submission.setReviewStatus(2);
+                log.info("设置 submission.reviewStatus = 2");
             }
             
             submissionMapper.updateById(submission);
+            log.info("更新后 submission: id={}, reviewStatus={}, finalTotalScore={}", submission.getId(), submission.getReviewStatus(), submission.getFinalTotalScore());
         }
     }
 

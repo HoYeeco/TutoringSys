@@ -358,7 +358,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, onActivated } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { 
@@ -500,6 +500,11 @@ const getStatusTagType = (status: string): string => {
 };
 
 const getSubmissions = async () => {
+  if (!assignmentId.value || assignmentId.value === 'undefined') {
+    console.warn('assignmentId is undefined, skipping getSubmissions');
+    return;
+  }
+  
   loading.value = true;
   try {
     const baseUrl = isAdmin.value ? '/admin/assignments' : '/teacher/assignments';
@@ -727,6 +732,10 @@ const formatDate = (date: string | null) => {
 };
 
 onMounted(() => {
+  getSubmissions();
+});
+
+onActivated(() => {
   getSubmissions();
 });
 </script>
