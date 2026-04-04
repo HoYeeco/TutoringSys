@@ -61,13 +61,7 @@
         <el-table-column prop="assignmentTitle" label="作业名称" min-width="180" show-overflow-tooltip />
         <el-table-column prop="courseName" label="所属课程" min-width="150" show-overflow-tooltip />
         <el-table-column prop="studentName" label="学生姓名" width="120" />
-        <el-table-column prop="questionType" label="题目类型" width="100">
-          <template #default="scope">
-            <el-tag size="small" :type="getQuestionTypeTag(scope.row.questionTypeCategory)">
-              {{ scope.row.questionTypeCategory || getQuestionTypeLabel(scope.row.questionType) }}
-            </el-tag>
-          </template>
-        </el-table-column>
+        <el-table-column prop="questionScore" label="总分" width="80" />
         <el-table-column prop="aiScore" label="AI评分" width="100" />
         <el-table-column prop="finalScore" label="最终得分" width="100" />
         <el-table-column prop="submitTime" label="提交时间" width="160">
@@ -139,29 +133,6 @@ const courses = ref<any[]>([]);
 const submissions = ref<any[]>([]);
 const selectedRows = ref<any[]>([]);
 
-const getQuestionTypeTag = (type: string): string => {
-  const typeMap: Record<string, string> = {
-    '客观题': '',
-    '主观题': 'warning',
-    '综合题': 'success'
-  };
-  return typeMap[type] || '';
-};
-
-const getQuestionTypeLabel = (type: string): string => {
-  const typeMap: Record<string, string> = {
-    SINGLE: '客观题',
-    MULTIPLE: '客观题',
-    JUDGE: '客观题',
-    SUBJECTIVE: '主观题',
-    single: '客观题',
-    multiple: '客观题',
-    judgment: '客观题',
-    essay: '主观题'
-  };
-  return typeMap[type] || type;
-};
-
 const formatDateTime = (date: string | number[] | null): string => {
   if (!date) return '-';
   try {
@@ -214,7 +185,6 @@ const getSubmissions = async () => {
     const response = await request.get('/teacher/review/list', { params });
     let records = (response.data?.records || []).map((item: any) => ({
       ...item,
-      questionTypeCategory: categorizeQuestionType(item.questionType),
       displayStatus: calculateDisplayStatus(item)
     }));
     
@@ -245,18 +215,6 @@ const calculateDisplayStatus = (item: any): string => {
   if (submissionReviewStatus === 0) return 'auto_graded';
   if (item.graderType === 'AI') return 'review_pending';
   return 'review_pending';
-};
-
-const categorizeQuestionType = (type: string): string => {
-  const objectiveTypes = ['SINGLE', 'MULTIPLE', 'JUDGE', 'single', 'multiple', 'judgment'];
-  const subjectiveTypes = ['SUBJECTIVE', 'subjective', 'essay'];
-  
-  if (objectiveTypes.includes(type)) {
-    return '客观题';
-  } else if (subjectiveTypes.includes(type)) {
-    return '主观题';
-  }
-  return '综合题';
 };
 
 const statusConfig: Record<string, { type: string; text: string }> = {

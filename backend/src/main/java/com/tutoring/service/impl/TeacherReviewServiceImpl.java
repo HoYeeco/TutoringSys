@@ -88,11 +88,7 @@ public class TeacherReviewServiceImpl implements TeacherReviewService {
         List<Submission> pendingSubmissions = submissionMapper.selectList(
             new LambdaQueryWrapper<Submission>()
                 .in(Submission::getAssignmentId, filteredAssignmentIds)
-                .and(wrapper -> wrapper
-                    .eq(Submission::getReviewStatus, 1)
-                    .or()
-                    .in(Submission::getStatus, Arrays.asList(0, 1, 2))
-                )
+                .in(Submission::getStatus, Arrays.asList(0, 1, 2, 3))
                 .orderByDesc(Submission::getSubmitTime)
         );
 
@@ -162,37 +158,34 @@ public class TeacherReviewServiceImpl implements TeacherReviewService {
             Question question = questionMap.get(answer.getQuestionId());
 
             String questionType = question != null ? question.getType() : "未知";
-            String questionTypeCategory = categorizeQuestionType(questionType);
             
-            boolean isSubjectiveAnswer = isSubjectiveQuestionType(questionType);
-            
-            String uniqueKey = answer.getStudentId() + "_" + answer.getAssignmentId();
-            
-            if (!uniqueKeyMap.containsKey(uniqueKey) || isSubjectiveAnswer) {
-                ReviewListVO vo = ReviewListVO.builder()
-                    .answerId(answer.getId())
-                    .studentId(answer.getStudentId())
-                    .studentName(student != null ? student.getRealName() : "未知")
-                    .assignmentId(answer.getAssignmentId())
-                    .assignmentTitle(assignment != null ? assignment.getTitle() : "未知作业")
-                    .courseId(assignment != null ? assignment.getCourseId() : null)
-                    .courseName(course != null ? course.getName() : "未知课程")
-                    .questionId(answer.getQuestionId())
-                    .questionType(questionType)
-                    .questionTypeCategory(questionTypeCategory)
-                    .questionContent(question != null ? question.getContent() : "")
-                    .aiScore(answer.getAiScore())
-                    .finalScore(submission.getFinalTotalScore())
-                    .reviewStatus(answer.getReviewStatus())
-                    .graderType(answer.getGraderType())
-                    .submitTime(submission.getSubmitTime())
-                    .aiGradeTime(answer.getUpdateTime())
-                    .submissionStatus(submission.getStatus())
-                    .submissionReviewStatus(submission.getReviewStatus())
-                    .build();
-                
-                uniqueKeyMap.put(uniqueKey, vo);
+            if (!isSubjectiveQuestionType(questionType)) {
+                continue;
             }
+            
+            ReviewListVO vo = ReviewListVO.builder()
+                .answerId(answer.getId())
+                .studentId(answer.getStudentId())
+                .studentName(student != null ? student.getRealName() : "未知")
+                .assignmentId(answer.getAssignmentId())
+                .assignmentTitle(assignment != null ? assignment.getTitle() : "未知作业")
+                .courseId(assignment != null ? assignment.getCourseId() : null)
+                .courseName(course != null ? course.getName() : "未知课程")
+                .questionId(answer.getQuestionId())
+                .questionType(questionType)
+                .questionContent(question != null ? question.getContent() : "")
+                .questionScore(question != null ? question.getScore() : 0)
+                .aiScore(answer.getAiScore())
+                .finalScore(answer.getFinalScore())
+                .reviewStatus(answer.getReviewStatus())
+                .graderType(answer.getGraderType())
+                .submitTime(submission.getSubmitTime())
+                .aiGradeTime(answer.getUpdateTime())
+                .submissionStatus(submission.getStatus())
+                .submissionReviewStatus(submission.getReviewStatus())
+                .build();
+            
+            uniqueKeyMap.put(answer.getId().toString(), vo);
         }
 
         List<ReviewListVO> voList = new ArrayList<>(uniqueKeyMap.values());
@@ -382,26 +375,6 @@ public class TeacherReviewServiceImpl implements TeacherReviewService {
             }
             
             submissionMapper.updateById(submission);
-        }
-    }
-
-    private String categorizeQuestionType(String type) {
-        if (type == null) {
-            return "综合题";
-        }
-        
-        String upperType = type.toUpperCase();
-        switch (upperType) {
-            case "SINGLE":
-            case "MULTIPLE":
-            case "JUDGE":
-            case "JUDGMENT":
-                return "客观题";
-            case "SUBJECTIVE":
-            case "ESSAY":
-                return "主观题";
-            default:
-                return "综合题";
         }
     }
 
