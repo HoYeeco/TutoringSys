@@ -7,16 +7,14 @@ import com.tutoring.dto.SaveDraftRequest;
 import com.tutoring.dto.StudentAssignmentListVO;
 import com.tutoring.dto.SubmitRequest;
 import com.tutoring.dto.SubmitResponse;
-import com.tutoring.entity.User;
 import com.tutoring.service.StudentAssignmentService;
 import com.tutoring.service.UserService;
+import com.tutoring.util.SecurityUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 @Tag(name = "学生作业", description = "学生作业相关接口")
@@ -40,7 +38,7 @@ public class StudentAssignmentController {
             @RequestParam(defaultValue = "deadline") String sortBy,
             @RequestParam(defaultValue = "asc") String sortOrder) {
         
-        Long studentId = getCurrentUserId();
+        Long studentId = SecurityUtil.getCurrentUserId(userService);
         Page<StudentAssignmentListVO> result = studentAssignmentService.getAssignmentList(
             studentId, page, size, status, courseId, keyword, sortBy, sortOrder);
         return Result.success(result);
@@ -49,7 +47,7 @@ public class StudentAssignmentController {
     @Operation(summary = "获取作业详情")
     @GetMapping("/{assignmentId}/detail")
     public Result<AssignmentDetailVO> getAssignmentDetail(@PathVariable Long assignmentId) {
-        Long studentId = getCurrentUserId();
+        Long studentId = SecurityUtil.getCurrentUserId(userService);
         AssignmentDetailVO detail = studentAssignmentService.getAssignmentDetail(studentId, assignmentId);
         return Result.success(detail);
     }
@@ -59,7 +57,7 @@ public class StudentAssignmentController {
     public Result<Void> saveDraft(
             @PathVariable Long assignmentId,
             @Valid @RequestBody SaveDraftRequest request) {
-        Long studentId = getCurrentUserId();
+        Long studentId = SecurityUtil.getCurrentUserId(userService);
         studentAssignmentService.saveDraft(studentId, assignmentId, request);
         return Result.success(null);
     }
@@ -67,7 +65,7 @@ public class StudentAssignmentController {
     @Operation(summary = "获取草稿")
     @GetMapping("/{assignmentId}/draft")
     public Result<Object> getDraft(@PathVariable Long assignmentId) {
-        Long studentId = getCurrentUserId();
+        Long studentId = SecurityUtil.getCurrentUserId(userService);
         Object draft = studentAssignmentService.getDraft(studentId, assignmentId);
         return Result.success(draft);
     }
@@ -77,24 +75,9 @@ public class StudentAssignmentController {
     public Result<SubmitResponse> submitAssignment(
             @PathVariable Long assignmentId,
             @Valid @RequestBody SubmitRequest request) {
-        Long studentId = getCurrentUserId();
+        Long studentId = SecurityUtil.getCurrentUserId(userService);
         SubmitResponse response = studentAssignmentService.submitAssignment(studentId, assignmentId, request);
         return Result.success(response);
-    }
-
-    private Long getCurrentUserId() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null || !authentication.isAuthenticated()) {
-            throw new RuntimeException("用户未认证");
-        }
-        String username = authentication.getName();
-        User user = userService.lambdaQuery()
-            .eq(User::getUsername, username)
-            .one();
-        if (user == null) {
-            throw new RuntimeException("用户不存在");
-        }
-        return user.getId();
     }
 
 }

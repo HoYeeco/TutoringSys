@@ -10,13 +10,12 @@ import com.tutoring.dto.UserVO;
 import com.tutoring.entity.User;
 import com.tutoring.service.TeacherCourseService;
 import com.tutoring.service.UserService;
+import com.tutoring.util.SecurityUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -39,7 +38,7 @@ public class TeacherCourseController {
             @RequestParam(defaultValue = "10") Integer size,
             @RequestParam(required = false) String keyword) {
         
-        Long teacherId = getCurrentUserId();
+        Long teacherId = SecurityUtil.getCurrentUserId(userService);
         Page<TeacherCourseVO> result = teacherCourseService.getCourseList(teacherId, page, size, keyword);
         return Result.success(result);
     }
@@ -47,7 +46,7 @@ public class TeacherCourseController {
     @Operation(summary = "获取课程详情")
     @GetMapping("/{courseId}")
     public Result<TeacherCourseVO> getCourseDetail(@PathVariable Long courseId) {
-        Long teacherId = getCurrentUserId();
+        Long teacherId = SecurityUtil.getCurrentUserId(userService);
         TeacherCourseVO detail = teacherCourseService.getCourseDetail(teacherId, courseId);
         return Result.success(detail);
     }
@@ -55,7 +54,7 @@ public class TeacherCourseController {
     @Operation(summary = "创建课程")
     @PostMapping
     public Result<Long> createCourse(@Valid @RequestBody CreateCourseRequest request) {
-        Long teacherId = getCurrentUserId();
+        Long teacherId = SecurityUtil.getCurrentUserId(userService);
         Long courseId = teacherCourseService.createCourse(teacherId, request);
         return Result.success(courseId);
     }
@@ -63,7 +62,7 @@ public class TeacherCourseController {
     @Operation(summary = "更新课程")
     @PutMapping
     public Result<Void> updateCourse(@Valid @RequestBody UpdateCourseRequest request) {
-        Long teacherId = getCurrentUserId();
+        Long teacherId = SecurityUtil.getCurrentUserId(userService);
         teacherCourseService.updateCourse(teacherId, request);
         return Result.success(null);
     }
@@ -71,7 +70,7 @@ public class TeacherCourseController {
     @Operation(summary = "删除课程")
     @DeleteMapping("/{courseId}")
     public Result<Void> deleteCourse(@PathVariable Long courseId) {
-        Long teacherId = getCurrentUserId();
+        Long teacherId = SecurityUtil.getCurrentUserId(userService);
         teacherCourseService.deleteCourse(teacherId, courseId);
         return Result.success(null);
     }
@@ -99,21 +98,6 @@ public class TeacherCourseController {
             .collect(Collectors.toList());
         
         return Result.success(studentVOs);
-    }
-
-    private Long getCurrentUserId() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null || !authentication.isAuthenticated()) {
-            throw new RuntimeException("用户未认证");
-        }
-        String username = authentication.getName();
-        User user = userService.lambdaQuery()
-            .eq(User::getUsername, username)
-            .one();
-        if (user == null) {
-            throw new RuntimeException("用户不存在");
-        }
-        return user.getId();
     }
 
 }

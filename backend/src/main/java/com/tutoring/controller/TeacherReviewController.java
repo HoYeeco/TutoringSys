@@ -9,12 +9,11 @@ import com.tutoring.entity.User;
 import com.tutoring.service.TeacherReviewService;
 import com.tutoring.service.UserService;
 import com.tutoring.service.impl.GradingCompensateService;
+import com.tutoring.util.SecurityUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -40,7 +39,7 @@ public class TeacherReviewController {
             @RequestParam(required = false) Long assignmentId,
             @RequestParam(required = false) String keyword) {
         
-        Long teacherId = getCurrentUserId();
+        Long teacherId = SecurityUtil.getCurrentUserId(userService);
         Page<ReviewListVO> result = teacherReviewService.getReviewList(
             teacherId, page, size, courseId, assignmentId, keyword);
         return Result.success(result);
@@ -49,7 +48,7 @@ public class TeacherReviewController {
     @Operation(summary = "获取复核详情")
     @GetMapping("/{answerId}")
     public Result<ReviewDetailVO> getReviewDetail(@PathVariable Long answerId) {
-        Long teacherId = getCurrentUserId();
+        Long teacherId = SecurityUtil.getCurrentUserId(userService);
         ReviewDetailVO detail = teacherReviewService.getReviewDetail(teacherId, answerId);
         return Result.success(detail);
     }
@@ -59,7 +58,7 @@ public class TeacherReviewController {
     public Result<Void> acceptAiScore(
             @PathVariable Long answerId,
             @RequestBody(required = false) Map<String, String> requestBody) {
-        Long teacherId = getCurrentUserId();
+        Long teacherId = SecurityUtil.getCurrentUserId(userService);
         String teacherFeedback = requestBody != null ? requestBody.get("teacherFeedback") : null;
         teacherReviewService.acceptAiScore(teacherId, answerId, teacherFeedback);
         return Result.success(null);
@@ -71,7 +70,7 @@ public class TeacherReviewController {
             @PathVariable Long answerId,
             @RequestParam Integer newScore,
             @RequestParam(required = false) String teacherFeedback) {
-        Long teacherId = getCurrentUserId();
+        Long teacherId = SecurityUtil.getCurrentUserId(userService);
         teacherReviewService.modifyScore(teacherId, answerId, newScore, teacherFeedback);
         return Result.success(null);
     }
@@ -81,7 +80,7 @@ public class TeacherReviewController {
     public Result<Void> batchAccept(
             @RequestBody List<Long> answerIds,
             @RequestParam(required = false) String teacherFeedback) {
-        Long teacherId = getCurrentUserId();
+        Long teacherId = SecurityUtil.getCurrentUserId(userService);
         teacherReviewService.batchAccept(teacherId, answerIds, teacherFeedback);
         return Result.success(null);
     }
@@ -92,7 +91,7 @@ public class TeacherReviewController {
             @RequestBody List<Long> answerIds,
             @RequestParam Integer newScore,
             @RequestParam(required = false) String teacherFeedback) {
-        Long teacherId = getCurrentUserId();
+        Long teacherId = SecurityUtil.getCurrentUserId(userService);
         teacherReviewService.batchModify(teacherId, answerIds, newScore, teacherFeedback);
         return Result.success(null);
     }
@@ -100,7 +99,7 @@ public class TeacherReviewController {
     @Operation(summary = "智辅批改（重新AI评分）")
     @PostMapping("/{answerId}/regrade")
     public Result<ReviewDetailVO> regradeWithAi(@PathVariable Long answerId) {
-        Long teacherId = getCurrentUserId();
+        Long teacherId = SecurityUtil.getCurrentUserId(userService);
         ReviewDetailVO result = teacherReviewService.regradeWithAi(teacherId, answerId);
         return Result.success(result);
     }
@@ -108,7 +107,7 @@ public class TeacherReviewController {
     @Operation(summary = "手动触发作业批改（用于处理卡住的提交）")
     @PostMapping("/submissions/{submissionId}/trigger-grading")
     public Result<Void> triggerGrading(@PathVariable Long submissionId) {
-        Long teacherId = getCurrentUserId();
+        Long teacherId = SecurityUtil.getCurrentUserId(userService);
         
         User user = userService.lambdaQuery()
             .eq(User::getId, teacherId)
@@ -119,21 +118,6 @@ public class TeacherReviewController {
 
         gradingCompensateService.triggerGradingImmediately(submissionId);
         return Result.success(null);
-    }
-
-    private Long getCurrentUserId() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null || !authentication.isAuthenticated()) {
-            throw new RuntimeException("用户未认证");
-        }
-        String username = authentication.getName();
-        User user = userService.lambdaQuery()
-            .eq(User::getUsername, username)
-            .one();
-        if (user == null) {
-            throw new RuntimeException("用户不存在");
-        }
-        return user.getId();
     }
 
 }

@@ -6,6 +6,7 @@ import com.tutoring.dto.ErrorBookStatVO;
 import jakarta.servlet.http.HttpServletResponse;
 
 import java.util.List;
+import java.util.Map;
 
 public interface StudentErrorBookService {
 
@@ -13,6 +14,10 @@ public interface StudentErrorBookService {
 
     Page<ErrorBookListVO> getErrorBookList(Long studentId, Integer page, Integer size,
             Long courseId, String type, String keyword);
+
+    void addToErrorBook(Long studentId, Long questionId, Long assignmentId);
+
+    Map<String, Object> batchAddToErrorBook(Long studentId, List<Map<String, Long>> questions);
 
     void removeFromErrorBook(Long studentId, Long errorBookId);
 

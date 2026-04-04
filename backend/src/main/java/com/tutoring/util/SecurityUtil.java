@@ -1,5 +1,8 @@
 package com.tutoring.util;
 
+import com.tutoring.entity.User;
+import com.tutoring.exception.BusinessException;
+import com.tutoring.service.UserService;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.GrantedAuthority;
@@ -35,6 +38,21 @@ public class SecurityUtil {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         return authentication != null && authentication.isAuthenticated() 
             && !"anonymousUser".equals(authentication.getPrincipal());
+    }
+
+    public static Long getCurrentUserId(UserService userService) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()) {
+            throw new BusinessException("用户未认证");
+        }
+        String username = authentication.getName();
+        User user = userService.lambdaQuery()
+            .eq(User::getUsername, username)
+            .one();
+        if (user == null) {
+            throw new BusinessException("用户不存在");
+        }
+        return user.getId();
     }
 
 }

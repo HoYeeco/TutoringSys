@@ -1,5 +1,6 @@
 package com.tutoring.config;
 
+import com.tutoring.security.JsonAuthenticationEntryPoint;
 import com.tutoring.security.LoginFailureHandler;
 import com.tutoring.security.LoginSuccessHandler;
 import lombok.RequiredArgsConstructor;
@@ -28,6 +29,7 @@ public class SecurityConfig {
 
     private final LoginSuccessHandler loginSuccessHandler;
     private final LoginFailureHandler loginFailureHandler;
+    private final JsonAuthenticationEntryPoint jsonAuthenticationEntryPoint;
 
     @Bean
     public PasswordEncoder passwordEncoder() {
@@ -70,6 +72,9 @@ public class SecurityConfig {
             .sessionManagement(session -> session
                 .maximumSessions(1)
                 .maxSessionsPreventsLogin(false)
+            )
+            .exceptionHandling(ex -> ex
+                .authenticationEntryPoint(jsonAuthenticationEntryPoint)
             );
         return http.build();
     }

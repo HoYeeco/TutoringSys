@@ -10,16 +10,14 @@ import com.tutoring.dto.SubmissionDetailVO;
 import com.tutoring.dto.SubmissionRecordVO;
 import com.tutoring.dto.TeacherAssignmentVO;
 import com.tutoring.dto.UpdateAssignmentRequest;
-import com.tutoring.entity.User;
 import com.tutoring.service.TeacherAssignmentService;
 import com.tutoring.service.UserService;
+import com.tutoring.util.SecurityUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 @Tag(name = "教师作业管理", description = "教师作业管理相关接口")
@@ -41,7 +39,7 @@ public class TeacherAssignmentController {
             @RequestParam(required = false) Long courseId,
             @RequestParam(required = false) String keyword) {
         
-        Long teacherId = getCurrentUserId();
+        Long teacherId = SecurityUtil.getCurrentUserId(userService);
         Page<TeacherAssignmentVO> result = teacherAssignmentService.getAssignmentList(
             teacherId, page, size, status, courseId, keyword);
         return Result.success(result);
@@ -50,7 +48,7 @@ public class TeacherAssignmentController {
     @Operation(summary = "获取作业详情")
     @GetMapping("/{assignmentId}")
     public Result<TeacherAssignmentVO> getAssignmentDetail(@PathVariable Long assignmentId) {
-        Long teacherId = getCurrentUserId();
+        Long teacherId = SecurityUtil.getCurrentUserId(userService);
         TeacherAssignmentVO detail = teacherAssignmentService.getAssignmentDetail(teacherId, assignmentId);
         return Result.success(detail);
     }
@@ -59,7 +57,7 @@ public class TeacherAssignmentController {
     @PostMapping
     @Log(module = "作业管理", operation = "创建作业", value = "创建新作业", saveRequestData = true)
     public Result<Long> createAssignment(@Valid @RequestBody CreateAssignmentRequest request) {
-        Long teacherId = getCurrentUserId();
+        Long teacherId = SecurityUtil.getCurrentUserId(userService);
         Long assignmentId = teacherAssignmentService.createAssignment(teacherId, request);
         return Result.success(assignmentId);
     }
@@ -68,7 +66,7 @@ public class TeacherAssignmentController {
     @PutMapping
     @Log(module = "作业管理", operation = "更新作业", value = "更新作业信息", saveRequestData = true)
     public Result<Void> updateAssignment(@Valid @RequestBody UpdateAssignmentRequest request) {
-        Long teacherId = getCurrentUserId();
+        Long teacherId = SecurityUtil.getCurrentUserId(userService);
         teacherAssignmentService.updateAssignment(teacherId, request);
         return Result.success(null);
     }
@@ -77,7 +75,7 @@ public class TeacherAssignmentController {
     @PostMapping("/{assignmentId}/publish")
     @Log(module = "作业管理", operation = "发布作业", value = "发布作业给学生", saveRequestData = true)
     public Result<Void> publishAssignment(@PathVariable Long assignmentId) {
-        Long teacherId = getCurrentUserId();
+        Long teacherId = SecurityUtil.getCurrentUserId(userService);
         teacherAssignmentService.publishAssignment(teacherId, assignmentId);
         return Result.success(null);
     }
@@ -85,7 +83,7 @@ public class TeacherAssignmentController {
     @Operation(summary = "删除作业")
     @DeleteMapping("/{assignmentId}")
     public Result<Void> deleteAssignment(@PathVariable Long assignmentId) {
-        Long teacherId = getCurrentUserId();
+        Long teacherId = SecurityUtil.getCurrentUserId(userService);
         teacherAssignmentService.deleteAssignment(teacherId, assignmentId);
         return Result.success(null);
     }
@@ -96,7 +94,7 @@ public class TeacherAssignmentController {
             @PathVariable Long assignmentId,
             @RequestParam(defaultValue = "1") Integer page,
             @RequestParam(defaultValue = "10") Integer size) {
-        Long teacherId = getCurrentUserId();
+        Long teacherId = SecurityUtil.getCurrentUserId(userService);
         Page<SubmissionRecordVO> result = teacherAssignmentService.getAssignmentSubmissions(
                 teacherId, assignmentId, page, size);
         return Result.success(result);
@@ -105,7 +103,7 @@ public class TeacherAssignmentController {
     @Operation(summary = "获取作业提交状态")
     @GetMapping("/{assignmentId}/submission-status")
     public Result<AssignmentSubmissionStatusVO> getAssignmentSubmissionStatus(@PathVariable Long assignmentId) {
-        Long teacherId = getCurrentUserId();
+        Long teacherId = SecurityUtil.getCurrentUserId(userService);
         AssignmentSubmissionStatusVO result = teacherAssignmentService.getAssignmentSubmissionStatus(teacherId, assignmentId);
         return Result.success(result);
     }
@@ -113,7 +111,7 @@ public class TeacherAssignmentController {
     @Operation(summary = "获取提交详情")
     @GetMapping("/submissions/{submissionId}")
     public Result<SubmissionDetailVO> getSubmissionDetail(@PathVariable Long submissionId) {
-        Long teacherId = getCurrentUserId();
+        Long teacherId = SecurityUtil.getCurrentUserId(userService);
         SubmissionDetailVO detail = teacherAssignmentService.getSubmissionDetail(teacherId, submissionId);
         if (detail == null) {
             return Result.error(404, "提交记录不存在");
@@ -127,7 +125,7 @@ public class TeacherAssignmentController {
     public Result<Void> reviewSubmission(
             @PathVariable Long submissionId,
             @Valid @RequestBody ReviewSubmissionRequest request) {
-        Long teacherId = getCurrentUserId();
+        Long teacherId = SecurityUtil.getCurrentUserId(userService);
         teacherAssignmentService.reviewSubmission(teacherId, submissionId, request);
         return Result.success(null);
     }
@@ -135,7 +133,7 @@ public class TeacherAssignmentController {
     @Operation(summary = "删除学生提交")
     @DeleteMapping("/submissions/{submissionId}")
     public Result<Void> deleteSubmission(@PathVariable Long submissionId) {
-        Long teacherId = getCurrentUserId();
+        Long teacherId = SecurityUtil.getCurrentUserId(userService);
         teacherAssignmentService.deleteSubmission(teacherId, submissionId);
         return Result.success(null);
     }
@@ -143,24 +141,9 @@ public class TeacherAssignmentController {
     @Operation(summary = "打回重做")
     @PostMapping("/submissions/{submissionId}/reject")
     public Result<Void> rejectSubmission(@PathVariable Long submissionId) {
-        Long teacherId = getCurrentUserId();
+        Long teacherId = SecurityUtil.getCurrentUserId(userService);
         teacherAssignmentService.rejectSubmission(teacherId, submissionId);
         return Result.success(null);
-    }
-
-    private Long getCurrentUserId() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null || !authentication.isAuthenticated()) {
-            throw new RuntimeException("用户未认证");
-        }
-        String username = authentication.getName();
-        User user = userService.lambdaQuery()
-            .eq(User::getUsername, username)
-            .one();
-        if (user == null) {
-            throw new RuntimeException("用户不存在");
-        }
-        return user.getId();
     }
 
 }

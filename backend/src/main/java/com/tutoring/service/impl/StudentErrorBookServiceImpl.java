@@ -35,6 +35,92 @@ public class StudentErrorBookServiceImpl implements StudentErrorBookService {
     private final CourseSelectionMapper courseSelectionMapper;
 
     @Override
+    @Transactional
+    public void addToErrorBook(Long studentId, Long questionId, Long assignmentId) {
+        StudentAnswer studentAnswer = studentAnswerMapper.selectOne(
+            new LambdaQueryWrapper<StudentAnswer>()
+                .eq(StudentAnswer::getStudentId, studentId)
+                .eq(StudentAnswer::getQuestionId, questionId)
+                .eq(StudentAnswer::getAssignmentId, assignmentId)
+                .eq(StudentAnswer::getIsDraft, 0)
+        );
+
+        if (studentAnswer == null) {
+            throw new BusinessException("未找到对应的答题记录");
+        }
+
+        long exists = errorBookMapper.selectCount(
+            new LambdaQueryWrapper<ErrorBook>()
+                .eq(ErrorBook::getStudentId, studentId)
+                .eq(ErrorBook::getStudentAnswerId, studentAnswer.getId())
+                .eq(ErrorBook::getStatus, 1)
+        );
+        if (exists > 0) {
+            throw new BusinessException("该题已在错题本中");
+        }
+
+        ErrorBook errorBook = new ErrorBook();
+        errorBook.setStudentId(studentId);
+        errorBook.setStudentAnswerId(studentAnswer.getId());
+        errorBook.setStatus(1);
+        errorBookMapper.insert(errorBook);
+    }
+
+    @Override
+    @Transactional
+    public Map<String, Object> batchAddToErrorBook(Long studentId, List<Map<String, Long>> questions) {
+        int added = 0;
+        int skipped = 0;
+
+        for (Map<String, Long> item : questions) {
+            Object qidObj = item.get("questionId");
+            Object aidObj = item.get("assignmentId");
+
+            if (qidObj == null || aidObj == null) continue;
+            Long questionId = ((Number) qidObj).longValue();
+            Long itemAssignmentId = ((Number) aidObj).longValue();
+
+            try {
+                StudentAnswer studentAnswer = studentAnswerMapper.selectOne(
+                    new LambdaQueryWrapper<StudentAnswer>()
+                        .eq(StudentAnswer::getStudentId, studentId)
+                        .eq(StudentAnswer::getQuestionId, questionId)
+                        .eq(StudentAnswer::getAssignmentId, itemAssignmentId)
+                        .eq(StudentAnswer::getIsDraft, 0)
+                );
+
+                if (studentAnswer == null) {
+                    skipped++;
+                    continue;
+                }
+
+                long exists = errorBookMapper.selectCount(
+                    new LambdaQueryWrapper<ErrorBook>()
+                        .eq(ErrorBook::getStudentId, studentId)
+                        .eq(ErrorBook::getStudentAnswerId, studentAnswer.getId())
+                        .eq(ErrorBook::getStatus, 1)
+                );
+
+                if (exists > 0) {
+                    skipped++;
+                    continue;
+                }
+
+                ErrorBook errorBook = new ErrorBook();
+                errorBook.setStudentId(studentId);
+                errorBook.setStudentAnswerId(studentAnswer.getId());
+                errorBook.setStatus(1);
+                errorBookMapper.insert(errorBook);
+                added++;
+            } catch (Exception e) {
+                skipped++;
+            }
+        }
+
+        return Map.of("added", added, "skipped", skipped);
+    }
+
+    @Override
     public List<ErrorBookStatVO> getErrorBookStats(Long studentId) {
         List<CourseSelection> selections = courseSelectionMapper.selectList(
             new LambdaQueryWrapper<CourseSelection>()

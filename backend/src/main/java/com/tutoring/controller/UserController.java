@@ -12,12 +12,11 @@ import com.tutoring.entity.LoginRecord;
 import com.tutoring.entity.User;
 import com.tutoring.service.LoginRecordService;
 import com.tutoring.service.UserService;
+import com.tutoring.util.SecurityUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -42,7 +41,7 @@ public class UserController {
     @Operation(summary = "获取当前用户信息")
     @GetMapping("/profile")
     public Result<UserInfoResponse> getProfile() {
-        String username = getCurrentUsername();
+        String username = SecurityUtil.getCurrentUsername();
         User user = userService.lambdaQuery()
             .eq(User::getUsername, username)
             .one();
@@ -69,7 +68,7 @@ public class UserController {
     @Operation(summary = "修改密码")
     @PutMapping("/password")
     public Result<String> updatePassword(@Valid @RequestBody UpdatePasswordRequest request) {
-        String username = getCurrentUsername();
+        String username = SecurityUtil.getCurrentUsername();
         User user = userService.lambdaQuery()
             .eq(User::getUsername, username)
             .one();
@@ -95,7 +94,7 @@ public class UserController {
             return Result.error(400, "文件不能为空");
         }
 
-        String username = getCurrentUsername();
+        String username = SecurityUtil.getCurrentUsername();
         User user = userService.lambdaQuery()
             .eq(User::getUsername, username)
             .one();
@@ -155,7 +154,7 @@ public class UserController {
     @Operation(summary = "更新头像URL")
     @PutMapping("/avatar")
     public Result<String> updateAvatarUrl(@RequestBody UpdateAvatarRequest request) {
-        String username = getCurrentUsername();
+        String username = SecurityUtil.getCurrentUsername();
         User user = userService.lambdaQuery()
             .eq(User::getUsername, username)
             .one();
@@ -185,7 +184,7 @@ public class UserController {
             @RequestParam(defaultValue = "1") Integer page,
             @RequestParam(defaultValue = "10") Integer size) {
         
-        String username = getCurrentUsername();
+        String username = SecurityUtil.getCurrentUsername();
         User user = userService.lambdaQuery()
             .eq(User::getUsername, username)
             .one();
@@ -215,14 +214,6 @@ public class UserController {
         );
 
         return Result.success(responsePage);
-    }
-
-    private String getCurrentUsername() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null || !authentication.isAuthenticated()) {
-            throw new RuntimeException("用户未认证");
-        }
-        return authentication.getName();
     }
 
 }

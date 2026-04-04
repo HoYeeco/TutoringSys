@@ -27,15 +27,15 @@ service.interceptors.response.use(
     }
     const res = response.data;
     if (res.code !== 200) {
-      ElMessage.error(res.msg || '请求失败');
-      return Promise.reject(new Error(res.msg || '请求失败'));
+      ElMessage.error(res.message || '请求失败');
+      return Promise.reject(new Error(res.message || '请求失败'));
     }
     return res;
   },
   (error) => {
     if (error.response?.status === 401) {
       if (error.config?.url?.includes('/auth/login')) {
-        ElMessage.error(error.response?.data?.msg || '用户名或密码错误');
+        ElMessage.error(error.response?.data?.message || '用户名或密码错误');
       } else {
         const userStore = useUserStore();
         userStore.logout();
