@@ -20,6 +20,7 @@ public class AnswerDetailVO {
     private Integer maxScore;
     private String studentAnswer;
     private String correctAnswer;
+    private String referenceAnswer;
     private Boolean isCorrect;
     private Integer score;
     private Integer finalScore;

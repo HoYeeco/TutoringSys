@@ -10,6 +10,7 @@ import com.tutoring.mapper.*;
 import com.tutoring.service.StudentErrorBookService;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.stereotype.Service;
@@ -24,6 +25,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class StudentErrorBookServiceImpl implements StudentErrorBookService {
 
@@ -253,15 +255,31 @@ public class StudentErrorBookServiceImpl implements StudentErrorBookService {
 
                 Course course = courseMap.get(assignment.getCourseId());
 
+                String studentAnswer = sa.getAnswer();
+                String questionType = question.getType();
+                if ("ESSAY".equalsIgnoreCase(questionType) || "SUBJECTIVE".equalsIgnoreCase(questionType)) {
+                    studentAnswer = sa.getAnswerContent() != null ? sa.getAnswerContent() : sa.getAnswer();
+                }
+
+                log.info("错题数据调试: questionId={}, type={}, refAns={}, correctAns={}, aiFeedback={}, studentAnsLen={}",
+                    question.getId(),
+                    question.getType(),
+                    question.getReferenceAnswer() != null ? "有(" + question.getReferenceAnswer().length() + "字符)" : "NULL",
+                    question.getAnswer() != null ? "有" : "NULL",
+                    sa.getAiFeedback() != null ? "有(" + sa.getAiFeedback().length() + "字符)" : "NULL",
+                    studentAnswer != null ? studentAnswer.length() : 0
+                );
+
                 return ErrorBookListVO.builder()
                     .id(eb.getId())
                     .questionId(question.getId())
                     .type(question.getType())
                     .content(question.getContent())
                     .options(question.getOptions())
-                    .studentAnswer(sa.getAnswer())
+                    .studentAnswer(studentAnswer)
                     .correctAnswer(question.getAnswer())
-                    .analysis(question.getAnalysis())
+                    .referenceAnswer(question.getReferenceAnswer())
+                    .aiFeedback(sa.getAiFeedback())
                     .courseId(assignment.getCourseId())
                     .courseName(course != null ? course.getName() : "未知课程")
                     .assignmentId(assignment.getId())

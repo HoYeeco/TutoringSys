@@ -50,14 +50,6 @@
                 :value="course.courseId"
               />
             </el-select>
-            <el-select
-              v-model="sortBy"
-              placeholder="排序方式"
-              class="sort-select"
-            >
-              <el-option label="错题时间（最新）" value="desc" />
-              <el-option label="错题时间（最早）" value="asc" />
-            </el-select>
             <el-button type="primary" @click="handleSearch">
               <el-icon><Search /></el-icon>
               搜索
@@ -91,10 +83,11 @@
                     {{ getQuestionTypeText(error.type) }}
                   </el-tag>
                   <span class="question-preview">{{
-                    truncateText(error.content, 60)
+                    truncateText(error.content, 50)
                   }}</span>
                 </div>
                 <div class="title-right">
+                  <span class="assignment-badge">{{ error.assignmentTitle }}</span>
                   <span class="course-badge">{{ error.courseName }}</span>
                   <span class="time-text">{{
                     formatDate(error.createTime)
@@ -105,41 +98,41 @@
 
             <div class="error-detail">
               <div class="detail-section">
-                <div class="section-title">题目内容</div>
+                <div class="section-title">错题详情</div>
                 <div
                   class="question-content"
                   v-html="error.content"
                 ></div>
               </div>
 
-              <div class="detail-section" v-if="error.options">
-                <div class="section-title">选项</div>
+              <div class="detail-section" v-if="error.options && parseOptions(error.options).length > 0">
                 <div class="options-list">
                   <div
-                    v-for="(option, key) in parseOptions(error.options)"
-                    :key="key"
+                    v-for="(option, idx) in parseOptions(error.options)"
+                    :key="idx"
                     class="option-item"
                     :class="{
                       'is-correct': isCorrectOption(
                         error.correctAnswer,
-                        String(key),
+                        String(idx),
+                        idx,
                       ),
                       'is-wrong':
-                        isStudentAnswer(error.studentAnswer, String(key)) &&
-                        !isCorrectOption(error.correctAnswer, String(key)),
+                        isStudentAnswer(error.studentAnswer, String(idx), idx) &&
+                        !isCorrectOption(error.correctAnswer, String(idx), idx),
                     }"
                   >
-                    <span class="option-key">{{ key }}.</span>
+                    <span class="option-key">{{ getOptionLabel(idx, idx) }}.</span>
                     <span class="option-text">{{ option }}</span>
                     <el-icon
-                      v-if="isCorrectOption(error.correctAnswer, String(key))"
+                      v-if="isCorrectOption(error.correctAnswer, String(idx), idx)"
                       class="correct-icon"
                       ><CircleCheck
                     /></el-icon>
                     <el-icon
                       v-if="
-                        isStudentAnswer(error.studentAnswer, String(key)) &&
-                        !isCorrectOption(error.correctAnswer, String(key))
+                        isStudentAnswer(error.studentAnswer, String(idx), idx) &&
+                        !isCorrectOption(error.correctAnswer, String(idx), idx)
                       "
                       class="wrong-icon"
                       ><CircleClose
@@ -153,39 +146,57 @@
                   <div class="answer-box wrong-answer">
                     <div class="answer-label">
                       <el-icon><CircleClose /></el-icon>
-                      你的答案
+                      我的答案
                     </div>
-                    <div class="answer-content">
-                      {{
-                        formatAnswer(error.studentAnswer, error.type)
-                      }}
-                    </div>
+                    <div class="answer-content" v-if="isEssayType(error.type)" v-html="error.studentAnswer || '<span class=\'empty-text\'>暂无作答</span>'"></div>
+                    <div class="answer-content" v-else>{{ formatAnswer(error.studentAnswer, error.type) }}</div>
                   </div>
                 </el-col>
                 <el-col :span="12">
                   <div class="answer-box correct-answer">
                     <div class="answer-label">
                       <el-icon><CircleCheck /></el-icon>
-                      正确答案
+                      参考答案
                     </div>
-                    <div class="answer-content">
-                      {{
-                        formatAnswer(error.correctAnswer, error.type)
-                      }}
-                    </div>
+                    <div class="answer-content" v-if="isEssayType(error.type)" v-html="error.referenceAnswer || error.correctAnswer || '<span class=\'empty-text\'>教师未设置参考答案</span>'"></div>
+                    <div class="answer-content" v-else>{{ formatAnswer(error.correctAnswer, error.type) }}</div>
                   </div>
                 </el-col>
               </el-row>
 
-              <div
-                class="detail-section analysis-section"
-                v-if="error.analysis"
-              >
-                <div class="section-title">
-                  <el-icon><Document /></el-icon>
-                  题目解析
+              <div class="ai-feedback" v-if="isEssayType(error.type)">
+                <div class="feedback-header">
+                  <el-icon><Cpu /></el-icon>
+                  <span>AI 批改反馈</span>
                 </div>
-                <div class="analysis-content">{{ error.analysis }}</div>
+
+                <template v-if="error.aiFeedback">
+                  <div class="feedback-section" v-if="parseAiFeedback(error.aiFeedback).errorPoints?.length">
+                    <div class="feedback-subtitle">核心错误点</div>
+                    <div class="error-tags">
+                      <el-tag
+                        v-for="(point, idx) in parseAiFeedback(error.aiFeedback).errorPoints"
+                        :key="idx"
+                        type="danger"
+                        effect="plain"
+                        class="error-tag"
+                      >
+                        {{ point }}
+                      </el-tag>
+                    </div>
+                  </div>
+
+                  <div class="feedback-section" v-if="parseAiFeedback(error.aiFeedback).suggestions">
+                    <div class="feedback-subtitle">修正建议</div>
+                    <div class="suggestion-content">
+                      {{ parseAiFeedback(error.aiFeedback).suggestions }}
+                    </div>
+                  </div>
+                </template>
+                <div class="no-feedback" v-else>
+                  <el-icon><Warning /></el-icon>
+                  <span>暂无AI批改结果</span>
+                </div>
               </div>
 
               <div class="detail-footer">
@@ -200,12 +211,13 @@
                   </span>
                 </div>
                 <el-button
-                  type="danger"
+                  type="primary"
                   size="small"
                   @click="confirmRemove(error)"
+                  plain
                 >
                   <el-icon><Delete /></el-icon>
-                  移除错题
+                  我已掌握
                 </el-button>
               </div>
             </div>
@@ -230,7 +242,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, onMounted } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import {
   Search,
@@ -239,17 +251,17 @@ import {
   ArrowDown,
   CircleCheck,
   CircleClose,
-  Document,
   Folder,
   School,
   Delete,
   Notebook,
+  Cpu,
+  Warning,
 } from '@element-plus/icons-vue';
 import request from '@/utils/request';
 
 const searchKeyword = ref('');
 const filterCourseId = ref('');
-const sortBy = ref('desc');
 const activeNames = ref<string[]>([]);
 const currentPage = ref(1);
 const pageSize = ref(10);
@@ -286,6 +298,18 @@ const getErrorList = async () => {
     const data = response.data || {};
     errorList.value = data.records || [];
     totalCount.value = data.total || 0;
+
+    if (data.records && data.records.length > 0) {
+      const essayErrors = data.records.filter((e: any) => isEssayType(e.type));
+      if (essayErrors.length > 0) {
+        console.log('主观题错题数据:', essayErrors.map((e: any) => ({
+          type: e.type,
+          referenceAnswer: e.referenceAnswer,
+          correctAnswer: e.correctAnswer,
+          aiFeedback: e.aiFeedback ? '有数据' : '空'
+        })));
+      }
+    }
   } catch (error) {
     console.error('获取错题列表失败:', error);
     ElMessage.error('获取错题列表失败');
@@ -301,7 +325,6 @@ const handleSearch = () => {
 const resetFilters = () => {
   searchKeyword.value = '';
   filterCourseId.value = '';
-  sortBy.value = 'desc';
   currentPage.value = 1;
   getErrorList();
 };
@@ -376,12 +399,53 @@ const removeError = async (errorId: number) => {
   }
 };
 
+const isEssayType = (type: string) => {
+  const lowerType = type?.toLowerCase();
+  return lowerType === 'essay' || lowerType === 'subjective' || lowerType === 'ess';
+};
+
+const parseAiFeedback = (aiFeedback: string | null) => {
+  if (!aiFeedback) return { errorPoints: undefined, suggestions: undefined };
+  
+  const errorPoints: string[] = [];
+  let suggestions = '';
+
+  const errorMatch = aiFeedback.match(/【错误点】([^【]+)/);
+  if (errorMatch) {
+    const errorStr = errorMatch[1].trim();
+    if (errorStr) {
+      errorPoints.push(...errorStr.split('、').map((e: string) => e.trim()).filter((e: string) => e));
+    }
+  }
+
+  const suggestionMatch = aiFeedback.match(/【改进建议】(.+)$/);
+  if (suggestionMatch) {
+    suggestions = suggestionMatch[1].trim();
+  }
+
+  if (errorPoints.length === 0 && !suggestions) {
+    suggestions = aiFeedback;
+  }
+
+  return {
+    errorPoints: errorPoints.length > 0 ? errorPoints : undefined,
+    suggestions: suggestions.trim() || undefined,
+  };
+};
+
 const getQuestionTypeText = (type: string) => {
   const typeMap: Record<string, string> = {
     single: '单选题',
     multiple: '多选题',
     judgment: '判断题',
-    essay: '简答题',
+    judge: '判断题',
+    essay: '主观题',
+    SINGLE: '单选题',
+    MULTIPLE: '多选题',
+    JUDGE: '判断题',
+    JUDGMENT: '判断题',
+    ESSAY: '主观题',
+    SUBJECTIVE: '主观题',
   };
   return typeMap[type] || type;
 };
@@ -389,9 +453,16 @@ const getQuestionTypeText = (type: string) => {
 const getQuestionTypeTag = (type: string) => {
   const tagMap: Record<string, string> = {
     single: 'primary',
-    multiple: 'success',
-    judgment: 'warning',
-    essay: 'info',
+    multiple: 'primary',
+    judgment: 'primary',
+    judge: 'primary',
+    essay: 'primary',
+    SINGLE: 'primary',
+    MULTIPLE: 'primary',
+    JUDGE: 'primary',
+    JUDGMENT: 'primary',
+    ESSAY: 'primary',
+    SUBJECTIVE: 'primary',
   };
   return tagMap[type] || 'info';
 };
@@ -413,10 +484,17 @@ const formatDate = (dateStr: string) => {
   });
 };
 
-const parseOptions = (options: string) => {
+const parseOptions = (options: any) => {
+  if (Array.isArray(options)) {
+    return options;
+  }
   try {
     if (typeof options === 'string') {
-      return JSON.parse(options);
+      const parsed = JSON.parse(options);
+      if (Array.isArray(parsed)) {
+        return parsed;
+      }
+      return parsed || {};
     }
     return options || {};
   } catch {
@@ -424,21 +502,32 @@ const parseOptions = (options: string) => {
   }
 };
 
-const isCorrectOption = (correctAnswer: string, key: string) => {
-  if (!correctAnswer) return false;
-  const answers = correctAnswer.toUpperCase().split(',');
-  return answers.includes(key.toUpperCase());
+const getOptionLabel = (key: string | number, index: number) => {
+  const keyStr = String(key);
+  if (/^[A-Da-d]$/.test(keyStr)) {
+    return keyStr.toUpperCase();
+  }
+  return String.fromCharCode(65 + index);
 };
 
-const isStudentAnswer = (studentAnswer: string, key: string) => {
+const isCorrectOption = (correctAnswer: string, key: string, index: number) => {
+  if (!correctAnswer) return false;
+  const answers = correctAnswer.toUpperCase().split(',');
+  const optionLabel = getOptionLabel(key, index);
+  return answers.includes(optionLabel);
+};
+
+const isStudentAnswer = (studentAnswer: string, key: string, index: number) => {
   if (!studentAnswer) return false;
   const answers = studentAnswer.toUpperCase().split(',');
-  return answers.includes(key.toUpperCase());
+  const optionLabel = getOptionLabel(key, index);
+  return answers.includes(optionLabel);
 };
 
 const formatAnswer = (answer: string, type: string) => {
   if (!answer) return '-';
-  if (type === 'judgment') {
+  const lowerType = type?.toLowerCase();
+  if (lowerType === 'judgment' || lowerType === 'judge') {
     return answer === 'true' || answer === '正确' ? '正确' : '错误';
   }
   return answer;
@@ -503,7 +592,7 @@ onMounted(() => {
   width: 40px;
   height: 40px;
   border-radius: 12px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, rgb(15, 38, 70) 0%, rgb(58, 97, 156) 50%, rgb(11, 17, 27) 100%);
   color: #fff;
 }
 
@@ -524,10 +613,6 @@ onMounted(() => {
 
 .filter-select {
   width: 150px;
-}
-
-.sort-select {
-  width: 160px;
 }
 
 /* 错题列表 */
@@ -575,11 +660,37 @@ onMounted(() => {
 }
 
 .course-badge {
-  background-color: #f0f2f5;
+  background-color: #fff;
   color: #606266;
-  padding: 4px 12px;
-  border-radius: 12px;
-  font-size: 13px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 12px;
+  border: 1px solid #dcdfe6;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 20px;
+  width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.assignment-badge {
+  background-color: #fff;
+  color: #606266;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 12px;
+  border: 1px solid #dcdfe6;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 20px;
+  width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .time-text {
@@ -615,17 +726,20 @@ onMounted(() => {
 
 .options-list {
   display: flex;
-  flex-direction: column;
+  flex-wrap: wrap;
   gap: 10px;
 }
 
 .option-item {
   display: flex;
   align-items: center;
-  padding: 12px 16px;
+  padding: 8px 12px;
   background-color: #ffffff;
   border-radius: 8px;
   border: 1px solid #e4e7ed;
+  flex: 1;
+  min-width: 200px;
+  max-width: calc(50% - 5px);
 }
 
 .option-item.is-correct {
@@ -662,11 +776,19 @@ onMounted(() => {
 
 .answer-section {
   margin-bottom: 20px;
+  display: flex;
+}
+
+.answer-section .el-col {
+  display: flex;
 }
 
 .answer-box {
   padding: 16px;
   border-radius: 8px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
 }
 
 .answer-box.wrong-answer {
@@ -699,19 +821,109 @@ onMounted(() => {
 .answer-content {
   line-height: 1.6;
   font-size: 14px;
+  flex: 1;
+  text-align: left;
 }
 
-.analysis-section {
-  background-color: rgba(64, 158, 255, 0.1);
+.answer-content :deep(p) {
+  margin: 0 0 8px 0;
+}
+
+.answer-content :deep(p:last-child) {
+  margin-bottom: 0;
+}
+
+.answer-content :deep(ul),
+.answer-content :deep(ol) {
+  margin: 8px 0;
+  padding-left: 24px;
+}
+
+.answer-content :deep(li) {
+  margin: 4px 0;
+}
+
+.answer-content :deep(strong) {
+  font-weight: 600;
+}
+
+.answer-content :deep(em) {
+  font-style: italic;
+}
+
+.answer-content :deep(u) {
+  text-decoration: underline;
+}
+
+.ai-feedback {
+  background: linear-gradient(135deg, #ecf5ff 0%, #f0f7ff 100%);
+  border-radius: 12px;
   padding: 16px;
-  border-radius: 8px;
-  border: 1px solid rgba(64, 158, 255, 0.3);
+  border: 1px solid #d9ecff;
+  margin-bottom: 20px;
 }
 
-.analysis-content {
-  line-height: 1.8;
-  color: #606266;
+.feedback-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #409eff;
+  margin-bottom: 16px;
+}
+
+.feedback-section {
+  margin-bottom: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.feedback-section:last-child {
+  margin-bottom: 0;
+}
+
+.feedback-subtitle {
+  font-size: 13px;
+  color: #409eff;
+  font-weight: 800;
+  margin-bottom: 8px;
+  text-align: center;
+  width: 100%;
+}
+
+.error-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+}
+
+.error-tag {
+  font-size: 12px;
+}
+
+.suggestion-content {
   font-size: 14px;
+  line-height: 1.8;
+  color: #303133;
+  text-align: left;
+}
+
+.no-feedback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: #909399;
+  font-size: 14px;
+  padding: 16px 0;
+}
+
+.empty-text {
+  color: #c0c4cc;
+  font-style: italic;
 }
 
 .detail-footer {
@@ -768,8 +980,7 @@ onMounted(() => {
   }
 
   .search-input,
-  .filter-select,
-  .sort-select {
+  .filter-select {
     width: 100%;
   }
 
@@ -783,11 +994,6 @@ onMounted(() => {
   .card-header {
     flex-direction: column;
     align-items: flex-start;
-  }
-
-  .stats-grid {
-    flex-direction: column;
-    gap: 16px;
   }
 
   .error-title-row {

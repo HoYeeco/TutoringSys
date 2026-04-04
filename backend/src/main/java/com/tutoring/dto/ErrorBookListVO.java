@@ -21,7 +21,8 @@ public class ErrorBookListVO {
     private List<String> options;
     private String studentAnswer;
     private String correctAnswer;
-    private String analysis;
+    private String referenceAnswer;
+    private String aiFeedback;
     private Long courseId;
     private String courseName;
     private Long assignmentId;

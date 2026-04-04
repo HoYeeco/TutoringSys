@@ -203,6 +203,7 @@ public class StudentGradingServiceImpl implements StudentGradingService {
                     .maxScore(question.getScore())
                     .studentAnswer(sa.getAnswer())
                     .correctAnswer(question.getAnswer())
+                    .referenceAnswer(question.getReferenceAnswer())
                     .isCorrect(isCorrect)
                     .score(sa.getScore())
                     .finalScore(sa.getFinalScore())

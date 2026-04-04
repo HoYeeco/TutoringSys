@@ -94,7 +94,7 @@
           <div class="answer-section">
             <div class="answer-row-two-col">
               <div class="answer-col">
-                <span class="answer-label">你的答案：</span>
+                <span class="answer-label">我的答案：</span>
                 <div
                   class="answer-value"
                   :class="getAnswerClass(question)"
@@ -112,10 +112,10 @@
                 <span class="answer-label">参考答案：</span>
                 <div class="answer-value reference-answer">
                   <template v-if="question.type === 'essay'">
-                    <div class="essay-content readonly-editor" v-html="question.correctAnswer || '暂无参考答案'"></div>
+                    <div class="essay-content readonly-editor" v-html="question.referenceAnswer || question.correctAnswer || '暂无参考答案'"></div>
                   </template>
                   <template v-else>
-                    {{ formatAnswer(question.correctAnswer, question.type) || '暂无参考答案' }}
+                    {{ formatAnswer(question.referenceAnswer || question.correctAnswer, question.type) || '暂无参考答案' }}
                   </template>
                 </div>
               </div>
@@ -167,7 +167,7 @@
             </div>
           </div>
 
-          <div class="question-footer" v-if="question.type !== 'essay' && (question.earnedScore || 0) < (question.score || 0)">
+          <div class="question-footer" v-if="(question.earnedScore || 0) < (question.score || 0)">
             <el-button
               v-if="!question.inWrongBook"
               type="primary"
@@ -221,11 +221,11 @@ const questions = ref<any[]>([]);
 const batchAdding = ref(false);
 
 const hasWrongQuestions = computed(() => {
-  return questions.value.some(q => q.type !== 'essay' && (q.earnedScore || 0) < (q.score || 0));
+  return questions.value.some(q => (q.earnedScore || 0) < (q.score || 0));
 });
 
 const allWrongInBook = computed(() => {
-  const wrongQs = questions.value.filter(q => q.type !== 'essay' && (q.earnedScore || 0) < (q.score || 0));
+  const wrongQs = questions.value.filter(q => (q.earnedScore || 0) < (q.score || 0));
   return wrongQs.length > 0 && wrongQs.every(q => q.inWrongBook);
 });
 
@@ -273,6 +273,7 @@ const getGradingDetail = async () => {
       score: a.maxScore,
       studentAnswer: a.studentAnswer,
       correctAnswer: a.correctAnswer,
+      referenceAnswer: a.referenceAnswer,
       isCorrect: a.isCorrect,
       earnedScore: a.finalScore ?? a.score,
       aiFeedback: parseAiFeedback(a.aiFeedback),
@@ -288,50 +289,29 @@ const getGradingDetail = async () => {
   }
 };
 
-// 解析AI反馈字符串为对象
 const parseAiFeedback = (aiFeedback: string | null) => {
   if (!aiFeedback) return null;
   
-  try {
-    // 尝试解析为JSON
-    const parsed = JSON.parse(aiFeedback);
-    if (parsed.errorPoints || parsed.suggestions) {
-      return parsed;
-    }
-  } catch {
-    // 不是JSON格式，作为纯文本处理
-  }
-  
-  // 尝试从文本中提取核心错误点和修正建议
   const errorPoints: string[] = [];
   let suggestions = '';
-  
-  const lines = aiFeedback.split('\n');
-  let inSuggestions = false;
-  
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (!trimmed) continue;
-    
-    if (trimmed.includes('错误') || trimmed.includes('问题')) {
-      const match = trimmed.match(/[:：]\s*(.+)/);
-      if (match) {
-        errorPoints.push(match[1]);
-      } else if (trimmed.length > 5) {
-        errorPoints.push(trimmed);
-      }
-    } else if (trimmed.includes('建议') || trimmed.includes('改进')) {
-      inSuggestions = true;
-    } else if (inSuggestions) {
-      suggestions += trimmed + '\n';
+
+  const errorMatch = aiFeedback.match(/【错误点】([^【]+)/);
+  if (errorMatch) {
+    const errorStr = errorMatch[1].trim();
+    if (errorStr) {
+      errorPoints.push(...errorStr.split('、').map((e: string) => e.trim()).filter((e: string) => e));
     }
   }
-  
+
+  const suggestionMatch = aiFeedback.match(/【改进建议】(.+)$/);
+  if (suggestionMatch) {
+    suggestions = suggestionMatch[1].trim();
+  }
+
   if (errorPoints.length === 0 && !suggestions) {
-    // 无法解析，将整个文本作为建议
     suggestions = aiFeedback;
   }
-  
+
   return {
     errorPoints: errorPoints.length > 0 ? errorPoints : undefined,
     suggestions: suggestions.trim() || undefined,
@@ -340,7 +320,7 @@ const parseAiFeedback = (aiFeedback: string | null) => {
 
 const checkErrorBookStatus = async () => {
   try {
-    const wrongQs = questions.value.filter(q => q.type !== 'essay' && (q.earnedScore || 0) < (q.score || 0));
+    const wrongQs = questions.value.filter(q => (q.earnedScore || 0) < (q.score || 0));
     if (wrongQs.length === 0) return;
     const questionIds = wrongQs.map(q => q.id);
     const res = await request.get('/student/error-book/check', {
@@ -507,7 +487,6 @@ const addToWrongBook = async (question: any) => {
 
 const addAllToWrongBook = async () => {
   const wrongQuestions = questions.value.filter(q => {
-    if (q.type === 'essay') return false;
     if (q.inWrongBook) return false;
     const earned = q.earnedScore || 0;
     const total = q.score || 0;
@@ -622,9 +601,15 @@ onMounted(() => {
   align-items: center;
 }
 
+.wrong-book-tag :deep(.el-tag__content) {
+  display: inline-flex;
+  align-items: center;
+}
+
 .wrong-book-tag__icon {
   margin-right: 4px;
-  vertical-align: middle;
+  display: inline-flex;
+  align-items: center;
 }
 
 .assignment-summary {
@@ -746,6 +731,7 @@ onMounted(() => {
   display: flex;
   gap: 16px;
   width: 100%;
+  justify-content: center;
 }
 
 .answer-col {
@@ -754,12 +740,20 @@ onMounted(() => {
   flex-direction: column;
   gap: 8px;
   min-width: 0;
+  max-width: 50%;
+}
+
+.answer-col .answer-value {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
 }
 
 .answer-label {
   font-size: 14px;
-  color: #606266;
+  color: rgb(64, 158, 255);
   font-weight: 500;
+  text-align: left;
 }
 
 .answer-value {
@@ -767,6 +761,8 @@ onMounted(() => {
   padding: 12px 16px;
   border-radius: 8px;
   background: #f5f7fa;
+  text-align: left;
+  min-height: 60px;
 }
 
 .answer-value.full-score {
@@ -792,14 +788,16 @@ onMounted(() => {
 .essay-content {
   line-height: 1.8;
   color: #303133;
+  text-align: left;
 }
 
 .readonly-editor {
-  background: #fff;
-  border: 1px solid #e4e7ed;
-  border-radius: 8px;
-  padding: 16px;
-  min-height: 100px;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 0;
+  min-height: auto;
+  flex: 1;
 }
 
 .readonly-editor :deep(p) {
@@ -863,6 +861,9 @@ onMounted(() => {
 
 .feedback-section {
   margin-bottom: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
 .feedback-section:last-child {
@@ -871,15 +872,18 @@ onMounted(() => {
 
 .feedback-subtitle {
   font-size: 13px;
-  color: #606266;
-  font-weight: 500;
+  color: rgb(64, 158, 255);
+  font-weight: 800;
   margin-bottom: 8px;
+  text-align: center;
+  width: 100%;
 }
 
 .error-tags {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  justify-content: center;
 }
 
 .error-tag {
@@ -893,6 +897,8 @@ onMounted(() => {
   display: flex;
   align-items: flex-start;
   gap: 12px;
+  justify-content: center;
+  text-align: left;
 }
 
 .suggestion-content .el-button {
