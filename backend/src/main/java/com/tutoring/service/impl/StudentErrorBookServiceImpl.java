@@ -383,4 +383,39 @@ public class StudentErrorBookServiceImpl implements StudentErrorBookService {
         };
     }
 
+    @Override
+    public Set<Long> checkInErrorBook(Long studentId, Long assignmentId, List<Long> questionIds) {
+        if (questionIds == null || questionIds.isEmpty()) {
+            return Set.of();
+        }
+        List<StudentAnswer> answers = studentAnswerMapper.selectList(
+            new LambdaQueryWrapper<StudentAnswer>()
+                .eq(StudentAnswer::getStudentId, studentId)
+                .eq(StudentAnswer::getAssignmentId, assignmentId)
+                .in(StudentAnswer::getQuestionId, questionIds)
+                .eq(StudentAnswer::getIsDraft, 0)
+                .select(StudentAnswer::getId, StudentAnswer::getQuestionId)
+        );
+        if (answers.isEmpty()) {
+            return Set.of();
+        }
+        List<Long> answerIds = answers.stream().map(StudentAnswer::getId).toList();
+        List<ErrorBook> errorBooks = errorBookMapper.selectList(
+            new LambdaQueryWrapper<ErrorBook>()
+                .eq(ErrorBook::getStudentId, studentId)
+                .in(ErrorBook::getStudentAnswerId, answerIds)
+                .eq(ErrorBook::getStatus, 1)
+                .select(ErrorBook::getStudentAnswerId)
+        );
+        Set<Long> existingAnswerIds = errorBooks.stream()
+            .map(ErrorBook::getStudentAnswerId)
+            .collect(Collectors.toSet());
+        Map<Long, Long> answerToQuestion = answers.stream()
+            .collect(Collectors.toMap(StudentAnswer::getId, StudentAnswer::getQuestionId));
+        return existingAnswerIds.stream()
+            .map(answerToQuestion::get)
+            .filter(Objects::nonNull)
+            .collect(Collectors.toSet());
+    }
+
 }

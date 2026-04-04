@@ -49,12 +49,21 @@
             <span class="card-title__text">答题详情</span>
           </div>
           <el-button
-            v-if="hasWrongQuestions"
+            v-if="hasWrongQuestions && !allWrongInBook"
             type="primary"
             size="small"
+            :loading="batchAdding"
             @click="addAllToWrongBook"
           >
             <el-icon><Collection /></el-icon> 一键加入错题本
+          </el-button>
+          <el-button
+            v-else-if="hasWrongQuestions && allWrongInBook"
+            type="info"
+            size="small"
+            disabled
+          >
+            <el-icon><Collection /></el-icon> 已全部加入错题本
           </el-button>
         </div>
       </template>
@@ -208,10 +217,15 @@ const assignment = ref({
 });
 
 const questions = ref<any[]>([]);
+const batchAdding = ref(false);
 
 const hasWrongQuestions = computed(() => {
-  // 非满分的题目算错题
   return questions.value.some(q => q.type !== 'essay' && (q.earnedScore || 0) < (q.score || 0));
+});
+
+const allWrongInBook = computed(() => {
+  const wrongQs = questions.value.filter(q => q.type !== 'essay' && (q.earnedScore || 0) < (q.score || 0));
+  return wrongQs.length > 0 && wrongQs.every(q => q.inWrongBook);
 });
 
 const getGradingDetail = async () => {
@@ -265,6 +279,8 @@ const getGradingDetail = async () => {
       addingToWrongBook: false,
       inWrongBook: false,
     }));
+
+    await checkErrorBookStatus();
   } catch (error) {
     console.error('获取批改详情失败:', error);
     ElMessage.error('获取批改详情失败');
@@ -319,6 +335,23 @@ const parseAiFeedback = (aiFeedback: string | null) => {
     errorPoints: errorPoints.length > 0 ? errorPoints : undefined,
     suggestions: suggestions.trim() || undefined,
   };
+};
+
+const checkErrorBookStatus = async () => {
+  try {
+    const wrongQs = questions.value.filter(q => q.type !== 'essay' && (q.earnedScore || 0) < (q.score || 0));
+    if (wrongQs.length === 0) return;
+    const questionIds = wrongQs.map(q => q.id);
+    const res = await request.get('/student/error-book/check', {
+      params: { assignmentId: Number(assignmentId.value), questionIds: questionIds.join(',') }
+    });
+    const existingIds = new Set(res.data || []);
+    questions.value.forEach(q => {
+      if (existingIds.has(q.id)) q.inWrongBook = true;
+    });
+  } catch {
+    // 静默失败，不影响主流程
+  }
 };
 
 const goBack = () => {
@@ -458,13 +491,13 @@ const addToWrongBook = async (question: any) => {
   try {
     await request.post('/student/error-book/add', {
       questionId: question.id,
-      assignmentId: assignmentId.value,
+      assignmentId: Number(assignmentId.value),
     });
     question.inWrongBook = true;
     ElMessage.success('已加入错题本');
   } catch (error: any) {
     console.error('加入错题本失败:', error);
-    const msg = error.response?.data?.msg || error.message || '加入错题本失败';
+    const msg = error.response?.data?.message || error.message || '加入错题本失败';
     ElMessage.error(msg);
   } finally {
     question.addingToWrongBook = false;
@@ -481,30 +514,29 @@ const addAllToWrongBook = async () => {
   });
 
   if (wrongQuestions.length === 0) {
-    ElMessage.info('没有新的错题需要加入');
+    ElMessage.info('错题本中已存在该作业中所有错题');
     return;
   }
 
+  batchAdding.value = true;
   try {
     const res = await request.post('/student/error-book/add-batch', {
       questions: wrongQuestions.map(q => ({
         questionId: q.id,
-        assignmentId: assignmentId.value,
+        assignmentId: Number(assignmentId.value),
       })),
     });
     const data = res.data || {};
     const added = data.added ?? wrongQuestions.length;
-    const skipped = data.skipped ?? 0;
 
     wrongQuestions.forEach((q: any) => { q.inWrongBook = true; });
-
-    let msg = `已将 ${added} 道错题加入错题本`;
-    if (skipped > 0) msg += `，跳过 ${skipped} 道（已在错题本中）`;
-    ElMessage.success(msg);
+    ElMessage.success('一键添加至错题本成功');
   } catch (error: any) {
     console.error('批量加入错题本失败:', error);
-    const msg = error.response?.data?.msg || error.message || '批量加入错题本失败';
+    const msg = error.response?.data?.message || error.message || '批量加入错题本失败';
     ElMessage.error(msg);
+  } finally {
+    batchAdding.value = false;
   }
 };
 

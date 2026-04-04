@@ -7,6 +7,7 @@ import jakarta.servlet.http.HttpServletResponse;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 public interface StudentErrorBookService {
 
@@ -23,5 +24,7 @@ public interface StudentErrorBookService {
 
     void exportErrorBook(Long studentId, Long courseId, String type, String format,
             HttpServletResponse response);
+
+    Set<Long> checkInErrorBook(Long studentId, Long assignmentId, List<Long> questionIds);
 
 }

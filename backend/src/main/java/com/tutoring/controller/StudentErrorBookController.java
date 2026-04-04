@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @Tag(name = "学生错题本", description = "学生错题本相关接口")
 @RestController
@@ -31,19 +32,23 @@ public class StudentErrorBookController {
     @PostMapping("/add")
     public Result<Void> addToErrorBook(@RequestBody Map<String, Object> body) {
         Long studentId = SecurityUtil.getCurrentUserId(userService);
-        Number qid = (Number) body.get("questionId");
-        Number aid = (Number) body.get("assignmentId");
-        System.out.println("=== ERRORBOOK ADD: studentId=" + studentId + " questionId=" + qid + " assignmentId=" + aid);
-        try {
-            studentErrorBookService.addToErrorBook(studentId,
-                qid != null ? qid.longValue() : null,
-                aid != null ? aid.longValue() : null);
-            System.out.println("=== ERRORBOOK ADD: SUCCESS");
-        } catch (Exception e) {
-            System.out.println("=== ERRORBOOK ADD ERROR: " + e.getClass().getName() + " - " + e.getMessage());
-            throw e;
+        Long questionId = toLong(body.get("questionId"));
+        Long assignmentId = toLong(body.get("assignmentId"));
+        if (questionId == null || assignmentId == null) {
+            return Result.error(400, "缺少必要参数: questionId 或 assignmentId");
         }
+        studentErrorBookService.addToErrorBook(studentId, questionId, assignmentId);
         return Result.success(null);
+    }
+
+    @Operation(summary = "检查题目是否已在错题本中")
+    @GetMapping("/check")
+    public Result<Set<Long>> checkInErrorBook(
+            @RequestParam Long assignmentId,
+            @RequestParam List<Long> questionIds) {
+        Long studentId = SecurityUtil.getCurrentUserId(userService);
+        Set<Long> existingIds = studentErrorBookService.checkInErrorBook(studentId, assignmentId, questionIds);
+        return Result.success(existingIds);
     }
 
     @Operation(summary = "批量加入错题本")
@@ -54,8 +59,8 @@ public class StudentErrorBookController {
         List<Map<String, Object>> questions = (List<Map<String, Object>>) body.get("questions");
         List<Map<String, Long>> converted = questions.stream()
             .map(m -> Map.of(
-                "questionId", m.get("questionId") != null ? ((Number) m.get("questionId")).longValue() : null,
-                "assignmentId", m.get("assignmentId") != null ? ((Number) m.get("assignmentId")).longValue() : null
+                "questionId", toLong(m.get("questionId")),
+                "assignmentId", toLong(m.get("assignmentId"))
             ))
             .toList();
         Map<String, Object> result = studentErrorBookService.batchAddToErrorBook(studentId, converted);
@@ -103,6 +108,16 @@ public class StudentErrorBookController {
         
         Long studentId = SecurityUtil.getCurrentUserId(userService);
         studentErrorBookService.exportErrorBook(studentId, courseId, type, format, response);
+    }
+
+    private Long toLong(Object value) {
+        if (value == null) return null;
+        if (value instanceof Number) return ((Number) value).longValue();
+        try {
+            return Long.parseLong(value.toString().trim());
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 
 }
