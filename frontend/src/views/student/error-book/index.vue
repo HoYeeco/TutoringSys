@@ -298,18 +298,6 @@ const getErrorList = async () => {
     const data = response.data || {};
     errorList.value = data.records || [];
     totalCount.value = data.total || 0;
-
-    if (data.records && data.records.length > 0) {
-      const essayErrors = data.records.filter((e: any) => isEssayType(e.type));
-      if (essayErrors.length > 0) {
-        console.log('主观题错题数据:', essayErrors.map((e: any) => ({
-          type: e.type,
-          referenceAnswer: e.referenceAnswer,
-          correctAnswer: e.correctAnswer,
-          aiFeedback: e.aiFeedback ? '有数据' : '空'
-        })));
-      }
-    }
   } catch (error) {
     console.error('获取错题列表失败:', error);
     ElMessage.error('获取错题列表失败');
@@ -529,6 +517,23 @@ const formatAnswer = (answer: string, type: string) => {
   const lowerType = type?.toLowerCase();
   if (lowerType === 'judgment' || lowerType === 'judge') {
     return answer === 'true' || answer === '正确' ? '正确' : '错误';
+  }
+  if (lowerType === 'multiple') {
+    if (answer.startsWith('[')) {
+      try {
+        const arr = JSON.parse(answer);
+        if (Array.isArray(arr)) {
+          return arr
+            .filter((a: string) => /^[A-Da-d]$/.test(a))
+            .map((a: string) => a.toUpperCase())
+            .sort()
+            .join('');
+        }
+      } catch {
+        // 解析失败，继续处理
+      }
+    }
+    return answer.toUpperCase().split('').filter((c: string) => /[A-D]/.test(c)).sort().join('');
   }
   return answer;
 };

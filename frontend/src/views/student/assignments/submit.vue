@@ -675,9 +675,12 @@ const collectAnswers = () => {
   const answersData = questions.value.map((q) => {
     let answerContent = answers.value[q.id];
     
-    // 处理多选题答案
     if (q.type === 'multiple' && Array.isArray(answerContent)) {
-      answerContent = JSON.stringify(answerContent);
+      answerContent = answerContent
+        .filter((a: string) => /^[A-Da-d]$/.test(a))
+        .map((a: string) => a.toUpperCase())
+        .sort()
+        .join('');
     }
     
     // 确保答案不为null或undefined
