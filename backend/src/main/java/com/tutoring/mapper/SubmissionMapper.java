@@ -13,7 +13,7 @@ public interface SubmissionMapper extends BaseMapper<Submission> {
     @Select("SELECT COUNT(*) FROM submission WHERE student_id = #{studentId} AND final_total_score IS NOT NULL")
     Long countGradedByStudentId(Long studentId);
 
-    @Select("SELECT AVG(final_total_score) FROM submission WHERE student_id = #{studentId} AND final_total_score IS NOT NULL")
-    BigDecimal selectAverageScoreByStudentId(Long studentId);
+    @Select("SELECT COUNT(*) FROM submission WHERE student_id = #{studentId} AND (status IN (0, 1, 2) OR (status = 3 AND review_status = 1))")
+    Long countPendingGradingByStudentId(Long studentId);
 
 }

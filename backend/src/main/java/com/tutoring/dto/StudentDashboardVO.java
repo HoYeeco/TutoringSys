@@ -15,7 +15,7 @@ public class StudentDashboardVO {
 
     private Long selectedCourses;
     private Long pendingAssignments;
+    private Long pendingGrading;
     private Long gradedSubmissions;
-    private BigDecimal averageScore;
 
 }

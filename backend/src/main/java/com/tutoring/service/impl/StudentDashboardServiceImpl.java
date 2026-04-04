@@ -8,9 +8,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
-import java.math.BigDecimal;
-import java.math.RoundingMode;
-
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -27,14 +24,14 @@ public class StudentDashboardServiceImpl implements StudentDashboardService {
         
         Long selectedCourses = countSelectedCourses(studentId);
         Long pendingAssignments = countPendingAssignments(studentId);
+        Long pendingGrading = countPendingGrading(studentId);
         Long gradedSubmissions = countGradedSubmissions(studentId);
-        BigDecimal averageScore = calculateAverageScore(studentId);
 
         return StudentDashboardVO.builder()
             .selectedCourses(selectedCourses)
             .pendingAssignments(pendingAssignments)
+            .pendingGrading(pendingGrading)
             .gradedSubmissions(gradedSubmissions)
-            .averageScore(averageScore)
             .build();
     }
 
@@ -50,12 +47,8 @@ public class StudentDashboardServiceImpl implements StudentDashboardService {
         return submissionMapper.countGradedByStudentId(studentId);
     }
 
-    private BigDecimal calculateAverageScore(Long studentId) {
-        BigDecimal avg = submissionMapper.selectAverageScoreByStudentId(studentId);
-        if (avg == null) {
-            return BigDecimal.ZERO;
-        }
-        return avg.setScale(2, RoundingMode.HALF_UP);
+    private Long countPendingGrading(Long studentId) {
+        return submissionMapper.countPendingGradingByStudentId(studentId);
     }
 
 }

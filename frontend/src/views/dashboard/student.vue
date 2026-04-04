@@ -49,6 +49,18 @@
         </el-card>
 
         <el-card shadow="never" class="stat-card">
+          <div class="stat-card__icon stat-card__icon--grading">
+            <el-icon><Document /></el-icon>
+          </div>
+          <div class="stat-card__content">
+            <div class="stat-card__label">待批改作业</div>
+            <div class="stat-card__value">
+              {{ studentStats.pendingGrading || 0 }}
+            </div>
+          </div>
+        </el-card>
+
+        <el-card shadow="never" class="stat-card">
           <div class="stat-card__icon stat-card__icon--graded">
             <el-icon><DocumentChecked /></el-icon>
           </div>
@@ -56,18 +68,6 @@
             <div class="stat-card__label">已批改作业</div>
             <div class="stat-card__value">
               {{ studentStats.gradedAssignments || 0 }}
-            </div>
-          </div>
-        </el-card>
-
-        <el-card shadow="never" class="stat-card">
-          <div class="stat-card__icon stat-card__icon--score">
-            <el-icon><Star /></el-icon>
-          </div>
-          <div class="stat-card__content">
-            <div class="stat-card__label">平均得分</div>
-            <div class="stat-card__value">
-              {{ studentStats.averageScore || 0 }}
             </div>
           </div>
         </el-card>
@@ -130,8 +130,8 @@ import {
   School,
   Ticket,
   Warning,
+  Document,
   DocumentChecked,
-  Star,
   Clock,
   Histogram,
   Grid,
@@ -144,8 +144,8 @@ const router = useRouter();
 const studentStats = ref({
   courseCount: 0,
   pendingAssignments: 0,
+  pendingGrading: 0,
   gradedAssignments: 0,
-  averageScore: 0,
 });
 
 const studentChartRef = ref(null);
@@ -171,8 +171,8 @@ const getStudentStats = async () => {
       studentStats.value = {
         courseCount: response.data.selectedCourses || 0,
         pendingAssignments: response.data.pendingAssignments || 0,
+        pendingGrading: response.data.pendingGrading || 0,
         gradedAssignments: response.data.gradedSubmissions || 0,
-        averageScore: response.data.averageScore || 0,
       };
     }
   } catch (error) {
@@ -189,7 +189,7 @@ const initStudentChart = () => {
     grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
     xAxis: {
       type: 'category',
-      data: ['已选课程', '待提交作业', '已批改作业', '平均得分'],
+      data: ['已选课程', '待提交作业', '待批改作业', '已批改作业'],
     },
     yAxis: { type: 'value' },
     series: [
@@ -197,13 +197,13 @@ const initStudentChart = () => {
         data: [
           studentStats.value.courseCount,
           studentStats.value.pendingAssignments,
+          studentStats.value.pendingGrading,
           studentStats.value.gradedAssignments,
-          studentStats.value.averageScore,
         ],
         type: 'bar',
         itemStyle: {
           color: (params: any) =>
-            ['#409eff', '#e6a23c', '#67c23a', '#f56c6c'][params.dataIndex],
+            ['#409eff', '#e6a23c', '#909399', '#67c23a'][params.dataIndex],
         },
         label: { show: true, position: 'top' },
       },
@@ -364,9 +364,9 @@ onUnmounted(() => {
   color: #22c55e;
 }
 
-.stat-card__icon--score {
-  background: #fef2f2;
-  color: #ef4444;
+.stat-card__icon--grading {
+  background: #f3f4f6;
+  color: #6b7280;
 }
 
 .stat-card__icon .el-icon {
