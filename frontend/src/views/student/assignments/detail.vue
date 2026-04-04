@@ -178,8 +178,9 @@
             >
               <el-icon><Collection /></el-icon> 加入错题本
             </el-button>
-            <el-tag v-else type="success" effect="plain" size="small">
-              <el-icon><Collection /></el-icon> 已加入错题本
+            <el-tag v-else type="success" plain size="small" class="wrong-book-tag">
+              <el-icon class="wrong-book-tag__icon"><Collection /></el-icon>
+              <span>已加入错题本</span>
             </el-tag>
           </div>
         </div>
@@ -614,6 +615,16 @@ onMounted(() => {
 
 .back-btn .el-icon {
   margin-right: 4px;
+}
+
+.wrong-book-tag {
+  display: inline-flex;
+  align-items: center;
+}
+
+.wrong-book-tag__icon {
+  margin-right: 4px;
+  vertical-align: middle;
 }
 
 .assignment-summary {

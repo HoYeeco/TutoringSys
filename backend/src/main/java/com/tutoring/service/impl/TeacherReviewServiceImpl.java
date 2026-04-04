@@ -371,12 +371,14 @@ public class TeacherReviewServiceImpl implements TeacherReviewService {
             submission.setFinalTotalScore(totalScore);
             submission.setReviewTime(LocalDateTime.now());
             
-            // 检查是否所有答案都已复核，如果是则更新提交状态为已完成
             boolean allAnsweredReviewed = answers.stream()
-                .allMatch(a -> a.getReviewStatus() == 2);
+                .allMatch(a -> a.getReviewStatus() != null && a.getReviewStatus() == 2);
             
-            if (allAnsweredReviewed && submission.getStatus() != 3) {
-                submission.setStatus(3); // 3 = 已完成
+            if (allAnsweredReviewed) {
+                if (submission.getStatus() != 3) {
+                    submission.setStatus(3);
+                }
+                submission.setReviewStatus(2);
             }
             
             submissionMapper.updateById(submission);
