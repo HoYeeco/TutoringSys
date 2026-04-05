@@ -100,7 +100,8 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch } from 'vue';
+import { ref, onMounted, watch, nextTick } from 'vue';
+import { storeToRefs } from 'pinia';
 import { useUserStore } from '@/stores/user';
 import { useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
@@ -108,9 +109,9 @@ import { Bell, Search, Clock, Check } from '@element-plus/icons-vue';
 import request from '@/utils/request';
 
 const userStore = useUserStore();
+const { token } = storeToRefs(userStore);
 const router = useRouter();
 
-// 消息相关状态
 const activeTab = ref('all');
 const messages = ref([]);
 const total = ref(0);
@@ -118,20 +119,16 @@ const currentPage = ref(1);
 const pageSize = ref(10);
 const unreadCount = ref(0);
 const searchKeyword = ref('');
+const dataLoaded = ref(false);
 
-// 获取消息列表
 const getMessages = async () => {
-  if (!userStore.userInfo?.id) return;
-  
   try {
     const params = {
-      userId: userStore.userInfo?.id,
       page: currentPage.value,
       size: pageSize.value,
       keyword: searchKeyword.value || undefined,
     };
 
-    // 处理标签页筛选
     if (activeTab.value === 'unread') {
       params.readStatus = 0;
     } else if (activeTab.value === 'read') {
@@ -142,35 +139,25 @@ const getMessages = async () => {
 
     messages.value = response.data.records || [];
     total.value = response.data.total || 0;
+    dataLoaded.value = true;
   } catch (error) {
     console.error('获取消息列表失败:', error);
     ElMessage.error('获取消息列表失败');
   }
 };
 
-// 获取未读消息数量
 const getUnreadCount = async () => {
   try {
-    const response = await request.get('/message/unread-count', {
-      params: {
-        userId: userStore.userInfo?.id,
-      },
-    });
+    const response = await request.get('/message/unread-count');
     unreadCount.value = response.data || 0;
   } catch (error) {
     console.error('获取未读消息数量失败:', error);
   }
 };
 
-// 标记消息为已读
 const markAsRead = async (message) => {
   try {
-    await request.put(`/message/read/${message.messageId}`, null, {
-      params: {
-        userId: userStore.userInfo?.id,
-      },
-    });
-    // 更新本地消息状态
+    await request.put(`/message/read/${message.messageId}`);
     const localMessage = messages.value.find((msg) => msg.id === message.id);
     if (localMessage) {
       localMessage.isRead = 1;
@@ -183,15 +170,9 @@ const markAsRead = async (message) => {
   }
 };
 
-// 标记所有消息为已读
 const markAllAsRead = async () => {
   try {
-    await request.put('/message/read/all', null, {
-      params: {
-        userId: userStore.userInfo?.id,
-      },
-    });
-    // 更新本地消息状态
+    await request.put('/message/read-all');
     messages.value.forEach((message) => {
       message.isRead = 1;
     });
@@ -203,57 +184,54 @@ const markAllAsRead = async () => {
   }
 };
 
-// 处理消息点击
 const handleMessageClick = (message) => {
-  // 标记为已读
   if (message.isRead === 0) {
     markAsRead(message);
   }
 
-  // 根据消息类型跳转到对应页面
   if (message.relatedType === 'assignment' && message.relatedId) {
     if (message.type === 'assignment') {
-      // 作业发布通知，跳转到作业提交页面
       router.push(`/student/assignments/${message.relatedId}/submit`);
     } else if (message.type === 'grading') {
-      // 作业批改通知，跳转到批改报告页面
       router.push(`/student/reports/${message.relatedId}`);
     }
   }
 };
 
-// 处理搜索
 const handleSearch = () => {
   currentPage.value = 1;
   getMessages();
 };
 
-// 处理标签切换 - 只重置页码，筛选由 watch 处理
 const handleTabClick = () => {
   currentPage.value = 1;
 };
 
-// 处理分页大小变化
 const handleSizeChange = (size) => {
   pageSize.value = size;
   currentPage.value = 1;
   getMessages();
 };
 
-// 处理页码变化
 const handleCurrentChange = (page) => {
   currentPage.value = page;
   getMessages();
 };
 
-// 监听标签切换，触发筛选
 watch(activeTab, () => {
   getMessages();
 });
 
-// 页面加载时获取消息和未读数量
-onMounted(() => {
-  if (userStore.userInfo?.id) {
+watch(token, (newVal) => {
+  if (newVal && !dataLoaded.value) {
+    getMessages();
+    getUnreadCount();
+  }
+}, { immediate: true });
+
+onMounted(async () => {
+  await nextTick();
+  if (token.value && !dataLoaded.value) {
     getMessages();
     getUnreadCount();
   }
