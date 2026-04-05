@@ -699,9 +699,25 @@ const loadAllStats = async () => {
   
   await loadHighFrequencyErrors();
   
+  const heatmapData = await loadMasteryHeatmap();
   nextTick(() => {
-    initHeatmapChart([], highFrequencyErrors.value);
+    initHeatmapChart(heatmapData);
   });
+};
+
+const loadMasteryHeatmap = async () => {
+  try {
+    const params: any = {};
+    if (errorFilter.value.courseId) {
+      params.courseId = errorFilter.value.courseId;
+    }
+    
+    const response = await request.get('/teacher/analytics/mastery-heatmap', { params });
+    return response.data || { students: [], questions: [], scores: [] };
+  } catch (error) {
+    console.error('加载热力图数据失败:', error);
+    return { students: [], questions: [], scores: [] };
+  }
 };
 
 const initSubmissionChart = () => {
@@ -1024,14 +1040,16 @@ const initErrorDistributionChart = (errorDistribution: any[]) => {
   }
 };
 
-const initHeatmapChart = (heatmapData: any[], frequentErrors: any[] = []) => {
+const initHeatmapChart = (heatmapData: { students: any[]; questions: any[]; scores: any[] }) => {
   if (heatmapChartRef.value) {
     if (heatmapChart) {
       heatmapChart.dispose();
     }
     heatmapChart = echarts.init(heatmapChartRef.value);
     
-    if (!frequentErrors || frequentErrors.length === 0) {
+    const { students, questions, scores } = heatmapData;
+    
+    if (!students || students.length === 0 || !questions || questions.length === 0) {
       heatmapChart.setOption({
         title: {
           text: '暂无掌握情况数据',
@@ -1046,54 +1064,29 @@ const initHeatmapChart = (heatmapData: any[], frequentErrors: any[] = []) => {
       return;
     }
     
-    const topErrors = frequentErrors.slice(0, 10);
-    
-    const allStudents: Set<string> = new Set();
-    topErrors.forEach((error: any) => {
-      if (error.wrongStudents && Array.isArray(error.wrongStudents)) {
-        error.wrongStudents.forEach((s: any) => {
-          allStudents.add(s.realName || s.username || s.name || '未知学生');
-        });
-      }
-    });
-    
-    const students = Array.from(allStudents).slice(0, 15);
-    
-    const stripHtml = (html: string) => {
-      if (!html) return '';
-      return html.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim();
-    };
-    
-    const questions = topErrors.map((e: any, idx: number) => {
-      const content = stripHtml(e.questionContent) || `题目${idx + 1}`;
+    const studentNames = students.map((s: any) => s.name || '未知学生');
+    const questionLabels = questions.map((q: any, idx: number) => {
+      const content = q.content || `题目${idx + 1}`;
       return content.length > 8 ? content.substring(0, 8) + '...' : content;
     });
     
+    const scoreMap = new Map<string, any>();
+    scores.forEach((s: any) => {
+      scoreMap.set(`${s.studentId}_${s.questionId}`, s);
+    });
+    
     const data: any[] = [];
-    students.forEach((student, studentIdx) => {
-      questions.forEach((question, questionIdx) => {
-        const errorInfo = topErrors[questionIdx];
-        let masteryRate = 100;
+    students.forEach((student: any, studentIdx: number) => {
+      questions.forEach((question: any, questionIdx: number) => {
+        const key = `${student.id}_${question.id}`;
+        const scoreData = scoreMap.get(key);
         
-        if (errorInfo) {
-          const wrongStudents = errorInfo.wrongStudents || [];
-          const errorCount = errorInfo.errorCount || wrongStudents.length;
-          const totalCount = errorInfo.totalCount || Math.max(errorCount, 10);
-          
-          const hasError = wrongStudents.some(
-            (s: any) => (s.realName || s.username || s.name) === student
-          );
-          
-          if (hasError) {
-            const errorRatio = errorCount / totalCount;
-            masteryRate = Math.round(Math.max(0, 100 - errorRatio * 100 - Math.random() * 15));
-          } else {
-            const correctRatio = 1 - (errorCount / totalCount);
-            masteryRate = Math.round(Math.min(100, 60 + correctRatio * 40 + Math.random() * 10));
-          }
+        let scoreRate = null;
+        if (scoreData && scoreData.scoreRate !== null) {
+          scoreRate = Math.round(scoreData.scoreRate);
         }
         
-        data.push([questionIdx, studentIdx, masteryRate]);
+        data.push([questionIdx, studentIdx, scoreRate]);
       });
     });
     
@@ -1101,17 +1094,44 @@ const initHeatmapChart = (heatmapData: any[], frequentErrors: any[] = []) => {
       tooltip: {
         position: 'top',
         formatter: (params: any) => {
-          const errorInfo = topErrors[params.value[0]];
-          const fullQuestion = stripHtml(errorInfo?.questionContent) || questions[params.value[0]];
-          const masteryLevel = params.value[2] >= 80 ? '掌握良好' : 
-                               params.value[2] >= 60 ? '基本掌握' : 
-                               params.value[2] >= 40 ? '掌握较差' : '未掌握';
+          const student = students[params.value[1]];
+          const question = questions[params.value[0]];
+          const scoreRate = params.value[2];
+          
+          let masteryLevel = '未作答';
+          let color = '#909399';
+          
+          if (scoreRate !== null) {
+            if (scoreRate >= 80) {
+              masteryLevel = '掌握良好';
+              color = '#67c23a';
+            } else if (scoreRate >= 60) {
+              masteryLevel = '基本掌握';
+              color = '#409eff';
+            } else if (scoreRate >= 40) {
+              masteryLevel = '掌握较差';
+              color = '#e6a23c';
+            } else {
+              masteryLevel = '未掌握';
+              color = '#f56c6c';
+            }
+          }
+          
+          const scoreData = scoreMap.get(`${student.id}_${question.id}`);
+          const scoreInfo = scoreData && scoreData.score !== null 
+            ? `${scoreData.score}/${scoreData.maxScore}分` 
+            : '未作答';
+          
           return `<div style="max-width: 300px;">
-            <div style="font-weight: 600; margin-bottom: 4px;">${students[params.value[1]]}</div>
-            <div style="margin-bottom: 4px; word-break: break-all;">${fullQuestion}</div>
+            <div style="font-weight: 600; margin-bottom: 4px;">${student.name}</div>
+            <div style="margin-bottom: 4px; word-break: break-all;">${question.content}</div>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+              <span>得分：</span>
+              <span>${scoreInfo}</span>
+            </div>
             <div style="display: flex; justify-content: space-between; align-items: center;">
               <span>掌握情况：</span>
-              <span style="color: ${params.value[2] >= 60 ? '#67c23a' : '#f56c6c'}; font-weight: 600;">${masteryLevel} (${params.value[2]}%)</span>
+              <span style="color: ${color}; font-weight: 600;">${masteryLevel}${scoreRate !== null ? ` (${scoreRate}%)` : ''}</span>
             </div>
           </div>`;
         }
@@ -1125,7 +1145,7 @@ const initHeatmapChart = (heatmapData: any[], frequentErrors: any[] = []) => {
       },
       xAxis: {
         type: 'category',
-        data: questions,
+        data: questionLabels,
         splitArea: {
           show: true
         },
@@ -1137,7 +1157,7 @@ const initHeatmapChart = (heatmapData: any[], frequentErrors: any[] = []) => {
       },
       yAxis: {
         type: 'category',
-        data: students.map((s: string) => s.length > 5 ? s.substring(0, 5) + '..' : s),
+        data: studentNames.map((s: string) => s.length > 5 ? s.substring(0, 5) + '..' : s),
         splitArea: {
           show: true
         },
@@ -1151,7 +1171,7 @@ const initHeatmapChart = (heatmapData: any[], frequentErrors: any[] = []) => {
         calculable: true,
         orient: 'horizontal',
         left: 'center',
-        bottom: '-5%', // 与水平轴数据作业名称保持距离
+        bottom: '-5%',
         inRange: {
           color: ['#f56c6c', '#e6a23c', '#409eff', '#67c23a']
         },

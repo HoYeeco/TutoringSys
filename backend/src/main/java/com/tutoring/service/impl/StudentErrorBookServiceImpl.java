@@ -269,6 +269,7 @@ public class StudentErrorBookServiceImpl implements StudentErrorBookService {
                     .correctAnswer(question.getAnswer())
                     .referenceAnswer(question.getReferenceAnswer())
                     .aiFeedback(sa.getAiFeedback())
+                    .analysis(question.getAnalysis())
                     .courseId(assignment.getCourseId())
                     .courseName(course != null ? course.getName() : "未知课程")
                     .assignmentId(assignment.getId())

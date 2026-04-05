@@ -510,6 +510,178 @@ public class TeacherAnalyticsServiceImpl implements TeacherAnalyticsService {
     }
 
     @Override
+    public MasteryHeatmapVO getMasteryHeatmap(Long teacherId, Long courseId) {
+        List<Course> courses = courseMapper.selectList(
+            new LambdaQueryWrapper<Course>()
+                .eq(Course::getTeacherId, teacherId)
+        );
+
+        if (courses.isEmpty()) {
+            return MasteryHeatmapVO.builder()
+                .students(new ArrayList<>())
+                .questions(new ArrayList<>())
+                .scores(new ArrayList<>())
+                .build();
+        }
+
+        List<Long> courseIds = courseId != null 
+            ? Collections.singletonList(courseId)
+            : courses.stream().map(Course::getId).collect(Collectors.toList());
+
+        List<Assignment> assignments = assignmentMapper.selectList(
+            new LambdaQueryWrapper<Assignment>()
+                .in(Assignment::getCourseId, courseIds)
+                .eq(Assignment::getStatus, "published")
+        );
+
+        if (assignments.isEmpty()) {
+            return MasteryHeatmapVO.builder()
+                .students(new ArrayList<>())
+                .questions(new ArrayList<>())
+                .scores(new ArrayList<>())
+                .build();
+        }
+
+        List<Long> assignmentIds = assignments.stream()
+            .map(Assignment::getId)
+            .collect(Collectors.toList());
+
+        List<Question> allQuestions = questionMapper.selectList(
+            new LambdaQueryWrapper<Question>()
+                .in(Question::getAssignmentId, assignmentIds)
+        );
+
+        List<StudentAnswer> answers = studentAnswerMapper.selectList(
+            new LambdaQueryWrapper<StudentAnswer>()
+                .in(StudentAnswer::getAssignmentId, assignmentIds)
+                .eq(StudentAnswer::getIsDraft, 0)
+        );
+
+        Map<Long, Integer> errorCountMap = new HashMap<>();
+        for (StudentAnswer answer : answers) {
+            Question question = allQuestions.stream()
+                .filter(q -> q.getId().equals(answer.getQuestionId()))
+                .findFirst().orElse(null);
+            if (question != null) {
+                boolean isError = answer.getFinalScore() == null || 
+                                  answer.getFinalScore() < question.getScore();
+                if (isError) {
+                    errorCountMap.merge(question.getId(), 1, Integer::sum);
+                }
+            }
+        }
+
+        List<Question> topErrorQuestions = allQuestions.stream()
+            .sorted((a, b) -> errorCountMap.getOrDefault(b.getId(), 0) - errorCountMap.getOrDefault(a.getId(), 0))
+            .limit(10)
+            .collect(Collectors.toList());
+
+        if (topErrorQuestions.isEmpty()) {
+            return MasteryHeatmapVO.builder()
+                .students(new ArrayList<>())
+                .questions(new ArrayList<>())
+                .scores(new ArrayList<>())
+                .build();
+        }
+
+        Set<Long> topQuestionIds = topErrorQuestions.stream()
+            .map(Question::getId)
+            .collect(Collectors.toSet());
+
+        List<CourseSelection> selections = courseSelectionMapper.selectList(
+            new LambdaQueryWrapper<CourseSelection>()
+                .in(CourseSelection::getCourseId, courseIds)
+        );
+
+        List<Long> studentIds = selections.stream()
+            .map(CourseSelection::getStudentId)
+            .distinct()
+            .collect(Collectors.toList());
+
+        if (studentIds.isEmpty()) {
+            return MasteryHeatmapVO.builder()
+                .students(new ArrayList<>())
+                .questions(new ArrayList<>())
+                .scores(new ArrayList<>())
+                .build();
+        }
+
+        List<User> students = userMapper.selectBatchIds(studentIds);
+        Map<Long, User> studentMap = students.stream()
+            .collect(Collectors.toMap(User::getId, Function.identity()));
+
+        Map<Long, Question> questionMap = topErrorQuestions.stream()
+            .collect(Collectors.toMap(Question::getId, Function.identity()));
+
+        Map<Long, StudentAnswer> answerMap = answers.stream()
+            .filter(a -> topQuestionIds.contains(a.getQuestionId()))
+            .collect(Collectors.toMap(
+                a -> a.getStudentId() * 10000 + a.getQuestionId(),
+                Function.identity(),
+                (a, b) -> a
+            ));
+
+        List<MasteryHeatmapVO.StudentInfo> studentInfos = studentIds.stream()
+            .map(id -> {
+                User student = studentMap.get(id);
+                return MasteryHeatmapVO.StudentInfo.builder()
+                    .id(id)
+                    .name(student != null ? student.getRealName() : "未知学生")
+                    .account(student != null ? student.getUsername() : "")
+                    .build();
+            })
+            .collect(Collectors.toList());
+
+        List<MasteryHeatmapVO.QuestionInfo> questionInfos = topErrorQuestions.stream()
+            .map(q -> {
+                String content = q.getContent();
+                if (content != null) {
+                    content = content.replaceAll("<[^>]*>", "").replaceAll("&nbsp;", " ").trim();
+                    if (content.length() > 20) {
+                        content = content.substring(0, 20) + "...";
+                    }
+                }
+                return MasteryHeatmapVO.QuestionInfo.builder()
+                    .id(q.getId())
+                    .content(content != null ? content : "题目")
+                    .maxScore(q.getScore())
+                    .build();
+            })
+            .collect(Collectors.toList());
+
+        List<MasteryHeatmapVO.ScoreData> scoreDataList = new ArrayList<>();
+        for (Long studentId : studentIds) {
+            for (Question question : topErrorQuestions) {
+                Long key = studentId * 10000 + question.getId();
+                StudentAnswer answer = answerMap.get(key);
+                
+                Integer score = null;
+                Double scoreRate = null;
+
+                if (answer != null && answer.getFinalScore() != null) {
+                    score = answer.getFinalScore();
+                    Integer maxScore = question.getScore();
+                    scoreRate = Math.round(score * 100.0 / maxScore * 100) / 100.0;
+                }
+
+                scoreDataList.add(MasteryHeatmapVO.ScoreData.builder()
+                    .studentId(studentId)
+                    .questionId(question.getId())
+                    .score(score)
+                    .maxScore(question.getScore())
+                    .scoreRate(scoreRate)
+                    .build());
+            }
+        }
+
+        return MasteryHeatmapVO.builder()
+            .students(studentInfos)
+            .questions(questionInfos)
+            .scores(scoreDataList)
+            .build();
+    }
+
+    @Override
     public StudentTrendVO getStudentTrend(Long teacherId, Long studentId) {
         User student = userMapper.selectById(studentId);
         if (student == null) {

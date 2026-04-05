@@ -364,8 +364,8 @@ const handleExport = async (format: string) => {
 };
 
 const confirmRemove = (error: any) => {
-  ElMessageBox.confirm('确定要移除这道错题吗？移除后将无法恢复。', '移除确认', {
-    confirmButtonText: '确定移除',
+  ElMessageBox.confirm('是否确认移除错题？之后也可以再次加入错题本哦。', '移除确认', {
+    confirmButtonText: '确认移除',
     cancelButtonText: '取消',
     type: 'warning',
   })

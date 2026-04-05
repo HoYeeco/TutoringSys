@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.tutoring.common.Result;
 import com.tutoring.dto.ErrorAnalysisVO;
 import com.tutoring.dto.FrequentErrorVO;
+import com.tutoring.dto.MasteryHeatmapVO;
 import com.tutoring.dto.OverviewStatsVO;
 import com.tutoring.dto.StudentTrendVO;
 import com.tutoring.service.TeacherAnalyticsService;
@@ -70,6 +71,15 @@ public class TeacherAnalyticsController {
                 .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
                 .contentLength(data.length)
                 .body(resource);
+    }
+
+    @Operation(summary = "获取掌握情况热力图")
+    @GetMapping("/mastery-heatmap")
+    public Result<MasteryHeatmapVO> getMasteryHeatmap(
+            @RequestParam(required = false) Long courseId) {
+        Long teacherId = SecurityUtil.getCurrentUserId(userService);
+        MasteryHeatmapVO heatmap = teacherAnalyticsService.getMasteryHeatmap(teacherId, courseId);
+        return Result.success(heatmap);
     }
 
     @Operation(summary = "获取学生个体分析")

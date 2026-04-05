@@ -23,6 +23,7 @@ public class ErrorBookListVO {
     private String correctAnswer;
     private String referenceAnswer;
     private String aiFeedback;
+    private String analysis;
     private Long courseId;
     private String courseName;
     private Long assignmentId;
