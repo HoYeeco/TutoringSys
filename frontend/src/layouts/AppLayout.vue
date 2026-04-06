@@ -8,7 +8,7 @@
       :width="collapsed ? '64px' : '150px'"
       :class="{ 'mobile-hidden': isMobile }"
     >
-      <el-menu :collapse="collapsed" :default-active="$route.path" router>
+      <el-menu :collapse="collapsed" :default-active="$route.path" @select="handleMenuSelect">
         <el-menu-item
           v-for="item in menuItems"
           :key="item.path"
@@ -72,7 +72,7 @@
     size="200px"
     title="菜单"
   >
-    <el-menu :default-active="$route.path" router @select="handleMenuSelect">
+    <el-menu :default-active="$route.path" @select="handleMobileMenuSelect">
       <el-menu-item
         v-for="item in menuItems"
         :key="item.path"
@@ -138,7 +138,24 @@ const toggleMobileMenu = () => {
   mobileMenuVisible.value = !mobileMenuVisible.value;
 };
 
-const handleMenuSelect = () => {
+const handleMenuSelect = (index: string) => {
+  const currentPath = router.currentRoute.value.path;
+  
+  if (index === '/dashboard') {
+    if (currentPath.startsWith('/dashboard')) {
+      window.dispatchEvent(new CustomEvent('teacher-dashboard-refresh'));
+      window.dispatchEvent(new CustomEvent('student-dashboard-refresh'));
+      window.dispatchEvent(new CustomEvent('admin-dashboard-refresh'));
+    } else {
+      router.push(index);
+    }
+  } else if (index !== currentPath) {
+    router.push(index);
+  }
+};
+
+const handleMobileMenuSelect = (index: string) => {
+  handleMenuSelect(index);
   mobileMenuVisible.value = false;
 };
 

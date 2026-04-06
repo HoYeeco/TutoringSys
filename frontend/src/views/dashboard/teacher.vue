@@ -146,7 +146,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, nextTick } from 'vue';
 import { useUserStore } from '@/stores/user';
-import { useRouter } from 'vue-router';
+import { useRouter, onBeforeRouteUpdate } from 'vue-router';
 import request from '@/utils/request';
 import * as echarts from 'echarts';
 import {
@@ -254,16 +254,52 @@ const handleResize = () => {
   teacherChart?.resize();
 };
 
+const handlePageShow = (event: PageTransitionEvent) => {
+  if (event.persisted) {
+    getTeacherStats();
+    nextTick(() => {
+      initTeacherChart();
+    });
+  }
+};
+
+const handleVisibilityChange = () => {
+  if (document.visibilityState === 'visible') {
+    getTeacherStats();
+    nextTick(() => {
+      initTeacherChart();
+    });
+  }
+};
+
+const refreshData = async () => {
+  await getTeacherStats();
+  nextTick(() => {
+    initTeacherChart();
+  });
+};
+
+onBeforeRouteUpdate((to, from, next) => {
+  refreshData();
+  next();
+});
+
 onMounted(async () => {
   await getTeacherStats();
   nextTick(() => {
     initTeacherChart();
   });
   window.addEventListener('resize', handleResize);
+  window.addEventListener('pageshow', handlePageShow);
+  document.addEventListener('visibilitychange', handleVisibilityChange);
+  window.addEventListener('teacher-dashboard-refresh', refreshData);
 });
 
 onUnmounted(() => {
   window.removeEventListener('resize', handleResize);
+  window.removeEventListener('pageshow', handlePageShow);
+  document.removeEventListener('visibilitychange', handleVisibilityChange);
+  window.removeEventListener('teacher-dashboard-refresh', refreshData);
   teacherChart?.dispose();
 });
 </script>
