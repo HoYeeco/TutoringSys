@@ -11,4 +11,6 @@ public interface StudentGradingService {
 
     GradingDetailVO getGradingDetail(Long studentId, Long submissionId);
 
+    GradingDetailVO getGradingDetailByAssignment(Long studentId, Long assignmentId);
+
 }

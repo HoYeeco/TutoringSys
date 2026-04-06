@@ -231,24 +231,14 @@ const allWrongInBook = computed(() => {
 
 const getGradingDetail = async () => {
   try {
-    // 先获取作业列表，找到对应的 submissionId
-    const listResponse = await request.get('/student/grading/list', {
-      params: { page: 1, size: 100 }
-    });
+    const response = await request.get(`/student/grading/by-assignment/${assignmentId.value}`);
+    const data = response.data;
     
-    const submissions = listResponse.data.records || [];
-    const submission = submissions.find((s: any) => s.assignmentId === parseInt(assignmentId.value));
-    
-    if (!submission) {
+    if (!data) {
       ElMessage.error('未找到该作业的批改记录');
       return;
     }
     
-    // 获取批改详情
-    const response = await request.get(`/student/grading/${submission.submissionId}`);
-    const data = response.data;
-    
-    // 判断作业状态：有主观题且reviewStatus=1表示待复核，否则已批改
     const hasSubjective = data.answers?.some((a: any) => {
       const type = a.type?.toUpperCase();
       return type === 'ESSAY' || type === 'SUBJECTIVE';
@@ -264,7 +254,6 @@ const getGradingDetail = async () => {
       status: status,
     };
     
-    // 转换答案数据格式
     questions.value = (data.answers || []).map((a: any) => ({
       id: a.questionId,
       type: a.type?.toLowerCase(),

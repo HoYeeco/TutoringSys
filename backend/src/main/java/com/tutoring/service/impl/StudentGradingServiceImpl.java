@@ -238,9 +238,25 @@ public class StudentGradingServiceImpl implements StudentGradingService {
             .aiTotalScore(submission.getAiTotalScore())
             .submitTime(submission.getSubmitTime())
             .reviewTime(submission.getReviewTime())
+            .reviewStatus(submission.getReviewStatus())
             .teacherFeedback(overallTeacherFeedback)
             .answers(answerVOs)
             .build();
+    }
+
+    @Override
+    public GradingDetailVO getGradingDetailByAssignment(Long studentId, Long assignmentId) {
+        Submission submission = submissionMapper.selectOne(
+            new LambdaQueryWrapper<Submission>()
+                .eq(Submission::getStudentId, studentId)
+                .eq(Submission::getAssignmentId, assignmentId)
+        );
+        
+        if (submission == null) {
+            throw new BusinessException("未找到该作业的提交记录");
+        }
+
+        return getGradingDetail(studentId, submission.getId());
     }
 
 }

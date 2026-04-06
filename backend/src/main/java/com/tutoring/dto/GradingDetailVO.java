@@ -27,6 +27,7 @@ public class GradingDetailVO {
     private Integer aiTotalScore;
     private LocalDateTime submitTime;
     private LocalDateTime reviewTime;
+    private Integer reviewStatus;
     private String teacherFeedback;
     private List<AnswerDetailVO> answers;
 }

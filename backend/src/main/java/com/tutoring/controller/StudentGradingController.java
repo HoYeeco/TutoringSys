@@ -54,6 +54,14 @@ public class StudentGradingController {
         return Result.success(detail);
     }
 
+    @Operation(summary = "根据作业ID获取批改详情")
+    @GetMapping("/by-assignment/{assignmentId}")
+    public Result<GradingDetailVO> getGradingDetailByAssignment(@PathVariable Long assignmentId) {
+        Long studentId = SecurityUtil.getCurrentUserId(userService);
+        GradingDetailVO detail = studentGradingService.getGradingDetailByAssignment(studentId, assignmentId);
+        return Result.success(detail);
+    }
+
     @Operation(summary = "重新触发自动批改")
     @PostMapping("/{submissionId}/regrade")
     public Result<Void> retriggerGrading(@PathVariable Long submissionId) {
