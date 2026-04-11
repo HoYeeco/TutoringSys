@@ -352,11 +352,15 @@ const handleLogin = async () => {
 
   loading.value = true;
   try {
-    const formData = new FormData();
-    formData.append('username', username.value);
-    formData.append('password', password.value);
+    const params = new URLSearchParams();
+    params.append('username', username.value);
+    params.append('password', password.value);
 
-    const response = await request.post('/auth/login', formData);
+    const response = await request.post('/auth/login', params, {
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+    });
 
     if (response.code === 200) {
       userStore.setToken(response.data.token);
