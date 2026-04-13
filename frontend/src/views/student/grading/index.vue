@@ -117,7 +117,7 @@
         <el-table-column prop="assignmentCount" label="作业数" width="100" align="center" />
         <el-table-column prop="averageScore" label="平均分" width="100" align="center">
           <template #default="{ row }">
-            <span :class="getScoreClass(row.averageScore)">{{ row.averageScore }}</span>
+            <span class="score-average">{{ row.averageScore }}</span>
           </template>
         </el-table-column>
         <el-table-column prop="highestScore" label="最高分" width="100" align="center">
@@ -132,7 +132,7 @@
         </el-table-column>
         <el-table-column prop="latestScore" label="最近得分" width="100" align="center">
           <template #default="{ row }">
-            <span :class="getScoreClass(row.latestScore)">{{ row.latestScore || '-' }}</span>
+            <span class="score-latest">{{ row.latestScore || '-' }}</span>
           </template>
         </el-table-column>
       </el-table>
@@ -437,7 +437,13 @@ const updateBarChart = () => {
       axisLine: { lineStyle: { color: '#dcdfe6' } },
       axisLabel: { 
         color: '#606266',
-        rotate: xData.length > 4 ? 30 : 0,
+        interval: 0,
+        formatter: function(value: string) {
+          if (value.length > 10) {
+            return value.substring(0, 10) + '...';
+          }
+          return value;
+        },
       },
     },
     yAxis: {
@@ -505,9 +511,9 @@ watch(filterCourse, () => {
   });
 });
 
-onMounted(() => {
-  getCourses();
-  getGrades();
+onMounted(async () => {
+  await getCourses();
+  await getGrades();
   window.addEventListener('resize', handleResize);
 });
 
@@ -584,15 +590,18 @@ onUnmounted(() => {
 .filter-bar {
   display: flex;
   gap: 16px;
-  flex-wrap: wrap;
+  align-items: center;
 }
 
 .filter-item {
-  min-width: 180px;
+  flex: 1;
+  min-width: 0;
 }
 
 .date-picker {
-  width: 280px;
+  flex: 1;
+  min-width: 0;
+  width: auto;
 }
 
 .stats-overview {
@@ -722,6 +731,16 @@ onUnmounted(() => {
 
 .score-low {
   color: #f56c6c;
+  font-weight: 600;
+}
+
+.score-average {
+  color: #409eff;
+  font-weight: 600;
+}
+
+.score-latest {
+  color: #e6a23c;
   font-weight: 600;
 }
 
