@@ -346,7 +346,7 @@ const getDistance = (p1: any, p2: any) => {
 // 登录处理函数
 const handleLogin = async () => {
   if (!username.value || !password.value) {
-    ElMessage.warning('请输入用户名和密码');
+    ElMessage.warning('请输入账号或密码');
     return;
   }
 
@@ -368,11 +368,11 @@ const handleLogin = async () => {
       ElMessage.success('登录成功');
       router.push('/dashboard');
     } else {
-      ElMessage.error('登录失败，请检查用户名和密码');
+      ElMessage.error('账号或密码错误');
     }
   } catch (error) {
     console.error('登录错误:', error);
-    ElMessage.error('登录失败，请检查用户名和密码');
+    ElMessage.error('账号或密码错误');
   } finally {
     loading.value = false;
   }

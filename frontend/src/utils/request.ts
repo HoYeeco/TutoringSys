@@ -34,9 +34,7 @@ service.interceptors.response.use(
   },
   (error) => {
     if (error.response?.status === 401) {
-      if (error.config?.url?.includes('/auth/login')) {
-        ElMessage.error(error.response?.data?.message || '用户名或密码错误');
-      } else {
+      if (!error.config?.url?.includes('/auth/login')) {
         const userStore = useUserStore();
         userStore.logout();
         router.push('/login');
