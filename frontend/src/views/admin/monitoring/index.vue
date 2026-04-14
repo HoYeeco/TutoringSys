@@ -118,7 +118,7 @@
           <div class="performance-section">
             <h4 class="sub-section-title">API 统计</h4>
             <div class="chart-container">
-              <div ref="apiStatsChartRef" class="chart" style="height: 350px"></div>
+              <div ref="apiStatsChartRef" class="chart" style="height: 350px; width: 100%;"></div>
             </div>
 
             <h4 class="sub-section-title">大模型监控</h4>
@@ -472,110 +472,134 @@ const getRedisStats = async () => {
 
 const initApiStatsChart = async () => {
   try {
-    if (apiStatsChartRef.value && apiStatsChartRef.value.clientWidth > 0) {
-      if (apiStatsChart) {
-        apiStatsChart.dispose();
-      }
-      apiStatsChart = echarts.init(apiStatsChartRef.value);
+    console.log('开始初始化 API 统计图表...');
+    if (!apiStatsChartRef.value) {
+      console.error('图表容器 ref 为空');
+      return;
+    }
+    console.log('图表容器宽度:', apiStatsChartRef.value.clientWidth);
+    
+    if (apiStatsChartRef.value.clientWidth === 0) {
+      console.warn('图表容器宽度为 0，延迟重试...');
+      setTimeout(initApiStatsChart, 500);
+      return;
+    }
+    
+    if (apiStatsChart) {
+      apiStatsChart.dispose();
+    }
+    apiStatsChart = echarts.init(apiStatsChartRef.value);
+    
+    // 获取最近 30 天的所有审计日志
+    const response = await request.get('/admin/monitor/audit-logs', {
+      params: { page: 1, size: 10000 },
+    });
+    
+    const logs = response.data?.records || [];
+    console.log('获取到的审计日志数量:', logs.length);
+    if (logs.length > 0) {
+      console.log('第一条日志的 operationTime:', logs[0].operationTime);
+    }
+    
+    const last10Days: string[] = [];
+    const callCounts: number[] = [];
+    
+    for (let i = 9; i >= 0; i--) {
+      const date = new Date();
+      date.setDate(date.getDate() - i);
+      const dateStr = `${date.getMonth() + 1}/${date.getDate()}`;
+      last10Days.push(dateStr);
       
-      // 获取最近 30 天的所有审计日志
-      const response = await request.get('/admin/monitor/audit-logs', {
-        params: { page: 1, size: 10000 },
-      });
+      const dayStart = new Date(date);
+      dayStart.setHours(0, 0, 0, 0);
+      const dayEnd = new Date(date);
+      dayEnd.setHours(23, 59, 59, 999);
       
-      const logs = response.data?.records || [];
-      console.log('获取到的审计日志数量:', logs.length);
-      if (logs.length > 0) {
-        console.log('第一条日志的 operationTime:', logs[0].operationTime);
-      }
-      
-      const last10Days: string[] = [];
-      const callCounts: number[] = [];
-      
-      for (let i = 9; i >= 0; i--) {
-        const date = new Date();
-        date.setDate(date.getDate() - i);
-        const dateStr = `${date.getMonth() + 1}/${date.getDate()}`;
-        last10Days.push(dateStr);
-        
-        const dayStart = new Date(date);
-        dayStart.setHours(0, 0, 0, 0);
-        const dayEnd = new Date(date);
-        dayEnd.setHours(23, 59, 59, 999);
-        
-        const count = logs.filter((log: any) => {
-          if (!log.operationTime) return false;
-          // 尝试多种日期格式解析
-          let logTime: Date;
+      const count = logs.filter((log: any) => {
+        if (!log.operationTime) return false;
+        let logTime: Date;
+        try {
           if (typeof log.operationTime === 'string') {
-            // 如果是字符串，直接解析
             logTime = new Date(log.operationTime);
           } else if (Array.isArray(log.operationTime)) {
-            // 如果是数组 [year, month, day, hour, minute, second]
             const [year, month, day, hour = 0, minute = 0, second = 0] = log.operationTime;
             logTime = new Date(year, month - 1, day, hour, minute, second);
           } else {
-            // 其他情况
             logTime = new Date(log.operationTime);
           }
-          return logTime >= dayStart && logTime <= dayEnd;
-        }).length;
-        
-        callCounts.push(count);
-      }
-      
-      console.log('最近 10 天统计:', last10Days, callCounts);
-      
-      const option = {
-        tooltip: {
-          trigger: 'axis',
-          axisPointer: {
-            type: 'shadow'
+          
+          if (isNaN(logTime.getTime())) {
+            return false;
           }
-        },
-        grid: {
-          left: '3%',
-          right: '4%',
-          bottom: '3%',
-          containLabel: true
-        },
-        xAxis: {
-          type: 'category',
-          data: last10Days,
+        } catch (e) {
+          return false;
+        }
+        
+        return logTime >= dayStart && logTime <= dayEnd;
+      }).length;
+      
+      callCounts.push(count);
+      
+      console.log(`Day ${i} (${dateStr}): ${count} calls`);
+    }
+    
+    console.log('最近 10 天统计:', last10Days, callCounts);
+    
+    console.log('=== 图表数据 ===');
+    console.log('日期标签:', last10Days);
+    console.log('调用次数:', callCounts);
+    console.log('总调用数:', callCounts.reduce((a, b) => a + b, 0));
+    
+    const option = {
+      tooltip: {
+        trigger: 'axis',
+        axisPointer: {
+          type: 'shadow'
+        }
+      },
+      grid: {
+        left: '3%',
+        right: '4%',
+        bottom: '3%',
+        containLabel: true
+      },
+      xAxis: {
+        type: 'category',
+        data: last10Days,
+        axisLabel: {
+          fontSize: 12
+        }
+      },
+      yAxis: [
+        {
+          type: 'value',
+          name: '调用次数',
+          position: 'left',
           axisLabel: {
             fontSize: 12
           }
-        },
-        yAxis: [
-          {
-            type: 'value',
-            name: '调用次数',
-            position: 'left',
-            axisLabel: {
-              fontSize: 12
-            }
+        }
+      ],
+      series: [
+        {
+          name: '调用次数',
+          type: 'bar',
+          data: callCounts,
+          itemStyle: {
+            color: '#409eff'
+          },
+          label: {
+            show: true,
+            position: 'top',
+            fontSize: 12
           }
-        ],
-        series: [
-          {
-            name: '调用次数',
-            type: 'bar',
-            data: callCounts,
-            itemStyle: {
-              color: '#409eff'
-            },
-            label: {
-              show: true,
-              position: 'top',
-              fontSize: 12
-            }
-          }
-        ]
-      };
-      apiStatsChart.setOption(option);
-    }
+        }
+      ]
+    };
+    apiStatsChart.setOption(option);
+    console.log('图表初始化完成');
   } catch (error) {
-    console.error('初始化API统计图表失败:', error);
+    console.error('初始化 API 统计图表失败:', error);
   }
 };
 
@@ -629,13 +653,16 @@ onMounted(() => {
 });
 
 watch(activeTab, (newVal) => {
+  console.log('标签页切换:', newVal);
   if (newVal === 'performance') {
+    console.log('开始初始化性能监控...');
     nextTick(() => {
       setTimeout(() => {
+        console.log('执行 initApiStatsChart...');
         initApiStatsChart();
         getLlmStats();
         getRedisStats();
-      }, 100);
+      }, 300);
     });
   } else if (newVal === 'logs') {
     getOperationLogs();
