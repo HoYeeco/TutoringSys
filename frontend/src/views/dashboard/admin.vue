@@ -100,11 +100,11 @@
           <div class="llm-stats">
             <div class="llm-stat-item">
               <div class="stat-label">Token 消耗</div>
-              <div class="stat-value">{{ llmStats.tokenConsumption }}</div>
+              <div class="stat-value">{{ formatNumber(llmStats.totalTokens || 0) }}</div>
             </div>
             <div class="llm-stat-item">
               <div class="stat-label">调用失败记录</div>
-              <div class="stat-value">{{ llmStats.failureCount }}</div>
+              <div class="stat-value">{{ llmStats.failedCalls || 0 }}</div>
             </div>
           </div>
         </el-card>
@@ -116,11 +116,11 @@
           <div class="redis-stats">
             <div class="redis-stat-item">
               <div class="stat-label">缓存命中率</div>
-              <div class="stat-value">{{ redisStats.hitRate }}%</div>
+              <div class="stat-value">{{ redisStats.hitRate || 0 }}%</div>
             </div>
             <div class="redis-stat-item">
               <div class="stat-label">内存使用</div>
-              <div class="stat-value">{{ redisStats.memoryUsage }}</div>
+              <div class="stat-value">{{ redisStats.usedMemoryHuman || '-' }}</div>
             </div>
           </div>
         </el-card>
@@ -171,8 +171,8 @@ const adminStats = ref({
 
 const recentLogs = ref([]);
 
-const llmStats = ref({ tokenConsumption: 0, failureCount: 0 });
-const redisStats = ref({ hitRate: 0, memoryUsage: '' });
+const llmStats = ref({ totalTokens: 0, failedCalls: 0 });
+const redisStats = ref({ hitRate: 0, usedMemoryHuman: '' });
 
 const adminBarChartRef = ref(null);
 const userTypeChartRef = ref(null);
@@ -187,6 +187,11 @@ const getGreeting = () => {
   if (hour >= 11 && hour < 13) return '中午好';
   if (hour >= 13 && hour < 19) return '下午好';
   return '晚上好';
+};
+
+const formatNumber = (num: number): string => {
+  if (num === undefined || num === null) return '0';
+  return num.toLocaleString('zh-CN');
 };
 
 const getAdminStats = async () => {
@@ -222,13 +227,13 @@ const getMonitoringData = async () => {
     const [llmRes, redisRes] = await Promise.all([
       request
         .get('/admin/monitor/llm')
-        .catch(() => ({ data: { tokenConsumption: 0, failureCount: 0 } })),
+        .catch(() => ({ data: { totalTokens: 0, failedCalls: 0 } })),
       request
         .get('/admin/monitor/redis')
-        .catch(() => ({ data: { hitRate: 0, memoryUsage: '' } })),
+        .catch(() => ({ data: { hitRate: 0, usedMemoryHuman: '' } })),
     ]);
-    llmStats.value = llmRes.data || { tokenConsumption: 0, failureCount: 0 };
-    redisStats.value = redisRes.data || { hitRate: 0, memoryUsage: '' };
+    llmStats.value = llmRes.data || { totalTokens: 0, failedCalls: 0 };
+    redisStats.value = redisRes.data || { hitRate: 0, usedMemoryHuman: '' };
   } catch (error) {
     console.error('获取监控数据失败:', error);
   }
