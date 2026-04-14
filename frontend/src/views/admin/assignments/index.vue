@@ -61,7 +61,7 @@
         :cell-style="{ textAlign: 'center' }"
         :header-cell-style="{ textAlign: 'center' }"
       >
-        <el-table-column prop="title" label="作业名称" min-width="180">
+        <el-table-column prop="title" label="作业名称" min-width="150">
           <template #default="scope">
             <el-tooltip
               :content="scope.row.title"
@@ -87,7 +87,7 @@
             </el-tooltip>
           </template>
         </el-table-column>
-        <el-table-column prop="teacherName" label="负责教师" width="120">
+        <el-table-column prop="teacherName" label="负责教师" width="100">
           <template #default="scope">
             <div class="teacher-info">
               <el-avatar :size="20" :src="scope.row.teacherAvatar || ''">
@@ -97,8 +97,8 @@
             </div>
           </template>
         </el-table-column>
-        <el-table-column prop="totalScore" label="总分值" width="100" />
-        <el-table-column prop="description" label="作业描述" min-width="180">
+        <el-table-column prop="totalScore" label="总分值" width="90" />
+        <el-table-column prop="description" label="作业描述" min-width="170">
           <template #default="scope">
             <span
               v-if="!scope.row.description || !scope.row.description.trim() || scope.row.description === 'null'"
@@ -116,12 +116,12 @@
             </el-tooltip>
           </template>
         </el-table-column>
-        <el-table-column prop="deadline" label="截止时间" width="160">
+        <el-table-column prop="deadline" label="截止时间" width="120">
           <template #default="scope">
             <span>{{ formatDeadline(scope.row.deadline) }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="completion" label="完成情况" width="120">
+        <el-table-column prop="completion" label="完成情况" width="100">
           <template #default="scope">
             <div class="completion-info">
               <span>
