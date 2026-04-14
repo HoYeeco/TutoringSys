@@ -52,7 +52,7 @@ file:
   allowed-image-types: jpg,jpeg,png,gif,webp,bmp
 
 llm:
-  api-key: ${QWEN_API_KEY:}
+  api-key: sk-cc84c3c6b39a4c119f1af4c9536ae6fc
   model: ${QWEN_MODEL:qwen-max}
   timeout: 30000
   retry: 3
