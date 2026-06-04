@@ -319,7 +319,7 @@ public class StudentErrorBookServiceImpl implements StudentErrorBookService {
             throw new BusinessException("无权操作该记录");
         }
 
-        errorBook.setStatus(0);
+        errorBook.setStatus(2);
         errorBookMapper.updateById(errorBook);
     }
 
