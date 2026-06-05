@@ -19,10 +19,7 @@
               />
             </el-select>
             <el-select v-model="filterForm.status" placeholder="复核状态" class="filter-item" clearable @change="handleFilterChange">
-              <el-option label="待批改" value="pending" />
-              <el-option label="批改中" value="grading" />
               <el-option label="待复核" value="review_pending" />
-              <el-option label="已自动批改" value="auto_graded" />
               <el-option label="已复核" value="reviewed" />
             </el-select>
             <el-input
