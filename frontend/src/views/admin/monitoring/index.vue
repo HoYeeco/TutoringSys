@@ -46,11 +46,9 @@
               </el-form-item>
               <el-form-item label="批改状态">
                 <el-select v-model="assignmentFilter.status" placeholder="选择状态" clearable @change="handleFilterChange">
-                  <el-option label="待提交" value="0" />
-                  <el-option label="已提交" value="1" />
-                  <el-option label="批改中" value="2" />
-                  <el-option label="已完成" value="3" />
-                  <el-option label="批改失败" value="4" />
+                  <el-option label="待批改" value="pending" />
+                  <el-option label="已批改" value="completed" />
+                  <el-option label="异常" value="error" />
                 </el-select>
               </el-form-item>
               <el-form-item>
@@ -80,19 +78,15 @@
               <template #default="scope">
                 <el-tag
                   :type="{
-                    0: 'info',
-                    1: 'warning',
-                    2: 'primary',
-                    3: 'success',
-                    4: 'danger'
+                    pending: 'warning',
+                    completed: 'success',
+                    error: 'danger'
                   }[scope.row.status]"
                 >
                   {{ {
-                    0: '待提交',
-                    1: '已提交',
-                    2: '批改中',
-                    3: '已完成',
-                    4: '批改失败'
+                    pending: '待批改',
+                    completed: '已批改',
+                    error: '异常'
                   }[scope.row.status] }}
                 </el-tag>
               </template>
@@ -352,7 +346,8 @@ const getAssignmentSubmissions = async () => {
       params.courseId = assignmentFilter.value.courseId;
     }
     if (assignmentFilter.value.status) {
-      params.status = parseInt(assignmentFilter.value.status);
+      params.reviewStatus = assignmentFilter.value.status === 'pending' ? 0 : 
+                           assignmentFilter.value.status === 'completed' ? 1 : undefined;
     }
     if (assignmentFilter.value.dateRange && assignmentFilter.value.dateRange.length === 2) {
       const startDate = new Date(assignmentFilter.value.dateRange[0]);
@@ -365,6 +360,8 @@ const getAssignmentSubmissions = async () => {
     assignmentSubmissions.value = (response.data?.records || []).map((item: any) => ({
       ...item,
       assignmentName: item.assignmentTitle,
+      status: item.reviewStatus === 0 ? 'pending' : 
+              item.reviewStatus === 1 ? 'completed' : 'pending',
       llmCallId: item.submissionId || '-',
     }));
     assignmentPage.value.total = response.data?.total || 0;
